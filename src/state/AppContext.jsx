@@ -392,6 +392,21 @@ export function AppProvider({ children }) {
   const togglePush = useCallback(() => setApiConfig((c) => ({ ...c, autoPush: !c.autoPush })), []);
   const togglePull = useCallback(() => setApiConfig((c) => ({ ...c, autoPull: !c.autoPull })), []);
   const toggleShowKey = useCallback(() => setApiShowKey((v) => !v), []);
+  // Generates a random, unique scanner API key on-device. The key itself
+  // proves nothing to the backend by itself — it still has to be registered
+  // there (per country/warehouse) before the server will accept it — this
+  // just saves typing/inventing one by hand and reveals it so it can be
+  // copied out and handed to whoever manages the WMS backend.
+  const generateApiKey = useCallback(() => {
+    const bytes = new Uint8Array(24);
+    crypto.getRandomValues(bytes);
+    const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+    const key = `whs_${hex}`;
+    setApiConfig((c) => ({ ...c, apiKey: key }));
+    setApiShowKey(true);
+    showToast('New key generated — register it with the WMS backend, then save');
+    return key;
+  }, [showToast]);
 
   const pullManifestNow = useCallback(async () => {
     if (!apiConfig.autoPull) { showToast('Enable "Receive expected manifest" first'); return; }
@@ -447,7 +462,7 @@ export function AppProvider({ children }) {
     signatureDataUrl, setSignatureDataUrl, sigInk, setSigInk, clearSignature, signReady, toSign, finish,
     confirmedDoc, printDocument, emailDocument,
     history, historyQuery, setHistoryQuery, historyFilter, setHistoryFilter, selectedDocNo, openSession, backToHistory,
-    apiConfig, apiShowKey, setApiBaseUrl, setApiKey, togglePush, togglePull, toggleShowKey,
+    apiConfig, apiShowKey, setApiBaseUrl, setApiKey, generateApiKey, togglePush, togglePull, toggleShowKey,
     manifest, pulling, pullManifestNow, syncing, syncNow, retrySync,
     orgSettings, updateOrgSettings,
     viewingPhoto, openPhoto, closePhoto,
@@ -461,7 +476,7 @@ export function AppProvider({ children }) {
     damageSheet, openDamage, closeDamage, toggleDamageType, setDamageNote, setDamagePhoto, saveDamage,
     courierName, plate, agreed, toggleAgree, signatureDataUrl, sigInk, clearSignature, signReady, toSign, finish,
     confirmedDoc, printDocument, emailDocument, history, historyQuery, historyFilter, selectedDocNo, openSession, backToHistory,
-    apiConfig, apiShowKey, setApiBaseUrl, setApiKey, togglePush, togglePull, toggleShowKey,
+    apiConfig, apiShowKey, setApiBaseUrl, setApiKey, generateApiKey, togglePush, togglePull, toggleShowKey,
     manifest, pulling, pullManifestNow, syncing, syncNow, retrySync,
     orgSettings, updateOrgSettings, viewingPhoto, openPhoto, closePhoto,
     updateInfo, updateDismissed, checkUpdateNow, dismissUpdate, downloadUpdate, toast, showToast,
