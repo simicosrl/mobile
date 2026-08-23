@@ -1,6 +1,6 @@
 {
-  "versionCode": 11,
-  "versionName": "1.0.11",
+  "versionCode": 12,
+  "versionName": "1.0.12",
   "apkUrl": "https://raw.githubusercontent.com/simicosrl/mobile/main/SIMICO-Warehouse-Scan-debug.apk",
-  "commit": "6c32f185f1c6f6d9f242b02f9083d5c51c6d45f0"
+  "commit": "893c47aa0e5a027c5f9ec8cf458928a280ced005"
 }
