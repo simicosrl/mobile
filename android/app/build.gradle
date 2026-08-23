@@ -7,13 +7,28 @@ android {
         applicationId "com.simico.warehousescan"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        // Auto-incremented per CI build so each new APK is a clean, ordered
+        // update over the last one; defaults to 1 for local builds.
+        versionCode (System.getenv("GITHUB_RUN_NUMBER") as Integer ?: 1)
+        versionName "1.0." + (System.getenv("GITHUB_RUN_NUMBER") ?: "0")
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
              // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+    }
+    // Pinned so every CI build is signed with the same key — otherwise each
+    // GitHub Actions run generates a fresh random debug keystore, Android
+    // treats each APK as a different app, and every install needs an
+    // uninstall first. With a stable key, installing a new build over the
+    // old one is a normal in-place update (app data/settings preserved).
+    signingConfigs {
+        debug {
+            storeFile file("../simico-debug.keystore")
+            storePassword "simicowarehouse"
+            keyAlias "simico-debug"
+            keyPassword "simicowarehouse"
         }
     }
     buildTypes {
