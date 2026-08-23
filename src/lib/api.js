@@ -6,7 +6,7 @@
 // Retry re-sends).
 
 export const ENDPOINTS = [
-  { method: 'POST', path: '/warehouse/sessions', note: 'Sends a confirmed document: header, parcel list, damages, signature (base64 PNG).' },
+  { method: 'POST', path: '/warehouse/sessions', note: 'Sends a confirmed document: header, parcel list, damage photos, signature and the rendered handover PDF (all base64).' },
   { method: 'GET', path: '/warehouse/manifest?date=today', note: 'Returns the tracking IDs expected for the day, per carrier.' },
   { method: 'POST', path: '/warehouse/parcels/{id}/damage', note: 'Pushes a damage record and its photo the moment it is captured.' },
   { method: 'GET', path: '/warehouse/sessions/{doc}/pdf', note: 'Pulls back the archived PDF the ERP generated for a document.' },
@@ -60,9 +60,16 @@ export function sessionToPayload(document) {
       tracking: p.code,
       boxes: p.boxes,
       expected: p.expected ?? null,
-      damage: p.damage ? { type: p.damage, photo: p.photo || null } : null,
+      // p.photo is just a locally-generated filename label (IMG_x_y.jpg) —
+      // the actual image bytes live in p.photoDataUrl. Sending the filename
+      // here silently shipped documents with no real photo attached.
+      damage: p.damage ? { type: p.damage, photo: p.photoDataUrl || null } : null,
     })),
     signature: document.signatureDataUrl || null,
+    // Base64 PDF of the exact handover document the app renders on-device,
+    // so the portal can show/store the same file the operator would print —
+    // rather than having to re-derive its own from the structured fields.
+    pdf: document.pdfDataUrl || null,
   };
 }
 
@@ -139,9 +146,10 @@ export const PAYLOAD_SAMPLE = JSON.stringify(
     closed_at: '2026-08-23T09:41:00+02:00',
     parcels: [
       { tracking: 'JJD014600011234567890', boxes: 1, expected: true, damage: null },
-      { tracking: 'TBA303120456789', boxes: 2, expected: false, damage: { type: 'Seal broken', photo: 'IMG_0442.jpg' } },
+      { tracking: 'TBA303120456789', boxes: 2, expected: false, damage: { type: 'Seal broken', photo: 'data:image/jpeg;base64,/9j/4AAQ…' } },
     ],
     signature: 'data:image/png;base64,iVBORw0…',
+    pdf: 'data:application/pdf;base64,JVBERi0…',
   },
   null,
   2,

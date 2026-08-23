@@ -319,6 +319,20 @@ export function AppProvider({ children }) {
 
   const signReady = courierName.trim().length > 1 && sigInk && agreed;
 
+  // Renders the exact same A4 handover PDF the app can print/share, as a
+  // base64 data URL, to attach to the outgoing session payload — so the ERP
+  // gets the real document instead of having to re-derive its own from the
+  // structured fields. Non-fatal: the session still sends without it if
+  // rendering fails for some reason.
+  const renderPdfDataUrl = useCallback(async (document) => {
+    try {
+      const mod = await import('../lib/pdfDoc');
+      return mod.buildHandoverPdf(document, orgSettings).output('datauristring');
+    } catch {
+      return null;
+    }
+  }, [orgSettings]);
+
   const finish = useCallback(async () => {
     if (!signReady) { showToast('Name, signature and confirmation are required'); return; }
     const now2 = new Date();
@@ -348,7 +362,8 @@ export function AppProvider({ children }) {
     setScreen('confirm');
 
     if (apiConfig.autoPush) {
-      const res = await api.pushSession(apiConfig, document);
+      const pdfDataUrl = await renderPdfDataUrl(document);
+      const res = await api.pushSession(apiConfig, { ...document, pdfDataUrl });
       const syncError = res.ok ? null : api.describeError(res);
       const updated = { ...document, syncStatus: res.ok ? 'ok' : 'failed', syncError };
       await docPut(updated);
@@ -356,7 +371,7 @@ export function AppProvider({ children }) {
       setConfirmedDoc((c) => (c && c.doc === doc ? updated : c));
       showToast(res.ok ? `${doc} sent to the ERP` : `${doc} failed to send — ${syncError}`);
     }
-  }, [signReady, direction, docSeq, carrier, courierCompany, shipment, courierName, plate, shift, parcels, signatureDataUrl, apiConfig, showToast]);
+  }, [signReady, direction, docSeq, carrier, courierCompany, shipment, courierName, plate, shift, parcels, signatureDataUrl, apiConfig, showToast, renderPdfDataUrl]);
 
   // ---- document export ----
   const printDocument = useCallback(async (document) => {
@@ -429,7 +444,8 @@ export function AppProvider({ children }) {
     let failCount = 0;
     let lastError = null;
     for (const d of pending) {
-      const res = await api.pushSession(apiConfig, d);
+      const pdfDataUrl = await renderPdfDataUrl(d);
+      const res = await api.pushSession(apiConfig, { ...d, pdfDataUrl });
       const syncError = res.ok ? null : api.describeError(res);
       if (res.ok) okCount++; else { failCount++; lastError = syncError; }
       const updated = { ...d, syncStatus: res.ok ? 'ok' : 'failed', syncError };
@@ -442,18 +458,19 @@ export function AppProvider({ children }) {
         : failCount ? `${okCount} sent · ${failCount} failed — ${lastError}`
         : `${okCount} sent`
     );
-  }, [apiConfig, history, showToast]);
+  }, [apiConfig, history, showToast, renderPdfDataUrl]);
 
   const retrySync = useCallback(async (doc) => {
     const d = history.find((x) => x.doc === doc);
     if (!d) return;
-    const res = await api.pushSession(apiConfig, d);
+    const pdfDataUrl = await renderPdfDataUrl(d);
+    const res = await api.pushSession(apiConfig, { ...d, pdfDataUrl });
     const syncError = res.ok ? null : api.describeError(res);
     const updated = { ...d, syncStatus: res.ok ? 'ok' : 'failed', syncError };
     await docPut(updated);
     setHistory((h) => h.map((x) => (x.doc === doc ? updated : x)));
     showToast(res.ok ? `${doc} sent` : `${doc} failed — ${syncError}`);
-  }, [apiConfig, history, showToast]);
+  }, [apiConfig, history, showToast, renderPdfDataUrl]);
 
   const value = useMemo(() => ({
     ready, now,
