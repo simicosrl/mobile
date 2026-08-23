@@ -49,6 +49,13 @@ export const SEED_DOCUMENTS = [
   },
 ];
 
+// Badges known out of the box (badge id -> operator name), merged into the
+// on-device badgeNames map on first load. Scanning one of these logs in
+// immediately instead of asking for a name the first time.
+export const DEFAULT_BADGE_NAMES = {
+  'BADGE-IONUT': 'Staicu Ionut',
+};
+
 // Tracking IDs a fresh demo manifest pull returns before an ERP is wired up.
 export const DEMO_MANIFEST = SEED_DOCUMENTS.flatMap((d) => d.parcels.map((p) => p.code)).concat([
   'FBA15KQ8N7X2003', 'JJD014600011234569001', 'GLS83920175330', '1Z999AA10123457099',

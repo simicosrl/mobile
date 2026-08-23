@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { docsGetAll, docPut, kvGet, kvSet } from '../lib/db';
-import { SEED_DOCUMENTS, DEMO_MANIFEST } from '../lib/seed';
+import { SEED_DOCUMENTS, DEMO_MANIFEST, DEFAULT_BADGE_NAMES } from '../lib/seed';
 import { DAMAGE_TYPES } from '../lib/carriers';
 import { hhmm, stamp, docNumber } from '../lib/format';
 import { feedback } from '../lib/audio';
@@ -80,6 +80,9 @@ export function AppProvider({ children }) {
       if (!manifestState.codes.length) {
         manifestState = { codes: DEMO_MANIFEST, lastPulledAt: null };
       }
+      const savedBadgeNames = (await kvGet('badgeNames', {})) || {};
+      const mergedBadgeNames = { ...DEFAULT_BADGE_NAMES, ...savedBadgeNames };
+      await kvSet('badgeNames', mergedBadgeNames);
       setHistory(docList.slice().sort((a, b) => (a.closedAtIso < b.closedAtIso ? 1 : -1)));
       setApiConfig(savedApi);
       setManifest(manifestState);
