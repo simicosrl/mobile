@@ -1,74 +1,60 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
+import { Capacitor } from '@capacitor/core';
+import { BarcodeScanner, BarcodeFormat } from '@capacitor-mlkit/barcode-scanning';
 
-// Camera-based fallback scanning for phones/tablets with no hardware
-// scan engine or Bluetooth ring scanner attached. Uses the native
-// BarcodeDetector API (shipped in Chrome/Android WebView) — no extra
-// dependency, no bundled barcode library. When it isn't available the
-// caller should fall back to manual entry (see components/ScanField.jsx).
-export function isBarcodeDetectionSupported() {
-  return typeof window !== 'undefined' && 'BarcodeDetector' in window;
+// Camera-based fallback scanning for phones/tablets with no hardware scan
+// engine or Bluetooth ring scanner attached. Uses the native ML Kit barcode
+// scanner plugin's ready-made scan() UI (Google's own full-screen scanner —
+// no camera permission prompt needed on Android, no custom overlay to
+// build) rather than the web BarcodeDetector/getUserMedia APIs, which are
+// unreliable specifically inside an Android WebView (they work in a real
+// browser tab but the camera commonly never opens in an embedded WebView
+// without extra native permission-bridging that a default Capacitor
+// activity doesn't provide).
+const FORMATS = [
+  BarcodeFormat.Code128,
+  BarcodeFormat.Code39,
+  BarcodeFormat.Code93,
+  BarcodeFormat.Ean13,
+  BarcodeFormat.Ean8,
+  BarcodeFormat.UpcA,
+  BarcodeFormat.UpcE,
+  BarcodeFormat.QrCode,
+  BarcodeFormat.Itf,
+  BarcodeFormat.DataMatrix,
+];
+
+export function isCameraScanSupported() {
+  return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
 }
 
-export function useBarcodeScanner(onDetect) {
-  const videoRef = useRef(null);
-  const streamRef = useRef(null);
-  const detectorRef = useRef(null);
-  const rafRef = useRef(null);
-  const [active, setActive] = useState(false);
+export function useBarcodeScanner() {
+  const [scanning, setScanning] = useState(false);
   const [error, setError] = useState(null);
 
-  const stop = useCallback(() => {
-    if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    rafRef.current = null;
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
+  const scan = useCallback(async () => {
+    if (!isCameraScanSupported()) {
+      setError('Camera scanning is only available in the installed app, not this preview.');
+      return null;
     }
-    setActive(false);
+    setError(null);
+    setScanning(true);
+    try {
+      const { available } = await BarcodeScanner.isGoogleBarcodeScannerModuleAvailable();
+      if (!available) {
+        await BarcodeScanner.installGoogleBarcodeScannerModule();
+      }
+      const result = await BarcodeScanner.scan({ formats: FORMATS });
+      const hit = result.barcodes && result.barcodes[0];
+      if (!hit) return null;
+      return hit.rawValue || hit.displayValue || null;
+    } catch (err) {
+      setError(err?.message || 'Could not open the camera scanner');
+      return null;
+    } finally {
+      setScanning(false);
+    }
   }, []);
 
-  const start = useCallback(async () => {
-    setError(null);
-    if (!isBarcodeDetectionSupported()) {
-      setError('Camera scanning is not supported on this device — enter the code manually.');
-      return;
-    }
-    try {
-      if (!detectorRef.current) {
-        const formats = ['code_128', 'code_39', 'ean_13', 'ean_8', 'upc_a', 'upc_e', 'qr_code', 'itf', 'data_matrix'];
-        // eslint-disable-next-line no-undef
-        detectorRef.current = new window.BarcodeDetector({ formats });
-      }
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
-      });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      }
-      setActive(true);
-      const tick = async () => {
-        if (!videoRef.current || !detectorRef.current) return;
-        try {
-          const codes = await detectorRef.current.detect(videoRef.current);
-          if (codes && codes.length) {
-            onDetect(codes[0].rawValue);
-            stop();
-            return;
-          }
-        } catch {
-          /* transient decode error — keep scanning */
-        }
-        rafRef.current = requestAnimationFrame(tick);
-      };
-      rafRef.current = requestAnimationFrame(tick);
-    } catch (err) {
-      setError(err?.message || 'Could not access the camera');
-    }
-  }, [onDetect, stop]);
-
-  useEffect(() => () => stop(), [stop]);
-
-  return { videoRef, active, error, start, stop };
+  return { scan, scanning, error };
 }

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useApp } from '../state/AppContext';
 import { docNumber, elapsedLabel } from '../lib/format';
 import { Check, TriangleAlert, ScanLine, Trash2, PenLine, Camera } from '../components/icons';
-import { useBarcodeScanner, isBarcodeDetectionSupported } from '../hooks/useBarcodeScanner';
+import { useBarcodeScanner, isCameraScanSupported } from '../hooks/useBarcodeScanner';
 
 export default function Scan() {
   const app = useApp();
@@ -14,30 +14,24 @@ export default function Scan() {
   const nextDoc = docNumber(direction, docSeq[direction]);
   const last = parcels.length ? parcels[parcels.length - 1] : null;
   const [buffer, setBuffer] = useState('');
-  const [cameraOpen, setCameraOpen] = useState(false);
   const inputRef = useRef(null);
-
-  const scanner = useBarcodeScanner((code) => {
-    submitScan(code);
-    setCameraOpen(false);
-  });
+  const { scan, scanning, error: scanError } = useBarcodeScanner();
 
   useEffect(() => {
     const refocus = () => {
-      if (!cameraOpen && inputRef.current && document.activeElement !== inputRef.current) {
+      if (!scanning && inputRef.current && document.activeElement !== inputRef.current) {
         try { inputRef.current.focus({ preventScroll: true }); } catch { /* ignore */ }
       }
     };
     refocus();
     const t = setInterval(refocus, 400);
     return () => clearInterval(t);
-  }, [cameraOpen, parcels.length]);
+  }, [scanning, parcels.length]);
 
-  useEffect(() => {
-    if (cameraOpen) scanner.start();
-    else scanner.stop();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cameraOpen]);
+  const scanWithCamera = async () => {
+    const code = await scan();
+    if (code) submitScan(code);
+  };
 
   const onKey = (e) => {
     if (e.key === 'Enter') {
@@ -147,9 +141,9 @@ export default function Scan() {
       <div className="rounded-[14px] border border-[rgba(148,163,184,.25)] bg-white p-3">
         <div className="mb-2 flex items-center justify-between">
           <div className="text-[10px] font-bold uppercase tracking-[.08em] text-secondary">Tracking ID · scanner ready</div>
-          {isBarcodeDetectionSupported() && (
-            <button onClick={() => setCameraOpen(true)} className="flex items-center gap-1 text-[10.5px] font-bold text-primary">
-              <Camera size={13} strokeWidth={2} /> Camera
+          {isCameraScanSupported() && (
+            <button onClick={scanWithCamera} disabled={scanning} className="flex items-center gap-1 text-[10.5px] font-bold text-primary disabled:opacity-60">
+              <Camera size={13} strokeWidth={2} /> {scanning ? 'Opening…' : 'Camera'}
             </button>
           )}
         </div>
@@ -161,21 +155,12 @@ export default function Scan() {
           placeholder="waiting for scan…"
           className="min-h-[50px] w-full rounded-xl border-2 border-primary bg-white px-4 font-mono text-[15px] tracking-[.02em] text-ink shadow-focusring"
         />
+        {scanError && <div className="mt-2 text-[11px] text-danger">{scanError}</div>}
       </div>
 
       <button onClick={toSign} className="flex min-h-[56px] w-full items-center justify-center gap-2.5 rounded-xl bg-ink text-[15px] font-extrabold text-white">
         <PenLine size={18} strokeWidth={2} /> Close session &amp; sign
       </button>
-
-      {cameraOpen && (
-        <div className="absolute inset-0 z-30 flex flex-col bg-black">
-          <video ref={scanner.videoRef} className="flex-1 object-cover" playsInline muted />
-          <div className="flex flex-col gap-2 p-4">
-            {scanner.error && <div className="text-center text-sm text-white">{scanner.error}</div>}
-            <button onClick={() => setCameraOpen(false)} className="min-h-[48px] rounded-xl bg-white text-sm font-bold text-ink">Cancel</button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
