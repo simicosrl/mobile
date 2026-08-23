@@ -5,6 +5,7 @@ import { DAMAGE_TYPES } from '../lib/carriers';
 import { hhmm, stamp, docNumber } from '../lib/format';
 import { feedback } from '../lib/audio';
 import * as api from '../lib/api';
+import { checkForUpdate, openDownload } from '../lib/updateCheck';
 
 const AppCtx = createContext(null);
 
@@ -52,6 +53,8 @@ export function AppProvider({ children }) {
   const [docSeq, setDocSeq] = useState({ in: 240, out: 241 });
   const [orgSettings, setOrgSettings] = useState(DEFAULT_ORG_SETTINGS);
   const [viewingPhoto, setViewingPhoto] = useState(null);
+  const [updateInfo, setUpdateInfo] = useState(null); // { available, versionName, apkUrl } | null
+  const [updateDismissed, setUpdateDismissed] = useState(false);
 
   const [now, setNow] = useState(Date.now());
 
@@ -104,6 +107,19 @@ export function AppProvider({ children }) {
   useEffect(() => { if (ready) kvSet('docSeq', docSeq); }, [ready, docSeq]);
   useEffect(() => { if (ready && shift) kvSet('shift', shift); }, [ready, shift]);
   useEffect(() => { if (ready) kvSet('orgSettings', orgSettings); }, [ready, orgSettings]);
+
+  // ---- update check (once per app open) ----
+  useEffect(() => {
+    if (!ready) return;
+    checkForUpdate().then((res) => { if (res.available) setUpdateInfo(res); });
+  }, [ready]);
+  const checkUpdateNow = useCallback(async () => {
+    const res = await checkForUpdate();
+    setUpdateInfo(res.available ? res : null);
+    return res;
+  }, []);
+  const dismissUpdate = useCallback(() => setUpdateDismissed(true), []);
+  const downloadUpdate = useCallback(() => { if (updateInfo?.apkUrl) openDownload(updateInfo.apkUrl); }, [updateInfo]);
 
   const showToast = useCallback((msg) => {
     setToastState(msg);
@@ -386,6 +402,7 @@ export function AppProvider({ children }) {
     manifest, pulling, pullManifestNow, syncing, syncNow, retrySync,
     orgSettings, updateOrgSettings,
     viewingPhoto, openPhoto, closePhoto,
+    updateInfo, updateDismissed, checkUpdateNow, dismissUpdate, downloadUpdate,
     toast, showToast,
     inputRef,
   }), [
@@ -397,7 +414,8 @@ export function AppProvider({ children }) {
     confirmedDoc, printDocument, emailDocument, history, historyQuery, historyFilter, selectedDocNo, openSession, backToHistory,
     apiConfig, apiShowKey, setApiBaseUrl, setApiKey, togglePush, togglePull, toggleShowKey,
     manifest, pulling, pullManifestNow, syncing, syncNow, retrySync,
-    orgSettings, updateOrgSettings, viewingPhoto, openPhoto, closePhoto, toast, showToast,
+    orgSettings, updateOrgSettings, viewingPhoto, openPhoto, closePhoto,
+    updateInfo, updateDismissed, checkUpdateNow, dismissUpdate, downloadUpdate, toast, showToast,
   ]);
 
   return <AppCtx.Provider value={value}>{children}</AppCtx.Provider>;
