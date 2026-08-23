@@ -1,0 +1,8 @@
+{
+  "appId": "com.simico.warehousescan",
+  "appName": "SIMICO Warehouse Scan",
+  "webDir": "dist",
+  "android": {
+    "allowMixedContent": false
+  }
+}
