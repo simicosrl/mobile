@@ -11,6 +11,57 @@
   </head>
   <body>
     <div id="root"></div>
+    <!--
+      Maximally-compatible plain-ES5 safety net: if the module bundle below
+      fails to parse or throws before React ever mounts (e.g. on an older
+      WebView), this still runs and shows something readable instead of a
+      silent blank screen. window.__appBooted is set by src/main.jsx once
+      React actually starts rendering (see components/ErrorBoundary.jsx for
+      the in-React equivalent, which covers crashes after that point).
+    -->
+    <script>
+      window.__bootDiag = { errors: [] };
+      window.addEventListener('error', function (e) {
+        window.__bootDiag.errors.push(
+          (e && e.message ? e.message : 'Unknown error') +
+            ' (' + (e && e.filename ? e.filename : '?') + ':' + (e && e.lineno ? e.lineno : '?') + ')'
+        );
+      });
+      window.addEventListener('unhandledrejection', function (e) {
+        var reason = e && e.reason;
+        window.__bootDiag.errors.push(
+          'Unhandled promise rejection: ' + (reason && reason.message ? reason.message : String(reason))
+        );
+      });
+      setTimeout(function () {
+        if (window.__appBooted) return;
+        var root = document.getElementById('root');
+        if (!root) return;
+        var msgs = window.__bootDiag.errors;
+        var html =
+          '<div style="min-height:100vh;background:#0F172A;color:#fff;font-family:ui-monospace,Menlo,monospace;' +
+          'font-size:12px;padding:16px;box-sizing:border-box">' +
+          '<div style="font-family:Manrope,sans-serif;font-size:16px;font-weight:800;margin-bottom:10px">' +
+          'App failed to start</div>' +
+          '<div style="font-family:Manrope,sans-serif;font-size:12.5px;color:#94A3B8;margin-bottom:14px;line-height:1.5">' +
+          'Please screenshot this screen and send it back.</div>';
+        if (msgs.length) {
+          for (var i = 0; i < msgs.length; i++) {
+            html +=
+              '<div style="background:#1F242D;border-radius:10px;padding:12px;margin-bottom:8px;' +
+              'white-space:pre-wrap;word-break:break-word">' +
+              msgs[i].replace(/</g, '&lt;') +
+              '</div>';
+          }
+        } else {
+          html +=
+            '<div style="background:#1F242D;border-radius:10px;padding:12px">No error was captured — ' +
+            'the app script itself may not have loaded.</div>';
+        }
+        html += '</div>';
+        root.innerHTML = html;
+      }, 4000);
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
