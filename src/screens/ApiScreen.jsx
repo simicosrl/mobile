@@ -12,7 +12,7 @@ function Toggle({ on, onClick }) {
 
 export default function ApiScreen() {
   const {
-    apiConfig, apiShowKey, setApiBaseUrl, setApiKey, togglePush, togglePull, toggleShowKey,
+    apiConfig, apiShowKey, setApiBaseUrl, setApiKey, generateApiKey, togglePush, togglePull, toggleShowKey,
     manifest, pulling, pullManifestNow, syncing, syncNow, retrySync, history,
   } = useApp();
 
@@ -57,12 +57,22 @@ export default function ApiScreen() {
           <input
             value={keyShown}
             onChange={(e) => setApiKey(e.target.value)}
-            placeholder="sk_live_…"
+            placeholder="whs_…"
             className="min-h-12 min-w-0 flex-1 rounded-xl border border-inputborder bg-page px-4 font-mono text-[12.5px] text-ink"
           />
           <button onClick={toggleShowKey} className="min-h-12 w-[52px] flex-none rounded-xl border border-[rgba(148,163,184,.35)] bg-white text-[11px] font-bold text-secondary">
             {apiShowKey ? 'Hide' : 'Show'}
           </button>
+        </div>
+        <button
+          onClick={generateApiKey}
+          className="mt-2 flex min-h-11 w-full items-center justify-center rounded-xl border border-[rgba(31,111,235,.35)] bg-[rgba(31,111,235,.06)] text-[12.5px] font-extrabold text-primary"
+        >
+          Generate new key
+        </button>
+        <div className="mt-1.5 text-[10.5px] leading-snug text-secondary">
+          Generates a random key on this device and saves it here. It only works once someone registers it
+          for this warehouse/country on the WMS backend — copy it (tap Show) and send it over.
         </div>
       </div>
 
