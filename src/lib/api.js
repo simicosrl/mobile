@@ -21,7 +21,7 @@ function withTimeout(ms) {
 async function request(config, path, options = {}) {
   const base = (config.baseUrl || '').replace(/\/+$/, '');
   if (!base) return { ok: false, status: 0, error: 'No base URL configured' };
-  const { signal, cancel } = withTimeout(15000);
+  const { signal, cancel } = withTimeout(options.timeoutMs || 15000);
   try {
     const res = await fetch(base + path, {
       method: options.method || 'GET',
@@ -92,7 +92,10 @@ export function describeError(res) {
 }
 
 export async function pushSession(config, document) {
-  return request(config, '/warehouse/sessions', { method: 'POST', body: sessionToPayload(document) });
+  // Carries a rendered PDF and any damage photos inline as base64, which can
+  // run into a few MB — the default 15s timeout is tuned for small JSON
+  // bodies and was cutting this off over slower warehouse connections.
+  return request(config, '/warehouse/sessions', { method: 'POST', body: sessionToPayload(document), timeoutMs: 60000 });
 }
 
 export async function pullManifest(config) {
@@ -103,7 +106,7 @@ export async function pullManifest(config) {
 }
 
 export async function pushDamage(config, trackingId, payload) {
-  return request(config, `/warehouse/parcels/${encodeURIComponent(trackingId)}/damage`, { method: 'POST', body: payload });
+  return request(config, `/warehouse/parcels/${encodeURIComponent(trackingId)}/damage`, { method: 'POST', body: payload, timeoutMs: 30000 });
 }
 
 /**

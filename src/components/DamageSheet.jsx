@@ -15,6 +15,14 @@ export default function DamageSheet() {
         source: CameraSource.Prompt,
         quality: 70,
         allowEditing: false,
+        // Without a size cap this captures at the device's native sensor
+        // resolution (often 12-100+ MP), which can turn a single damage
+        // photo into several MB of base64 once it's inlined into the
+        // session JSON — plenty to blow past a normal request timeout on a
+        // weak warehouse connection. 1600px on the long edge is still very
+        // readable for a damage report and keeps the payload small.
+        width: 1600,
+        height: 1600,
       });
       setDamagePhoto(`data:image/${photo.format || 'jpeg'};base64,${photo.base64String}`);
     } catch (err) {
