@@ -211,6 +211,7 @@ export function AppProvider({ children }) {
     setSigInk(false);
     setAgreed(false);
     setCourierName('');
+    setCourierCompany('');
     setPlate('');
     setShipment('');
     setSessionStartedAt(Date.now());
@@ -360,6 +361,19 @@ export function AppProvider({ children }) {
     setConfirmedDoc(document);
     setPreviousScreen('confirm');
     setScreen('confirm');
+    // Clear the working session now that it's captured in `document` and
+    // saved — otherwise parcels.length > 0 keeps looking like an open
+    // session forever, and the next tap on Inbound/Outbound "resumes" a
+    // shipment that was actually already closed and signed.
+    setParcels([]);
+    setSignatureDataUrl(null);
+    setSigInk(false);
+    setAgreed(false);
+    setCourierName('');
+    setCourierCompany('');
+    setPlate('');
+    setShipment('');
+    setSessionStartedAt(null);
 
     if (apiConfig.autoPush) {
       const pdfDataUrl = await renderPdfDataUrl(document);
