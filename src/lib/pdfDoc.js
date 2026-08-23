@@ -18,26 +18,31 @@ const PRIMARY = [31, 111, 235];
 const DANGER = [220, 38, 38];
 const PANEL = [248, 250, 252];
 
-// SIMICO SRL registered details are placeholders — replace with the real
-// address, VAT number and mailbox before shipping (see README section 11).
-const COMPANY = {
-  name: 'SIMICO SRL',
-  address: "Via dell'Industria 12, 24060 Casazza (BG), Italy",
-  vat: 'P.IVA IT04512340167 · warehouse@simico.srl',
+// Defaults if no org settings are passed in — editable via the Settings
+// screen (src/screens/Settings.jsx), persisted as `orgSettings`.
+const DEFAULT_COMPANY = {
+  companyName: 'SIMICO SRL',
+  companyAddress: "Via dell'Industria 12, 24060 Casazza (BG), Italy",
+  companyVat: 'P.IVA IT04512340167',
+  companyEmail: 'warehouse@simico.srl',
 };
 
-const LEGAL_TEXT =
-  'The driver named above confirms having handed over / collected the parcels listed in this document, in the quantity ' +
-  'stated and in the apparent condition recorded. Any damage noted was verified jointly at the moment of handover and is ' +
-  "documented with photographs held by SIMICO SRL. Signing this document does not constitute acceptance of the goods' " +
-  'contents, which remain subject to inspection.';
+function legalText(companyName) {
+  return (
+    'The driver named above confirms having handed over / collected the parcels listed in this document, in the quantity ' +
+    'stated and in the apparent condition recorded. Any damage noted was verified jointly at the moment of handover and is ' +
+    `documented with photographs held by ${companyName}. Signing this document does not constitute acceptance of the goods' ` +
+    'contents, which remain subject to inspection.'
+  );
+}
 
 function condition(p) {
   return p.damage ? p.damage : 'Good, sealed';
 }
 
 /** Builds the handover document as a single-page jsPDF instance. */
-export function buildHandoverPdf(document) {
+export function buildHandoverPdf(document, org) {
+  const company = { ...DEFAULT_COMPANY, ...(org || {}) };
   const doc = new jsPDF({ unit: 'pt', format: [PAGE_W, PAGE_H] });
   const contentW = PAGE_W - MARGIN_X * 2;
   let y = MARGIN_TOP;
@@ -52,12 +57,12 @@ export function buildHandoverPdf(document) {
 
   doc.setTextColor(...INK);
   doc.setFontSize(14);
-  doc.text(COMPANY.name, MARGIN_X + 44, y + 13);
+  doc.text(company.companyName, MARGIN_X + 44, y + 13);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(...SECONDARY);
-  doc.text(COMPANY.address, MARGIN_X + 44, y + 25);
-  doc.text(COMPANY.vat, MARGIN_X + 44, y + 35);
+  doc.text(company.companyAddress, MARGIN_X + 44, y + 25);
+  doc.text(`${company.companyVat} · ${company.companyEmail}`, MARGIN_X + 44, y + 35);
 
   const kindLabel = document.direction === 'out' ? 'OUTBOUND HANDOVER NOTE' : 'INBOUND RECEIPT NOTE';
   doc.setFont('helvetica', 'bold');
@@ -175,7 +180,7 @@ export function buildHandoverPdf(document) {
 
   // Legal mention
   doc.setFillColor(...PANEL);
-  const legalLines = doc.splitTextToSize(LEGAL_TEXT, contentW - 22);
+  const legalLines = doc.splitTextToSize(legalText(company.companyName), contentW - 22);
   const legalH = legalLines.length * 10 + 12;
   doc.rect(MARGIN_X, y, contentW, legalH, 'F');
   doc.setFillColor(...ACCENT);
@@ -247,8 +252,8 @@ function safeFileName(document) {
  * Falls back to a browser download when running outside the native shell
  * (e.g. `npm run dev`).
  */
-export async function exportHandoverPdf(document) {
-  const doc = buildHandoverPdf(document);
+export async function exportHandoverPdf(document, org) {
+  const doc = buildHandoverPdf(document, org);
   const filename = safeFileName(document);
 
   if (Capacitor.isNativePlatform()) {

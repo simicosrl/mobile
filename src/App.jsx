@@ -6,6 +6,7 @@ import BottomNav from './components/BottomNav';
 import Toast from './components/Toast';
 import DuplicateSheet from './components/DuplicateSheet';
 import DamageSheet from './components/DamageSheet';
+import PhotoViewer from './components/PhotoViewer';
 import BadgeLogin from './screens/BadgeLogin';
 import Home from './screens/Home';
 import SessionSetup from './screens/SessionSetup';
@@ -16,6 +17,7 @@ import DocumentScreen from './screens/DocumentScreen';
 import History from './screens/History';
 import SessionDetail from './screens/SessionDetail';
 import ApiScreen from './screens/ApiScreen';
+import Settings from './screens/Settings';
 
 const SCREENS = {
   home: Home,
@@ -27,6 +29,7 @@ const SCREENS = {
   history: History,
   session: SessionDetail,
   api: ApiScreen,
+  settings: Settings,
 };
 
 function Shell() {
@@ -63,6 +66,7 @@ function Shell() {
       <BottomNav />
       <DuplicateSheet />
       <DamageSheet />
+      <PhotoViewer />
       <Toast />
     </div>
   );

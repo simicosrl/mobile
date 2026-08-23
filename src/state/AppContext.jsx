@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { docsGetAll, docPut, kvGet, kvSet } from '../lib/db';
-import { SEED_DOCUMENTS, DEMO_MANIFEST, DEFAULT_BADGE_NAMES } from '../lib/seed';
+import { SEED_DOCUMENTS, DEMO_MANIFEST, DEFAULT_BADGE_NAMES, DEFAULT_ORG_SETTINGS } from '../lib/seed';
 import { DAMAGE_TYPES } from '../lib/carriers';
 import { hhmm, stamp, docNumber } from '../lib/format';
 import { feedback } from '../lib/audio';
@@ -50,6 +50,8 @@ export function AppProvider({ children }) {
   const [pulling, setPulling] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [docSeq, setDocSeq] = useState({ in: 240, out: 241 });
+  const [orgSettings, setOrgSettings] = useState(DEFAULT_ORG_SETTINGS);
+  const [viewingPhoto, setViewingPhoto] = useState(null);
 
   const [now, setNow] = useState(Date.now());
 
@@ -64,11 +66,12 @@ export function AppProvider({ children }) {
   // ---- initial load ----
   useEffect(() => {
     (async () => {
-      const [savedShift, savedApi, savedManifest, savedSeq, docs] = await Promise.all([
+      const [savedShift, savedApi, savedManifest, savedSeq, savedOrg, docs] = await Promise.all([
         kvGet('shift', null),
         kvGet('apiConfig', INITIAL_API_CONFIG),
         kvGet('manifest', { codes: [], lastPulledAt: null }),
         kvGet('docSeq', { in: 240, out: 241 }),
+        kvGet('orgSettings', DEFAULT_ORG_SETTINGS),
         docsGetAll(),
       ]);
       let docList = docs;
@@ -87,6 +90,7 @@ export function AppProvider({ children }) {
       setApiConfig(savedApi);
       setManifest(manifestState);
       setDocSeq(savedSeq);
+      setOrgSettings({ ...DEFAULT_ORG_SETTINGS, ...savedOrg });
       if (savedShift) {
         setShift(savedShift);
         setScreen('home');
@@ -99,6 +103,7 @@ export function AppProvider({ children }) {
   useEffect(() => { if (ready) kvSet('manifest', manifest); }, [ready, manifest]);
   useEffect(() => { if (ready) kvSet('docSeq', docSeq); }, [ready, docSeq]);
   useEffect(() => { if (ready && shift) kvSet('shift', shift); }, [ready, shift]);
+  useEffect(() => { if (ready) kvSet('orgSettings', orgSettings); }, [ready, orgSettings]);
 
   const showToast = useCallback((msg) => {
     setToastState(msg);
@@ -107,13 +112,14 @@ export function AppProvider({ children }) {
   }, []);
 
   // ---- navigation ----
-  const canGoBack = ['setup', 'scan', 'sign', 'doc', 'session'].includes(screen);
+  const canGoBack = ['setup', 'scan', 'sign', 'doc', 'session', 'settings'].includes(screen);
   const goBack = useCallback(() => {
     setScreen((s) => {
       if (s === 'setup') return 'home';
       if (s === 'scan') return 'setup';
       if (s === 'sign') return 'scan';
       if (s === 'session') return 'history';
+      if (s === 'settings') return 'home';
       if (s === 'doc') return previousScreen === 'confirm' ? 'confirm' : 'home';
       return 'home';
     });
@@ -123,6 +129,7 @@ export function AppProvider({ children }) {
   const goToHistoryTab = useCallback(() => setScreen('history'), []);
   const goToDocsTab = useCallback(() => { setPreviousScreen(screen); setScreen('doc'); }, [screen]);
   const goToApiTab = useCallback(() => setScreen('api'), []);
+  const goToSettings = useCallback(() => setScreen('settings'), []);
 
   // ---- shift / badge login ----
   const loginWithBadge = useCallback((badgeId, operatorName) => {
@@ -135,6 +142,23 @@ export function AppProvider({ children }) {
     kvSet('shift', null);
     setScreen('login');
   }, []);
+  const updateOperatorName = useCallback(async (name) => {
+    const trimmed = name.trim();
+    if (!trimmed || !shift) return;
+    setShift((s) => ({ ...s, operatorName: trimmed }));
+    const knownNames = (await kvGet('badgeNames', {})) || {};
+    knownNames[shift.badgeId] = trimmed;
+    await kvSet('badgeNames', knownNames);
+  }, [shift]);
+
+  // ---- org / warehouse / company settings ----
+  const updateOrgSettings = useCallback((partial) => {
+    setOrgSettings((s) => ({ ...s, ...partial }));
+  }, []);
+
+  // ---- photo viewer (damage attachments) ----
+  const openPhoto = useCallback((url) => setViewingPhoto(url), []);
+  const closePhoto = useCallback(() => setViewingPhoto(null), []);
 
   // ---- session setup ----
   const startSession = useCallback((dir) => {
@@ -283,11 +307,11 @@ export function AppProvider({ children }) {
   const printDocument = useCallback(async (document) => {
     try {
       const mod = await import('../lib/pdfDoc');
-      await mod.exportHandoverPdf(document);
+      await mod.exportHandoverPdf(document, orgSettings);
     } catch (err) {
       showToast('Could not generate the PDF: ' + (err?.message || err));
     }
-  }, [showToast]);
+  }, [showToast, orgSettings]);
   const emailDocument = useCallback(async (document) => {
     showToast('Choose your mail app from the share sheet');
     await printDocument(document);
@@ -347,8 +371,8 @@ export function AppProvider({ children }) {
 
   const value = useMemo(() => ({
     ready, now,
-    shift, loginWithBadge, endShift,
-    screen, setScreen, canGoBack, goBack, goHome, goToScanTab, goToHistoryTab, goToDocsTab, goToApiTab,
+    shift, loginWithBadge, endShift, updateOperatorName,
+    screen, setScreen, canGoBack, goBack, goHome, goToScanTab, goToHistoryTab, goToDocsTab, goToApiTab, goToSettings,
     direction, carrier, setCarrier, courierCompany, setCourierCompany, shipment, setShipment,
     parcels, sessionStartedAt, startSession, toScan, docSeq,
     submitScan, accept, dupCode, dupTime, closeDup, dupAddBox,
@@ -360,17 +384,20 @@ export function AppProvider({ children }) {
     history, historyQuery, setHistoryQuery, historyFilter, setHistoryFilter, selectedDocNo, openSession, backToHistory,
     apiConfig, apiShowKey, setApiBaseUrl, setApiKey, togglePush, togglePull, toggleShowKey,
     manifest, pulling, pullManifestNow, syncing, syncNow, retrySync,
+    orgSettings, updateOrgSettings,
+    viewingPhoto, openPhoto, closePhoto,
     toast, showToast,
     inputRef,
   }), [
-    ready, now, shift, loginWithBadge, endShift, screen, canGoBack, goBack, goHome, goToScanTab, goToHistoryTab, goToDocsTab, goToApiTab,
+    ready, now, shift, loginWithBadge, endShift, updateOperatorName, screen, canGoBack, goBack, goHome, goToScanTab, goToHistoryTab, goToDocsTab, goToApiTab, goToSettings,
     direction, carrier, courierCompany, shipment, parcels, sessionStartedAt, startSession, toScan, docSeq,
     submitScan, accept, dupCode, dupTime, closeDup, dupAddBox, boxPlus, boxMinus, removeLast, flash,
     damageSheet, openDamage, closeDamage, toggleDamageType, setDamageNote, setDamagePhoto, saveDamage,
     courierName, plate, agreed, toggleAgree, signatureDataUrl, sigInk, clearSignature, signReady, toSign, finish,
     confirmedDoc, printDocument, emailDocument, history, historyQuery, historyFilter, selectedDocNo, openSession, backToHistory,
     apiConfig, apiShowKey, setApiBaseUrl, setApiKey, togglePush, togglePull, toggleShowKey,
-    manifest, pulling, pullManifestNow, syncing, syncNow, retrySync, toast, showToast,
+    manifest, pulling, pullManifestNow, syncing, syncNow, retrySync,
+    orgSettings, updateOrgSettings, viewingPhoto, openPhoto, closePhoto, toast, showToast,
   ]);
 
   return <AppCtx.Provider value={value}>{children}</AppCtx.Provider>;

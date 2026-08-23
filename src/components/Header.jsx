@@ -1,16 +1,17 @@
 import { useApp } from '../state/AppContext';
-import { ChevronLeft } from './icons';
+import { ChevronLeft, Settings } from './icons';
 import { hhmm, docNumber } from '../lib/format';
 
 function headerCopy(app) {
-  const { screen, direction, confirmedDoc, selectedDocNo, history, carrier, docSeq } = app;
+  const { screen, direction, confirmedDoc, selectedDocNo, history, carrier, docSeq, orgSettings } = app;
   const isOut = direction === 'out';
   const sel = history.find((h) => h.doc === selectedDocNo);
   const sessionDocLabel = docNumber(direction, docSeq[direction]);
   const docLabel = confirmedDoc?.doc || sessionDocLabel;
 
   if (screen === 'api') return { title: 'API & integrations', sub: 'Send and receive warehouse data' };
-  if (screen === 'home') return { title: 'SIMICO Warehouse', sub: 'Casazza (BG) · dock 2' };
+  if (screen === 'settings') return { title: 'Settings', sub: 'Operator, warehouse & company' };
+  if (screen === 'home') return { title: 'SIMICO Warehouse', sub: `${orgSettings.warehouseLocation} · ${orgSettings.warehouseDock}` };
   if (screen === 'setup') return { title: 'New session', sub: '' };
   if (screen === 'scan') return { title: isOut ? 'Outbound scan' : 'Inbound scan', sub: `${sessionDocLabel} · ${carrier}` };
   if (screen === 'sign') return { title: 'Driver signature', sub: `${sessionDocLabel} · ${carrier}` };
@@ -22,7 +23,7 @@ function headerCopy(app) {
 
 export default function Header() {
   const app = useApp();
-  const { canGoBack, goBack, shift, now } = app;
+  const { canGoBack, goBack, shift, now, screen, goToSettings } = app;
   const { title, sub } = headerCopy(app);
 
   return (
@@ -44,6 +45,15 @@ export default function Header() {
       </div>
       <div className="flex flex-none items-center gap-2">
         <div className="font-mono text-[11px] text-secondary">{hhmm(new Date(now))}</div>
+        {screen !== 'settings' && (
+          <button
+            onClick={goToSettings}
+            aria-label="Settings"
+            className="flex h-[30px] w-[30px] items-center justify-center rounded-full border border-[rgba(148,163,184,.3)] text-secondary"
+          >
+            <Settings size={15} strokeWidth={2} />
+          </button>
+        )}
         <div className="flex h-[30px] w-[30px] items-center justify-center rounded-full bg-primary text-[11px] font-extrabold text-white">
           {(shift?.operatorName || '??')
             .split(' ')

@@ -8,7 +8,7 @@ export default function Scan() {
   const app = useApp();
   const {
     direction, carrier, parcels, sessionStartedAt, flash,
-    submitScan, boxPlus, boxMinus, removeLast, openDamage, toSign, docSeq,
+    submitScan, boxPlus, boxMinus, removeLast, openDamage, toSign, docSeq, openPhoto,
   } = app;
   const isOut = direction === 'out';
   const nextDoc = docNumber(direction, docSeq[direction]);
@@ -94,10 +94,15 @@ export default function Scan() {
             {last.damage && (
               <div className="mt-3 flex items-start gap-2 rounded-[11px] border border-[rgba(220,38,38,.25)] bg-danger-tint2 p-2.5">
                 <TriangleAlert size={16} strokeWidth={2} className="mt-px flex-none text-danger" />
-                <div>
+                <div className="min-w-0 flex-1">
                   <div className="text-xs font-bold text-danger-dark">{last.damage}</div>
                   <div className="mt-0.5 font-mono text-[10px] text-danger">{last.photo}</div>
                 </div>
+                {last.photoDataUrl && (
+                  <button onClick={() => openPhoto(last.photoDataUrl)} className="flex-none">
+                    <img src={last.photoDataUrl} alt="Damage attachment" className="h-12 w-12 rounded-md border border-[rgba(220,38,38,.35)] object-cover" />
+                  </button>
+                )}
               </div>
             )}
           </>
