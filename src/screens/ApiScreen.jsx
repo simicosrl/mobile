@@ -131,6 +131,9 @@ export default function ApiScreen() {
                 <div className="min-w-0 flex-1">
                   <div className="truncate font-mono text-xs font-bold">{h.doc}</div>
                   <div className="truncate text-[10.5px] text-secondary">{h.carrier} · {h.parcels.length} parcels · {boxes} boxes</div>
+                  {status === 'failed' && h.syncError && (
+                    <div className="truncate text-[10px] font-medium text-[#B91C1C]">{h.syncError}</div>
+                  )}
                 </div>
                 <div className="flex-none rounded-full px-2 py-1 text-[10px] font-extrabold uppercase tracking-[.05em]" style={{ background: bg, color }}>
                   {status === 'ok' ? 'sent' : status}
