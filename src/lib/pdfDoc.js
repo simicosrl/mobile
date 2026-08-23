@@ -245,32 +245,49 @@ function safeFileName(document) {
 }
 
 /**
- * Writes the PDF to device storage and opens the native share sheet
- * (the user can print, save, or email from there — Android has no single
- * universal "print" intent outside a dedicated print-service plugin, so
- * routing every export through Share is the most broadly compatible choice).
- * Falls back to a browser download when running outside the native shell
- * (e.g. `npm run dev`).
+ * Writes a PDF (as a base64 data URL) to device storage and opens the
+ * native share sheet — the user can print, save, or email from there
+ * (Android has no single universal "print" intent outside a dedicated
+ * print-service plugin, so routing every export through Share is the most
+ * broadly compatible choice). Falls back to a browser download when
+ * running outside the native shell (e.g. `npm run dev`).
  */
-export async function exportHandoverPdf(document, org) {
-  const doc = buildHandoverPdf(document, org);
-  const filename = safeFileName(document);
-
+async function saveAndShare(dataUrl, filename, doc) {
   if (Capacitor.isNativePlatform()) {
-    const base64 = doc.output('datauristring').split(',')[1];
+    const base64 = dataUrl.split(',')[1];
     const result = await Filesystem.writeFile({
       path: filename,
       data: base64,
       directory: Directory.Cache,
     });
     await Share.share({
-      title: document.doc,
-      text: `${document.doc} — SIMICO Warehouse handover document`,
+      title: doc.doc,
+      text: `${doc.doc} — SIMICO Warehouse handover document`,
       url: result.uri,
     });
     return result.uri;
   }
 
-  doc.save(filename);
+  // Browser fallback: trigger a normal download via a Blob URL (more
+  // broadly supported than navigating straight to a data: URI, and matches
+  // what jsPDF's own .save() does internally).
+  const blob = await (await fetch(dataUrl)).blob();
+  const blobUrl = URL.createObjectURL(blob);
+  const a = window.document.createElement('a');
+  a.href = blobUrl;
+  a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
   return null;
+}
+
+/** Builds and shares the handover document generated locally on-device. */
+export async function exportHandoverPdf(document, org) {
+  const doc = buildHandoverPdf(document, org);
+  return saveAndShare(doc.output('datauristring'), safeFileName(document), document);
+}
+
+/** Shares an already-fetched PDF data URL (e.g. the ERP's archived copy) without rebuilding it. */
+export async function exportPdfDataUrl(dataUrl, document) {
+  return saveAndShare(dataUrl, safeFileName(document), document);
 }

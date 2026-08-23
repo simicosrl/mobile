@@ -260,15 +260,28 @@ export function AppProvider({ children }) {
       showToast('Pick a damage type and take a photo');
       return;
     }
+    const label = damageSheet.picks.join(', ') + (damageSheet.note ? ' — ' + damageSheet.note : '');
+    const photoName = `IMG_${docSeq[direction]}_${parcels.length}.jpg`;
+    const trackingCode = parcels.length ? parcels[parcels.length - 1].code : null;
     setParcels((arr) => {
       if (!arr.length) return arr;
       const a = arr.slice();
-      const label = damageSheet.picks.join(', ') + (damageSheet.note ? ' — ' + damageSheet.note : '');
-      a[a.length - 1] = { ...a[a.length - 1], damage: label, photo: `IMG_${docSeq[direction]}_${a.length}.jpg`, photoDataUrl: damageSheet.photoDataUrl };
+      a[a.length - 1] = { ...a[a.length - 1], damage: label, photo: photoName, photoDataUrl: damageSheet.photoDataUrl };
       return a;
     });
     setDamageSheet({ open: false, picks: [], note: '', photoDataUrl: null });
-  }, [damageSheet, docSeq, direction, showToast]);
+
+    if (apiConfig.autoPush && trackingCode) {
+      api.pushDamage(apiConfig, trackingCode, {
+        tracking: trackingCode,
+        type: label,
+        photo: damageSheet.photoDataUrl,
+        recorded_at: new Date().toISOString(),
+      }).then((res) => {
+        if (!res.ok) showToast(`Damage push to ERP failed for ${trackingCode} — will still go out with the session`);
+      });
+    }
+  }, [damageSheet, docSeq, direction, parcels, apiConfig, showToast]);
 
   // ---- signature ----
   const toSign = useCallback(() => {
@@ -323,11 +336,21 @@ export function AppProvider({ children }) {
   const printDocument = useCallback(async (document) => {
     try {
       const mod = await import('../lib/pdfDoc');
+      // If the ERP already has this document, prefer its own archived PDF
+      // (e.g. it may carry the ERP's official numbering/stamps) over
+      // regenerating one locally — falls back silently if that fails.
+      if (apiConfig.baseUrl && document.syncStatus === 'ok') {
+        const archived = await api.fetchArchivedPdf(apiConfig, document.doc);
+        if (archived.ok) {
+          await mod.exportPdfDataUrl(archived.dataUrl, document);
+          return;
+        }
+      }
       await mod.exportHandoverPdf(document, orgSettings);
     } catch (err) {
       showToast('Could not generate the PDF: ' + (err?.message || err));
     }
-  }, [showToast, orgSettings]);
+  }, [showToast, orgSettings, apiConfig]);
   const emailDocument = useCallback(async (document) => {
     showToast('Choose your mail app from the share sheet');
     await printDocument(document);
