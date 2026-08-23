@@ -1,0 +1,96 @@
+import { useRef } from 'react';
+import { useApp } from '../state/AppContext';
+import { docNumber } from '../lib/format';
+import SignaturePad from '../components/SignaturePad';
+import { Check, ArrowRight } from '../components/icons';
+
+export default function Signature() {
+  const app = useApp();
+  const {
+    direction, carrier, courierCompany, setCourierCompany, plate, setPlate,
+    courierName, setCourierName, parcels, docSeq, agreed, toggleAgree,
+    sigInk, setSignatureDataUrl, setSigInk, clearSignature, signReady, finish,
+  } = app;
+  const isOut = direction === 'out';
+  const nextDoc = docNumber(direction, docSeq[direction]);
+  const boxes = parcels.reduce((a, p) => a + p.boxes, 0);
+  const padRef = useRef(null);
+
+  const onSigChange = (dataUrl, hasInk) => {
+    setSignatureDataUrl(dataUrl);
+    setSigInk(hasInk);
+  };
+
+  return (
+    <div className="flex flex-col gap-3.5 px-3.5 pb-[22px] pt-3.5">
+      <div className="rounded-[14px] border border-[rgba(148,163,184,.25)] bg-white p-[12px_13px]">
+        <div className="flex items-center gap-2">
+          <div className="rounded-full px-2 py-[3px] text-[10px] font-extrabold uppercase tracking-[.1em] text-white" style={{ background: isOut ? '#FF7A00' : '#1F6FEB' }}>
+            {isOut ? 'Outbound' : 'Inbound'}
+          </div>
+          <div className="font-mono text-[11px] text-secondary">{nextDoc}</div>
+        </div>
+        <div className="mt-2 text-sm font-bold">{parcels.length} parcels / {boxes} boxes · {carrier}</div>
+      </div>
+
+      <div>
+        <div className="mb-[7px] text-[11px] font-bold uppercase tracking-[.06em] text-secondary">Driver name</div>
+        <input
+          value={courierName}
+          onChange={(e) => setCourierName(e.target.value)}
+          placeholder="Full name, printed"
+          className="min-h-[50px] w-full rounded-xl border border-inputborder bg-page px-4 text-[15px] text-ink"
+        />
+      </div>
+      <div className="flex gap-2.5">
+        <div className="flex-1">
+          <div className="mb-[7px] text-[11px] font-bold uppercase tracking-[.06em] text-secondary">Company</div>
+          <input
+            value={courierCompany}
+            onChange={(e) => setCourierCompany(e.target.value)}
+            placeholder="Carrier company"
+            className="min-h-[50px] w-full rounded-xl border border-inputborder bg-page px-3 text-[13px] text-ink"
+          />
+        </div>
+        <div className="w-[118px] flex-none">
+          <div className="mb-[7px] text-[11px] font-bold uppercase tracking-[.06em] text-secondary">Plate</div>
+          <input
+            value={plate}
+            onChange={(e) => setPlate(e.target.value)}
+            placeholder="BG 123 XY"
+            className="min-h-[50px] w-full rounded-xl border border-inputborder bg-page px-3 font-mono text-[13px] uppercase text-ink"
+          />
+        </div>
+      </div>
+
+      <div>
+        <div className="mb-[7px] flex items-center gap-2">
+          <div className="text-[11px] font-bold uppercase tracking-[.06em] text-secondary">Signature</div>
+          <button onClick={() => { padRef.current?.clear(); clearSignature(); }} className="ml-auto p-1 text-[11px] font-bold text-primary">
+            Clear
+          </button>
+        </div>
+        <SignaturePad ref={padRef} onChange={onSigChange} hasInk={sigInk} />
+      </div>
+
+      <button onClick={toggleAgree} className="flex items-start gap-2.5 rounded-xl border border-[rgba(148,163,184,.3)] bg-white p-3 text-left">
+        <div
+          className="flex h-[22px] w-[22px] flex-none items-center justify-center rounded-md border-2"
+          style={{ borderColor: agreed ? '#1F6FEB' : 'rgba(148,163,184,.6)', background: agreed ? '#1F6FEB' : '#fff' }}
+        >
+          {agreed && <Check size={13} strokeWidth={3} className="text-white" />}
+        </div>
+        <div className="text-[11.5px] leading-normal text-secondary">
+          The driver confirms the number of parcels and their apparent condition at handover, and accepts the recorded damage notes.
+        </div>
+      </button>
+
+      <button
+        onClick={finish}
+        className={'flex min-h-[56px] w-full items-center justify-center gap-2.5 rounded-xl text-[15px] font-extrabold text-white ' + (signReady ? 'cursor-pointer bg-primary' : 'cursor-not-allowed bg-disabled')}
+      >
+        Confirm handover <ArrowRight size={17} strokeWidth={2.2} />
+      </button>
+    </div>
+  );
+}
