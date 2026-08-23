@@ -1,0 +1,86 @@
+name: Build debug APK
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'SIMICO-Warehouse-Scan-debug.apk'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install matching Android SDK platform/build-tools
+        run: |
+          set -e
+          COMPILE_SDK=$(grep -oE 'compileSdkVersion = [0-9]+' android/variables.gradle | grep -oE '[0-9]+')
+          echo "compileSdkVersion = $COMPILE_SDK"
+          yes | sdkmanager --licenses > /dev/null || true
+          sdkmanager "platform-tools" "platforms;android-${COMPILE_SDK}"
+          LATEST_BUILD_TOOLS=$(sdkmanager --list 2>/dev/null | grep -oE 'build-tools;[0-9]+\.[0-9]+\.[0-9]+' | sort -t';' -k2 -V | tail -1)
+          echo "Installing $LATEST_BUILD_TOOLS"
+          sdkmanager "$LATEST_BUILD_TOOLS"
+
+      - name: Install JS deps
+        run: npm ci
+
+      - name: Build web bundle
+        run: npm run build
+
+      - name: Sync Capacitor Android project
+        run: npx cap sync android
+
+      - name: Assemble debug APK
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Verify APK
+        run: |
+          set -e
+          APK=android/app/build/outputs/apk/debug/app-debug.apk
+          test -f "$APK"
+          file "$APK"
+          ls -la "$APK"
+          cp "$APK" SIMICO-Warehouse-Scan-debug.apk
+
+      - name: Upload APK as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SIMICO-Warehouse-Scan-debug
+          path: SIMICO-Warehouse-Scan-debug.apk
+          retention-days: 90
+
+      - name: Commit APK back to the repo
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -f SIMICO-Warehouse-Scan-debug.apk
+          if git diff --cached --quiet; then
+            echo "APK unchanged, nothing to commit"
+          else
+            git commit -m "ci: update compiled debug APK
+
+Built from ${{ github.sha }} by GitHub Actions.
+Debug-signed (Android's default debug keystore) — fine for sideloading, not for Play Store."
+            git push origin HEAD:main
+          fi
