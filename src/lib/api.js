@@ -66,6 +66,24 @@ export function sessionToPayload(document) {
   };
 }
 
+// Turns a request() result into a short, human-readable reason — "failed"
+// alone gives no way to tell a bad URL from a rejected key from a route
+// that doesn't exist on the backend, so this is shown in toasts and next
+// to each row in the API tab's send queue.
+export function describeError(res) {
+  if (res.error) return res.error;
+  if (res.status) {
+    const bodyMsg =
+      res.data && typeof res.data === 'object'
+        ? res.data.message || res.data.error
+        : typeof res.data === 'string' && res.data.trim()
+          ? res.data.trim().slice(0, 140)
+          : null;
+    return `HTTP ${res.status}` + (bodyMsg ? ` — ${bodyMsg}` : '');
+  }
+  return 'Unknown error';
+}
+
 export async function pushSession(config, document) {
   return request(config, '/warehouse/sessions', { method: 'POST', body: sessionToPayload(document) });
 }
@@ -74,7 +92,7 @@ export async function pullManifest(config) {
   const res = await request(config, '/warehouse/manifest?date=today');
   if (res.ok && Array.isArray(res.data)) return { ok: true, codes: res.data };
   if (res.ok && Array.isArray(res.data?.tracking_ids)) return { ok: true, codes: res.data.tracking_ids };
-  return { ok: false, error: res.error || `HTTP ${res.status}` };
+  return { ok: false, error: describeError(res) };
 }
 
 export async function pushDamage(config, trackingId, payload) {

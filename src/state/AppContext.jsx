@@ -349,12 +349,12 @@ export function AppProvider({ children }) {
 
     if (apiConfig.autoPush) {
       const res = await api.pushSession(apiConfig, document);
-      const status = res.ok ? 'ok' : 'failed';
-      const updated = { ...document, syncStatus: status };
+      const syncError = res.ok ? null : api.describeError(res);
+      const updated = { ...document, syncStatus: res.ok ? 'ok' : 'failed', syncError };
       await docPut(updated);
       setHistory((h) => h.map((d) => (d.doc === doc ? updated : d)));
       setConfirmedDoc((c) => (c && c.doc === doc ? updated : c));
-      showToast(res.ok ? `${doc} sent to the ERP` : `${doc} failed to send — retry from the API tab`);
+      showToast(res.ok ? `${doc} sent to the ERP` : `${doc} failed to send — ${syncError}`);
     }
   }, [signReady, direction, docSeq, carrier, courierCompany, shipment, courierName, plate, shift, parcels, signatureDataUrl, apiConfig, showToast]);
 
@@ -427,26 +427,32 @@ export function AppProvider({ children }) {
     const pending = history.filter((d) => d.syncStatus !== 'ok');
     let okCount = 0;
     let failCount = 0;
+    let lastError = null;
     for (const d of pending) {
       const res = await api.pushSession(apiConfig, d);
-      const status = res.ok ? 'ok' : 'failed';
-      if (res.ok) okCount++; else failCount++;
-      const updated = { ...d, syncStatus: status };
+      const syncError = res.ok ? null : api.describeError(res);
+      if (res.ok) okCount++; else { failCount++; lastError = syncError; }
+      const updated = { ...d, syncStatus: res.ok ? 'ok' : 'failed', syncError };
       await docPut(updated);
       setHistory((h) => h.map((x) => (x.doc === d.doc ? updated : x)));
     }
     setSyncing(false);
-    showToast(pending.length ? `${okCount} sent · ${failCount} failed` : 'Nothing pending');
+    showToast(
+      !pending.length ? 'Nothing pending'
+        : failCount ? `${okCount} sent · ${failCount} failed — ${lastError}`
+        : `${okCount} sent`
+    );
   }, [apiConfig, history, showToast]);
 
   const retrySync = useCallback(async (doc) => {
     const d = history.find((x) => x.doc === doc);
     if (!d) return;
     const res = await api.pushSession(apiConfig, d);
-    const updated = { ...d, syncStatus: res.ok ? 'ok' : 'failed' };
+    const syncError = res.ok ? null : api.describeError(res);
+    const updated = { ...d, syncStatus: res.ok ? 'ok' : 'failed', syncError };
     await docPut(updated);
     setHistory((h) => h.map((x) => (x.doc === doc ? updated : x)));
-    showToast(res.ok ? `${doc} sent` : `${doc} failed again`);
+    showToast(res.ok ? `${doc} sent` : `${doc} failed — ${syncError}`);
   }, [apiConfig, history, showToast]);
 
   const value = useMemo(() => ({
