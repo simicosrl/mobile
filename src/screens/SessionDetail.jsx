@@ -2,7 +2,7 @@ import { useApp } from '../state/AppContext';
 import { Download, Printer } from '../components/icons';
 
 export default function SessionDetail() {
-  const { history, selectedDocNo, historyQuery, printDocument } = useApp();
+  const { history, selectedDocNo, historyQuery, printDocument, openPhoto } = useApp();
   const sel = history.find((h) => h.doc === selectedDocNo);
   if (!sel) return null;
   const q = historyQuery.trim().toUpperCase();
@@ -42,6 +42,11 @@ export default function SessionDetail() {
               <div className="truncate font-mono text-[11.5px] font-bold">{p.code}</div>
               <div className="truncate text-[10.5px]" style={{ color: p.damage ? '#DC2626' : '#64748B' }}>{p.damage || 'Good, sealed'}</div>
             </div>
+            {p.photoDataUrl && (
+              <button onClick={() => openPhoto(p.photoDataUrl)} className="flex-none">
+                <img src={p.photoDataUrl} alt="Damage attachment" className="h-10 w-10 rounded-md border border-[rgba(220,38,38,.35)] object-cover" />
+              </button>
+            )}
             <div className="flex-none text-[11px] text-light">{p.time}</div>
             <div className="flex-none text-[11px] font-bold">{p.boxes}×</div>
           </div>
