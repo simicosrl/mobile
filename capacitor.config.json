@@ -1,6 +1,6 @@
 {
   "appId": "com.simico.warehousescan",
-  "appName": "SIMICO Warehouse Scan",
+  "appName": "WMS App",
   "webDir": "dist",
   "android": {
     "allowMixedContent": false

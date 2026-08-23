@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { docsGetAll, docPut, kvGet, kvSet } from '../lib/db';
-import { SEED_DOCUMENTS, DEMO_MANIFEST, DEFAULT_BADGE_NAMES, DEFAULT_ORG_SETTINGS } from '../lib/seed';
+import { docsGetAll, docPut, docsClearAll, kvGet, kvSet } from '../lib/db';
+import { DEFAULT_BADGE_NAMES, DEFAULT_ORG_SETTINGS } from '../lib/seed';
 import { DAMAGE_TYPES } from '../lib/carriers';
 import { hhmm, stamp, docNumber } from '../lib/format';
 import { feedback } from '../lib/audio';
@@ -50,7 +50,7 @@ export function AppProvider({ children }) {
   const [manifest, setManifest] = useState({ codes: [], lastPulledAt: null });
   const [pulling, setPulling] = useState(false);
   const [syncing, setSyncing] = useState(false);
-  const [docSeq, setDocSeq] = useState({ in: 0, out: 0 });
+  const [docSeq, setDocSeq] = useState({ in: 1, out: 1 });
   const [orgSettings, setOrgSettings] = useState(DEFAULT_ORG_SETTINGS);
   const [viewingPhoto, setViewingPhoto] = useState(null);
   const [updateInfo, setUpdateInfo] = useState(null); // { available, versionName, apkUrl } | null
@@ -69,33 +69,37 @@ export function AppProvider({ children }) {
   // ---- initial load ----
   useEffect(() => {
     (async () => {
-      const [savedShift, savedApi, savedManifest, savedSeq, savedOrg, docs, docSeqReset] = await Promise.all([
+      const [savedShift, savedApi, savedManifest, savedSeq, savedOrg, docs, docSeqReset, historyWiped] = await Promise.all([
         kvGet('shift', null),
         kvGet('apiConfig', INITIAL_API_CONFIG),
         kvGet('manifest', { codes: [], lastPulledAt: null }),
-        kvGet('docSeq', { in: 0, out: 0 }),
+        kvGet('docSeq', { in: 1, out: 1 }),
         kvGet('orgSettings', DEFAULT_ORG_SETTINGS),
         docsGetAll(),
-        kvGet('docSeqResetV1', false),
+        kvGet('docSeqResetV2', false),
+        kvGet('historyWipeV1', false),
       ]);
-      // One-time reset of the document counter back to 0 — installs from
-      // before this change had it seeded at 240/241; new installs already
-      // default to 0 above, so this is a no-op for them.
+      // One-time reset of the document counter to start numbering at 1
+      // (WH-IN-000001 / WH-OUT-000001) — installs from before this change
+      // had it at 0 or the old 240/241 seed; new installs already default
+      // to 1 above, so this is a no-op for them.
       let seqToUse = savedSeq;
       if (!docSeqReset) {
-        seqToUse = { in: 0, out: 0 };
+        seqToUse = { in: 1, out: 1 };
         await kvSet('docSeq', seqToUse);
-        await kvSet('docSeqResetV1', true);
+        await kvSet('docSeqResetV2', true);
       }
+      // One-time wipe of any demo/seed documents from earlier builds, so
+      // every install — including ones already on a phone — ends up with a
+      // clean, empty History/Docs list. New installs never seed demo data
+      // any more, so this only ever does something once, on upgrade.
       let docList = docs;
-      if (!docList.length) {
-        for (const d of SEED_DOCUMENTS) await docPut(d);
-        docList = SEED_DOCUMENTS;
+      if (!historyWiped) {
+        await docsClearAll();
+        docList = [];
+        await kvSet('historyWipeV1', true);
       }
-      let manifestState = savedManifest;
-      if (!manifestState.codes.length) {
-        manifestState = { codes: DEMO_MANIFEST, lastPulledAt: null };
-      }
+      const manifestState = savedManifest;
       const savedBadgeNames = (await kvGet('badgeNames', {})) || {};
       const mergedBadgeNames = { ...DEFAULT_BADGE_NAMES, ...savedBadgeNames };
       await kvSet('badgeNames', mergedBadgeNames);

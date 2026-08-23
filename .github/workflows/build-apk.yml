@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths-ignore:
-      - 'SIMICO-Warehouse-Scan-debug.apk'
+      - 'WMS-App-debug.apk'
       - 'version.json'
   workflow_dispatch: {}
 
@@ -61,7 +61,7 @@ jobs:
           test -f "$APK"
           file "$APK"
           ls -la "$APK"
-          cp "$APK" SIMICO-Warehouse-Scan-debug.apk
+          cp "$APK" WMS-App-debug.apk
 
       - name: Write version manifest (for the in-app update check)
         run: |
@@ -69,7 +69,7 @@ jobs:
           {
             "versionCode": ${{ github.run_number }},
             "versionName": "1.0.${{ github.run_number }}",
-            "apkUrl": "https://raw.githubusercontent.com/simicosrl/mobile/main/SIMICO-Warehouse-Scan-debug.apk",
+            "apkUrl": "https://raw.githubusercontent.com/simicosrl/mobile/main/WMS-App-debug.apk",
             "commit": "${{ github.sha }}"
           }
           EOF
@@ -78,8 +78,8 @@ jobs:
       - name: Upload APK as workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: SIMICO-Warehouse-Scan-debug
-          path: SIMICO-Warehouse-Scan-debug.apk
+          name: WMS-App-debug
+          path: WMS-App-debug.apk
           retention-days: 90
 
       - name: Commit APK + version manifest back to the repo
@@ -87,7 +87,8 @@ jobs:
           set -e
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -f SIMICO-Warehouse-Scan-debug.apk version.json
+          git add -f WMS-App-debug.apk version.json
+          git rm -f --ignore-unmatch SIMICO-Warehouse-Scan-debug.apk
           if git diff --cached --quiet; then
             echo "Nothing changed, nothing to commit"
           else

@@ -75,3 +75,12 @@ export async function docGet(doc) {
     req.onerror = () => reject(req.error);
   });
 }
+
+export async function docsClearAll() {
+  const store = await tx(STORE_DOCS, 'readwrite');
+  return new Promise((resolve, reject) => {
+    const req = store.clear();
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}

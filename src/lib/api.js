@@ -113,7 +113,7 @@ export async function fetchArchivedPdf(config, docNo) {
 
 export const PAYLOAD_SAMPLE = JSON.stringify(
   {
-    document: 'SM-IN-000241',
+    document: 'WH-IN-000001',
     direction: 'inbound',
     carrier: 'DHL',
     driver: { name: 'Luca Ferri', plate: 'GA 481 KP' },

@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">SIMICO Warehouse Scan</string>
-    <string name="title_activity_main">SIMICO Warehouse Scan</string>
+    <string name="app_name">WMS App</string>
+    <string name="title_activity_main">WMS App</string>
     <string name="package_name">com.simico.warehousescan</string>
     <string name="custom_url_scheme">com.simico.warehousescan</string>
 </resources>
