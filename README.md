@@ -138,6 +138,7 @@ scans then one signature; signature required both inbound and outbound;
 hardware-scanner-first tracking input; duplicate tracking ID blocked (double
 beep + "+1 box"); unknown tracking ID accepted directly; photo mandatory only
 when damage is flagged; one A4 document per session with a repeating table
-header and single-page layout; bottom tab nav (Home · Scan · History · Docs ·
-API); accept = single beep + short vibration, reject = double beep + vibrate
+header and single-page layout; bottom tab nav (Home · History · Docs ·
+API — tapping Inbound/Outbound on Home starts or resumes a scan session);
+accept = single beep + short vibration, reject = double beep + vibrate
 pattern.

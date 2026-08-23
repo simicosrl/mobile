@@ -77,9 +77,9 @@ export default function BadgeLogin() {
       />
 
       <div className="flex items-center gap-2.5">
-        <div className="flex h-[34px] w-[34px] items-center justify-center rounded-[9px] bg-white text-[15px] font-extrabold text-primary">S</div>
+        <div className="flex h-[34px] w-[34px] items-center justify-center rounded-[9px] bg-white text-[15px] font-extrabold text-primary">W</div>
         <div>
-          <div className="text-[15px] font-extrabold tracking-[-.01em]">SIMICO</div>
+          <div className="text-[15px] font-extrabold tracking-[-.01em]">WMS App</div>
           <div className="text-[9px] uppercase tracking-[.14em] text-white/70">Warehouse scan</div>
         </div>
       </div>

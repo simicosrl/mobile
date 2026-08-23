@@ -12,4 +12,4 @@ export const elapsedLabel = (startedAt) => {
   return `${Math.floor(secs / 60)}m ${secs % 60}s`;
 };
 
-export const docNumber = (direction, seq) => (direction === 'out' ? 'SM-OUT-' : 'SM-IN-') + pad6(seq);
+export const docNumber = (direction, seq) => (direction === 'out' ? 'WH-OUT-' : 'WH-IN-') + pad6(seq);

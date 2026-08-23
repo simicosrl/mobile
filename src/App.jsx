@@ -48,7 +48,7 @@ function Shell() {
   if (!ready) {
     return (
       <div className="flex h-full items-center justify-center bg-[#0F172A] text-white">
-        <div className="text-sm font-bold tracking-wide">SIMICO Warehouse Scan</div>
+        <div className="text-sm font-bold tracking-wide">WMS App</div>
       </div>
     );
   }

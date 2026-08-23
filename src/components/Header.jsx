@@ -11,7 +11,7 @@ function headerCopy(app) {
 
   if (screen === 'api') return { title: 'API & integrations', sub: 'Send and receive warehouse data' };
   if (screen === 'settings') return { title: 'Settings', sub: 'Operator, warehouse & company' };
-  if (screen === 'home') return { title: 'SIMICO Warehouse', sub: `${orgSettings.warehouseLocation} · ${orgSettings.warehouseDock}` };
+  if (screen === 'home') return { title: 'WMS App', sub: `${orgSettings.warehouseLocation} · ${orgSettings.warehouseDock}` };
   if (screen === 'setup') return { title: 'New session', sub: '' };
   if (screen === 'scan') return { title: isOut ? 'Outbound scan' : 'Inbound scan', sub: `${sessionDocLabel} · ${carrier}` };
   if (screen === 'sign') return { title: 'Driver signature', sub: `${sessionDocLabel} · ${carrier}` };
