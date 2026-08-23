@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths-ignore:
       - 'SIMICO-Warehouse-Scan-debug.apk'
+      - 'version.json'
   workflow_dispatch: {}
 
 permissions:
@@ -62,6 +63,18 @@ jobs:
           ls -la "$APK"
           cp "$APK" SIMICO-Warehouse-Scan-debug.apk
 
+      - name: Write version manifest (for the in-app update check)
+        run: |
+          cat > version.json <<EOF
+          {
+            "versionCode": ${{ github.run_number }},
+            "versionName": "1.0.${{ github.run_number }}",
+            "apkUrl": "https://raw.githubusercontent.com/simicosrl/mobile/main/SIMICO-Warehouse-Scan-debug.apk",
+            "commit": "${{ github.sha }}"
+          }
+          EOF
+          cat version.json
+
       - name: Upload APK as workflow artifact
         uses: actions/upload-artifact@v4
         with:
@@ -69,15 +82,15 @@ jobs:
           path: SIMICO-Warehouse-Scan-debug.apk
           retention-days: 90
 
-      - name: Commit APK back to the repo
+      - name: Commit APK + version manifest back to the repo
         run: |
           set -e
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -f SIMICO-Warehouse-Scan-debug.apk
+          git add -f SIMICO-Warehouse-Scan-debug.apk version.json
           if git diff --cached --quiet; then
-            echo "APK unchanged, nothing to commit"
+            echo "Nothing changed, nothing to commit"
           else
-            git commit -m "ci: update compiled debug APK" -m "Built from ${{ github.sha }} by GitHub Actions. Debug-signed (Android's default debug keystore) - fine for sideloading, not for Play Store."
+            git commit -m "ci: update compiled debug APK (v1.0.${{ github.run_number }})" -m "Built from ${{ github.sha }} by GitHub Actions. Debug-signed with the project's pinned debug key — fine for sideloading, not for Play Store."
             git push origin HEAD:main
           fi

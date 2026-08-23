@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { App as CapacitorApp } from '@capacitor/app';
+import { Capacitor } from '@capacitor/core';
 import { useApp } from '../state/AppContext';
-import { Check } from '../components/icons';
+import { Check, Download } from '../components/icons';
 
 function Field({ label, ...props }) {
   return (
@@ -24,10 +26,25 @@ function Section({ title, children }) {
 }
 
 export default function Settings() {
-  const { shift, updateOperatorName, orgSettings, updateOrgSettings, showToast } = useApp();
+  const { shift, updateOperatorName, orgSettings, updateOrgSettings, showToast, updateInfo, checkUpdateNow, downloadUpdate } = useApp();
   const [name, setName] = useState(shift?.operatorName || '');
   const [org, setOrg] = useState(orgSettings);
   const [saved, setSaved] = useState(false);
+  const [appVersion, setAppVersion] = useState(null);
+  const [checking, setChecking] = useState(false);
+
+  useEffect(() => {
+    if (Capacitor.isNativePlatform()) {
+      CapacitorApp.getInfo().then((info) => setAppVersion(info)).catch(() => {});
+    }
+  }, []);
+
+  const checkNow = async () => {
+    setChecking(true);
+    const res = await checkUpdateNow();
+    setChecking(false);
+    showToast(res.available ? `Update available — v${res.versionName}` : 'You have the latest version');
+  };
 
   const set = (key) => (e) => { setOrg((o) => ({ ...o, [key]: e.target.value })); setSaved(false); };
 
@@ -73,6 +90,33 @@ export default function Settings() {
           </div>
         </div>
       </Section>
+
+      {Capacitor.isNativePlatform() && (
+        <Section title="App updates">
+          <div className="flex items-center gap-2.5">
+            <div className="min-w-0 flex-1">
+              <div className="text-[13px] font-bold text-ink">
+                {appVersion ? `Installed: v${appVersion.version} (build ${appVersion.build})` : 'Installed version'}
+              </div>
+              {updateInfo?.available && (
+                <div className="mt-0.5 text-[11px] font-bold text-primary">Update available — v{updateInfo.versionName}</div>
+              )}
+            </div>
+            <button
+              onClick={checkNow}
+              disabled={checking}
+              className="flex h-9 flex-none items-center rounded-lg border border-[rgba(148,163,184,.35)] px-3 text-xs font-bold text-ink disabled:opacity-60"
+            >
+              {checking ? 'Checking…' : 'Check now'}
+            </button>
+          </div>
+          {updateInfo?.available && (
+            <button onClick={downloadUpdate} className="flex min-h-[46px] w-full items-center justify-center gap-2 rounded-xl bg-primary text-sm font-extrabold text-white">
+              <Download size={16} strokeWidth={2.2} /> Download update
+            </button>
+          )}
+        </Section>
+      )}
 
       <button
         onClick={save}

@@ -1,10 +1,10 @@
 import { useMemo } from 'react';
 import { useApp } from '../state/AppContext';
-import { ArrowDownToLine, Truck, ChevronRight } from '../components/icons';
+import { ArrowDownToLine, Truck, ChevronRight, Download, X } from '../components/icons';
 import { hhmm } from '../lib/format';
 
 export default function Home() {
-  const { shift, startSession, history, endShift } = useApp();
+  const { shift, startSession, history, endShift, updateInfo, updateDismissed, dismissUpdate, downloadUpdate } = useApp();
 
   const today = useMemo(() => {
     const todayStr = new Date().toLocaleDateString('en-GB');
@@ -19,6 +19,20 @@ export default function Home() {
 
   return (
     <div className="flex flex-col gap-3.5 px-3.5 pb-[22px] pt-4">
+      {updateInfo?.available && !updateDismissed && (
+        <div className="flex items-center gap-2.5 rounded-2xl border border-[rgba(31,111,235,.3)] bg-[rgba(31,111,235,.07)] p-3.5">
+          <div className="min-w-0 flex-1">
+            <div className="text-[13px] font-extrabold text-primary">Update available — v{updateInfo.versionName}</div>
+            <div className="mt-0.5 text-[11px] leading-snug text-secondary">Downloads via your browser; open the file afterwards to install.</div>
+          </div>
+          <button onClick={downloadUpdate} className="flex h-9 flex-none items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-bold text-white">
+            <Download size={14} strokeWidth={2.2} /> Get it
+          </button>
+          <button onClick={dismissUpdate} aria-label="Dismiss" className="flex h-9 w-9 flex-none items-center justify-center rounded-lg text-secondary">
+            <X size={15} strokeWidth={2.2} />
+          </button>
+        </div>
+      )}
       <div className="rounded-2xl border border-[rgba(148,163,184,.25)] bg-white p-3.5 shadow-card">
         <div className="flex items-center justify-between gap-2.5">
           <div>
