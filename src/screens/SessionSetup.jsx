@@ -7,7 +7,7 @@ export default function SessionSetup() {
   const app = useApp();
   const { direction, carrier, setCarrier, courierCompany, setCourierCompany, shipment, setShipment, toScan } = app;
   const isOut = direction === 'out';
-  const nextDoc = docNumber(direction, app.docSeq?.[direction] ?? (isOut ? 241 : 240));
+  const nextDoc = docNumber(direction, app.docSeq?.[direction] ?? 0);
 
   return (
     <div className="flex flex-col gap-4 px-3.5 pb-[22px] pt-4">

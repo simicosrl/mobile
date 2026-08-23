@@ -16,7 +16,7 @@ function headerCopy(app) {
   if (screen === 'scan') return { title: isOut ? 'Outbound scan' : 'Inbound scan', sub: `${sessionDocLabel} · ${carrier}` };
   if (screen === 'sign') return { title: 'Driver signature', sub: `${sessionDocLabel} · ${carrier}` };
   if (screen === 'confirm') return { title: 'Session closed', sub: `${docLabel} · ${carrier}` };
-  if (screen === 'doc') return { title: 'Handover document', sub: confirmedDoc ? `${confirmedDoc.doc} · ${confirmedDoc.carrier}` : 'No document yet' };
+  if (screen === 'doc') return { title: 'Documents', sub: `${history.length} handover document${history.length === 1 ? '' : 's'}` };
   if (screen === 'session') return { title: sel ? sel.doc : 'Session', sub: sel ? `${sel.direction === 'out' ? 'Outbound' : 'Inbound'} · ${sel.date}` : '' };
   return { title: 'History', sub: 'Sessions and parcels' };
 }

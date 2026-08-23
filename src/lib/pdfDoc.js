@@ -25,6 +25,8 @@ const DEFAULT_COMPANY = {
   companyAddress: "Via dell'Industria 12, 24060 Casazza (BG), Italy",
   companyVat: 'P.IVA IT04512340167',
   companyEmail: 'warehouse@simico.srl',
+  warehouseLocation: 'Casazza (BG)',
+  warehouseDock: 'Dock 2',
 };
 
 function legalText(companyName) {
@@ -62,7 +64,12 @@ export function buildHandoverPdf(document, org) {
   doc.setFontSize(8);
   doc.setTextColor(...SECONDARY);
   doc.text(company.companyAddress, MARGIN_X + 44, y + 25);
-  doc.text(`${company.companyVat} · ${company.companyEmail}`, MARGIN_X + 44, y + 35);
+  const warehouseLine = [company.warehouseLocation, company.warehouseDock].filter(Boolean).join(' · ');
+  doc.text(
+    warehouseLine ? `${company.companyVat} · ${company.companyEmail} · ${warehouseLine}` : `${company.companyVat} · ${company.companyEmail}`,
+    MARGIN_X + 44,
+    y + 35,
+  );
 
   const kindLabel = document.direction === 'out' ? 'OUTBOUND HANDOVER NOTE' : 'INBOUND RECEIPT NOTE';
   doc.setFont('helvetica', 'bold');

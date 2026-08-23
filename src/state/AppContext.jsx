@@ -50,7 +50,7 @@ export function AppProvider({ children }) {
   const [manifest, setManifest] = useState({ codes: [], lastPulledAt: null });
   const [pulling, setPulling] = useState(false);
   const [syncing, setSyncing] = useState(false);
-  const [docSeq, setDocSeq] = useState({ in: 240, out: 241 });
+  const [docSeq, setDocSeq] = useState({ in: 0, out: 0 });
   const [orgSettings, setOrgSettings] = useState(DEFAULT_ORG_SETTINGS);
   const [viewingPhoto, setViewingPhoto] = useState(null);
   const [updateInfo, setUpdateInfo] = useState(null); // { available, versionName, apkUrl } | null
@@ -69,14 +69,24 @@ export function AppProvider({ children }) {
   // ---- initial load ----
   useEffect(() => {
     (async () => {
-      const [savedShift, savedApi, savedManifest, savedSeq, savedOrg, docs] = await Promise.all([
+      const [savedShift, savedApi, savedManifest, savedSeq, savedOrg, docs, docSeqReset] = await Promise.all([
         kvGet('shift', null),
         kvGet('apiConfig', INITIAL_API_CONFIG),
         kvGet('manifest', { codes: [], lastPulledAt: null }),
-        kvGet('docSeq', { in: 240, out: 241 }),
+        kvGet('docSeq', { in: 0, out: 0 }),
         kvGet('orgSettings', DEFAULT_ORG_SETTINGS),
         docsGetAll(),
+        kvGet('docSeqResetV1', false),
       ]);
+      // One-time reset of the document counter back to 0 — installs from
+      // before this change had it seeded at 240/241; new installs already
+      // default to 0 above, so this is a no-op for them.
+      let seqToUse = savedSeq;
+      if (!docSeqReset) {
+        seqToUse = { in: 0, out: 0 };
+        await kvSet('docSeq', seqToUse);
+        await kvSet('docSeqResetV1', true);
+      }
       let docList = docs;
       if (!docList.length) {
         for (const d of SEED_DOCUMENTS) await docPut(d);
@@ -92,7 +102,7 @@ export function AppProvider({ children }) {
       setHistory(docList.slice().sort((a, b) => (a.closedAtIso < b.closedAtIso ? 1 : -1)));
       setApiConfig(savedApi);
       setManifest(manifestState);
-      setDocSeq(savedSeq);
+      setDocSeq(seqToUse);
       setOrgSettings({ ...DEFAULT_ORG_SETTINGS, ...savedOrg });
       if (savedShift) {
         setShift(savedShift);
@@ -141,7 +151,6 @@ export function AppProvider({ children }) {
     });
   }, [previousScreen]);
   const goHome = useCallback(() => setScreen('home'), []);
-  const goToScanTab = useCallback(() => setScreen(parcels.length ? 'scan' : 'setup'), [parcels.length]);
   const goToHistoryTab = useCallback(() => setScreen('history'), []);
   const goToDocsTab = useCallback(() => { setPreviousScreen(screen); setScreen('doc'); }, [screen]);
   const goToApiTab = useCallback(() => setScreen('api'), []);
@@ -177,7 +186,20 @@ export function AppProvider({ children }) {
   const closePhoto = useCallback(() => setViewingPhoto(null), []);
 
   // ---- session setup ----
+  // Tapping Inbound/Outbound on Home resumes an already-open session in
+  // that same direction (there's no separate "Scan" tab any more — this is
+  // the only way back in) rather than silently discarding scanned parcels.
+  // Switching direction mid-session is blocked rather than wiping it.
   const startSession = useCallback((dir) => {
+    const sessionOpen = parcels.length > 0 || screen === 'setup' || screen === 'scan' || screen === 'sign';
+    if (sessionOpen && direction === dir) {
+      setScreen(parcels.length ? 'scan' : 'setup');
+      return;
+    }
+    if (sessionOpen && direction !== dir) {
+      showToast(`Finish the open ${direction === 'in' ? 'inbound' : 'outbound'} session first`);
+      return;
+    }
     setDirection(dir);
     setParcels([]);
     setConfirmedDoc(null);
@@ -189,7 +211,7 @@ export function AppProvider({ children }) {
     setShipment('');
     setSessionStartedAt(Date.now());
     setScreen('setup');
-  }, []);
+  }, [parcels.length, screen, direction, showToast]);
   const toScan = useCallback(() => { setSessionStartedAt(Date.now()); setScreen('scan'); }, []);
 
   // ---- scanning ----
@@ -411,7 +433,7 @@ export function AppProvider({ children }) {
   const value = useMemo(() => ({
     ready, now,
     shift, loginWithBadge, endShift, updateOperatorName,
-    screen, setScreen, canGoBack, goBack, goHome, goToScanTab, goToHistoryTab, goToDocsTab, goToApiTab, goToSettings,
+    screen, setScreen, canGoBack, goBack, goHome, goToHistoryTab, goToDocsTab, goToApiTab, goToSettings,
     direction, carrier, setCarrier, courierCompany, setCourierCompany, shipment, setShipment,
     parcels, sessionStartedAt, startSession, toScan, docSeq,
     submitScan, accept, dupCode, dupTime, closeDup, dupAddBox,
@@ -429,7 +451,7 @@ export function AppProvider({ children }) {
     toast, showToast,
     inputRef,
   }), [
-    ready, now, shift, loginWithBadge, endShift, updateOperatorName, screen, canGoBack, goBack, goHome, goToScanTab, goToHistoryTab, goToDocsTab, goToApiTab, goToSettings,
+    ready, now, shift, loginWithBadge, endShift, updateOperatorName, screen, canGoBack, goBack, goHome, goToHistoryTab, goToDocsTab, goToApiTab, goToSettings,
     direction, carrier, courierCompany, shipment, parcels, sessionStartedAt, startSession, toScan, docSeq,
     submitScan, accept, dupCode, dupTime, closeDup, dupAddBox, boxPlus, boxMinus, removeLast, flash,
     damageSheet, openDamage, closeDamage, toggleDamageType, setDamageNote, setDamagePhoto, saveDamage,
