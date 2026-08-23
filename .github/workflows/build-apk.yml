@@ -78,9 +78,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "APK unchanged, nothing to commit"
           else
-            git commit -m "ci: update compiled debug APK
-
-Built from ${{ github.sha }} by GitHub Actions.
-Debug-signed (Android's default debug keystore) — fine for sideloading, not for Play Store."
+            git commit -m "ci: update compiled debug APK" -m "Built from ${{ github.sha }} by GitHub Actions. Debug-signed (Android's default debug keystore) - fine for sideloading, not for Play Store."
             git push origin HEAD:main
           fi
