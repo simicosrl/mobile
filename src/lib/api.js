@@ -34,8 +34,13 @@ async function request(config, path, options = {}) {
       signal,
     });
     cancel();
-    const contentType = res.headers.get('content-type') || '';
-    const data = contentType.includes('application/json') ? await res.json().catch(() => null) : await res.text().catch(() => null);
+    // Parse as JSON whenever the body actually is JSON, regardless of the
+    // Content-Type header — plenty of real-world WMS/ERP endpoints answer
+    // with correct JSON but a missing or wrong content-type, and gating on
+    // that header silently broke every response shape check below.
+    const text = await res.text().catch(() => '');
+    let data = text;
+    try { data = text ? JSON.parse(text) : null; } catch { /* not JSON — keep the raw text */ }
     return { ok: res.ok, status: res.status, data };
   } catch (err) {
     cancel();
@@ -76,8 +81,34 @@ export async function pushDamage(config, trackingId, payload) {
   return request(config, `/warehouse/parcels/${encodeURIComponent(trackingId)}/damage`, { method: 'POST', body: payload });
 }
 
+/**
+ * Fetches the ERP's own archived PDF for a document, as a base64 data URL.
+ * Deliberately doesn't go through request() — that helper decodes bodies as
+ * text/JSON, which would corrupt binary PDF bytes.
+ */
 export async function fetchArchivedPdf(config, docNo) {
-  return request(config, `/warehouse/sessions/${encodeURIComponent(docNo)}/pdf`);
+  const base = (config.baseUrl || '').replace(/\/+$/, '');
+  if (!base) return { ok: false, error: 'No base URL configured' };
+  const { signal, cancel } = withTimeout(15000);
+  try {
+    const res = await fetch(`${base}/warehouse/sessions/${encodeURIComponent(docNo)}/pdf`, {
+      headers: config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {},
+      signal,
+    });
+    cancel();
+    if (!res.ok) return { ok: false, status: res.status, error: `HTTP ${res.status}` };
+    const blob = await res.blob();
+    const dataUrl = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+    return { ok: true, dataUrl };
+  } catch (err) {
+    cancel();
+    return { ok: false, error: err?.name === 'AbortError' ? 'Request timed out' : String(err?.message || err) };
+  }
 }
 
 export const PAYLOAD_SAMPLE = JSON.stringify(
