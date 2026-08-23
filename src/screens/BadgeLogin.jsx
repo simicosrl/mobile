@@ -2,43 +2,30 @@ import { useEffect, useRef, useState } from 'react';
 import { useApp } from '../state/AppContext';
 import { kvGet, kvSet } from '../lib/db';
 import { ScanLine, ArrowRight, Camera } from '../components/icons';
-import { useBarcodeScanner, isBarcodeDetectionSupported } from '../hooks/useBarcodeScanner';
+import { useBarcodeScanner, isCameraScanSupported } from '../hooks/useBarcodeScanner';
 
-// Badge scan is hardware-scanner-first: a keyboard-wedge scanner (Zebra
-// engine or a Bluetooth ring scanner) types into a hidden, always-focused
-// input and submits on Enter — no UI needed for that path. Phones/tablets
-// with no scanner attached get a camera-based scan option (when the
-// device/browser supports it) plus a manual entry fallback either way.
+// Badge login is scan-only, by design — no manual entry. A hardware
+// keyboard-wedge scanner (Zebra engine or Bluetooth ring scanner) types
+// into a hidden, always-focused input and submits on Enter automatically.
+// Phones/tablets with no scanner attached use the camera button, which
+// opens the native ML Kit scanner (see hooks/useBarcodeScanner.js).
 export default function BadgeLogin() {
   const { loginWithBadge } = useApp();
   const [pendingBadge, setPendingBadge] = useState(null);
   const [name, setName] = useState('');
-  const [manualOpen, setManualOpen] = useState(false);
-  const [manualValue, setManualValue] = useState('');
-  const [cameraOpen, setCameraOpen] = useState(false);
   const hiddenRef = useRef(null);
-
-  const scanner = useBarcodeScanner((code) => {
-    setCameraOpen(false);
-    handleBadge(code);
-  });
+  const { scan, scanning, error } = useBarcodeScanner();
 
   useEffect(() => {
     const refocus = () => {
-      if (!pendingBadge && !cameraOpen && hiddenRef.current && document.activeElement !== hiddenRef.current) {
+      if (!pendingBadge && hiddenRef.current && document.activeElement !== hiddenRef.current) {
         try { hiddenRef.current.focus({ preventScroll: true }); } catch { /* ignore */ }
       }
     };
     refocus();
     const t = setInterval(refocus, 400);
     return () => clearInterval(t);
-  }, [pendingBadge, cameraOpen]);
-
-  useEffect(() => {
-    if (cameraOpen) scanner.start();
-    else scanner.stop();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cameraOpen]);
+  }, [pendingBadge]);
 
   const handleBadge = async (raw) => {
     const badgeId = String(raw || '').trim().toUpperCase();
@@ -49,6 +36,11 @@ export default function BadgeLogin() {
     } else {
       setPendingBadge(badgeId);
     }
+  };
+
+  const scanWithCamera = async () => {
+    const code = await scan();
+    if (code) handleBadge(code);
   };
 
   const confirmName = async () => {
@@ -102,36 +94,16 @@ export default function BadgeLogin() {
             <ScanLine size={34} strokeWidth={1.6} className="text-white/90" />
             <div className="font-mono text-xs uppercase tracking-[.08em] text-white/65">Waiting for badge…</div>
           </div>
-          {isBarcodeDetectionSupported() && (
+          {isCameraScanSupported() && (
             <button
-              onClick={() => setCameraOpen(true)}
-              className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl border border-white/35 bg-white/10 text-[13px] font-bold text-white"
+              onClick={scanWithCamera}
+              disabled={scanning}
+              className="flex min-h-[52px] w-full items-center justify-center gap-2 rounded-xl bg-white text-[15px] font-extrabold text-primary disabled:opacity-60"
             >
-              <Camera size={17} strokeWidth={2} /> No Zebra scanner — use phone camera
+              <Camera size={18} strokeWidth={2} /> {scanning ? 'Opening camera…' : 'No Zebra scanner — scan with camera'}
             </button>
           )}
-          {!manualOpen ? (
-            <button onClick={() => setManualOpen(true)} className="text-center text-[12.5px] font-bold text-white/80 underline underline-offset-2">
-              Enter badge ID manually instead
-            </button>
-          ) : (
-            <div className="flex gap-2">
-              <input
-                autoFocus
-                value={manualValue}
-                onChange={(e) => setManualValue(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') handleBadge(manualValue); }}
-                placeholder="BADGE-0000"
-                className="min-h-[48px] flex-1 rounded-xl border border-white/35 bg-white/10 px-4 font-mono text-sm text-white placeholder:text-white/50"
-              />
-              <button
-                onClick={() => handleBadge(manualValue)}
-                className="flex min-h-[48px] items-center justify-center rounded-xl bg-white px-4 font-extrabold text-primary"
-              >
-                Go
-              </button>
-            </div>
-          )}
+          {error && <div className="text-center text-[12px] text-white/80">{error}</div>}
         </>
       ) : (
         <div className="flex flex-col gap-3">
@@ -154,16 +126,6 @@ export default function BadgeLogin() {
           >
             Start shift <ArrowRight size={17} strokeWidth={2.2} />
           </button>
-        </div>
-      )}
-
-      {cameraOpen && (
-        <div className="absolute inset-0 z-30 flex flex-col bg-black">
-          <video ref={scanner.videoRef} className="flex-1 object-cover" playsInline muted />
-          <div className="flex flex-col gap-2 p-4">
-            {scanner.error && <div className="text-center text-sm text-white">{scanner.error}</div>}
-            <button onClick={() => setCameraOpen(false)} className="min-h-[48px] rounded-xl bg-white text-sm font-bold text-ink">Cancel</button>
-          </div>
         </div>
       )}
     </div>
