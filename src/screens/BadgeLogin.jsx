@@ -1,30 +1,44 @@
 import { useEffect, useRef, useState } from 'react';
 import { useApp } from '../state/AppContext';
 import { kvGet, kvSet } from '../lib/db';
-import { ScanLine, ArrowRight } from '../components/icons';
+import { ScanLine, ArrowRight, Camera } from '../components/icons';
+import { useBarcodeScanner, isBarcodeDetectionSupported } from '../hooks/useBarcodeScanner';
 
 // Badge scan is hardware-scanner-first: a keyboard-wedge scanner (Zebra
 // engine or a Bluetooth ring scanner) types into a hidden, always-focused
 // input and submits on Enter — no UI needed for that path. Phones/tablets
-// without an attached scanner get a manual entry fallback.
+// with no scanner attached get a camera-based scan option (when the
+// device/browser supports it) plus a manual entry fallback either way.
 export default function BadgeLogin() {
   const { loginWithBadge } = useApp();
   const [pendingBadge, setPendingBadge] = useState(null);
   const [name, setName] = useState('');
   const [manualOpen, setManualOpen] = useState(false);
   const [manualValue, setManualValue] = useState('');
+  const [cameraOpen, setCameraOpen] = useState(false);
   const hiddenRef = useRef(null);
+
+  const scanner = useBarcodeScanner((code) => {
+    setCameraOpen(false);
+    handleBadge(code);
+  });
 
   useEffect(() => {
     const refocus = () => {
-      if (!pendingBadge && hiddenRef.current && document.activeElement !== hiddenRef.current) {
+      if (!pendingBadge && !cameraOpen && hiddenRef.current && document.activeElement !== hiddenRef.current) {
         try { hiddenRef.current.focus({ preventScroll: true }); } catch { /* ignore */ }
       }
     };
     refocus();
     const t = setInterval(refocus, 400);
     return () => clearInterval(t);
-  }, [pendingBadge]);
+  }, [pendingBadge, cameraOpen]);
+
+  useEffect(() => {
+    if (cameraOpen) scanner.start();
+    else scanner.stop();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cameraOpen]);
 
   const handleBadge = async (raw) => {
     const badgeId = String(raw || '').trim().toUpperCase();
@@ -47,7 +61,7 @@ export default function BadgeLogin() {
 
   return (
     <div
-      className="flex h-full flex-col justify-center gap-[22px] px-6 py-[30px] text-white safe-top safe-bottom"
+      className="relative flex h-full flex-col justify-center gap-[22px] px-6 py-[30px] text-white safe-top safe-bottom"
       style={{ background: 'linear-gradient(160deg,#1F6FEB 0%,#0969DA 60%,#0B378E 100%)' }}
     >
       <input
@@ -88,9 +102,17 @@ export default function BadgeLogin() {
             <ScanLine size={34} strokeWidth={1.6} className="text-white/90" />
             <div className="font-mono text-xs uppercase tracking-[.08em] text-white/65">Waiting for badge…</div>
           </div>
+          {isBarcodeDetectionSupported() && (
+            <button
+              onClick={() => setCameraOpen(true)}
+              className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl border border-white/35 bg-white/10 text-[13px] font-bold text-white"
+            >
+              <Camera size={17} strokeWidth={2} /> No Zebra scanner — use phone camera
+            </button>
+          )}
           {!manualOpen ? (
             <button onClick={() => setManualOpen(true)} className="text-center text-[12.5px] font-bold text-white/80 underline underline-offset-2">
-              No scanner attached — enter badge ID manually
+              Enter badge ID manually instead
             </button>
           ) : (
             <div className="flex gap-2">
@@ -132,6 +154,16 @@ export default function BadgeLogin() {
           >
             Start shift <ArrowRight size={17} strokeWidth={2.2} />
           </button>
+        </div>
+      )}
+
+      {cameraOpen && (
+        <div className="absolute inset-0 z-30 flex flex-col bg-black">
+          <video ref={scanner.videoRef} className="flex-1 object-cover" playsInline muted />
+          <div className="flex flex-col gap-2 p-4">
+            {scanner.error && <div className="text-center text-sm text-white">{scanner.error}</div>}
+            <button onClick={() => setCameraOpen(false)} className="min-h-[48px] rounded-xl bg-white text-sm font-bold text-ink">Cancel</button>
+          </div>
         </div>
       )}
     </div>
