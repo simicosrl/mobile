@@ -71,6 +71,13 @@ export default function BadgeLogin() {
             e.target.value = '';
           }
         }}
+        // This field is invisible and never meant to be tapped by a human —
+        // it only exists so a hardware scanner-wedge (Zebra engine or
+        // Bluetooth ring scanner, which the OS treats as a real keyboard)
+        // can type into it. inputMode="none" tells the OS not to pop the
+        // on-screen keyboard just because this gets auto-focused; it has no
+        // effect on a genuine physical/HID keyboard device.
+        inputMode="none"
         className="absolute h-px w-px opacity-0"
         aria-hidden="true"
         tabIndex={-1}
