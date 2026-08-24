@@ -180,6 +180,20 @@ export const Settings = (p) => (
   </Svg>
 );
 
+export const Keyboard = (p) => (
+  <Svg strokeWidth={1.9} {...p}>
+    <rect width="20" height="16" x="2" y="4" rx="2" ry="2" />
+    <path d="M6 8h.001" />
+    <path d="M10 8h.001" />
+    <path d="M14 8h.001" />
+    <path d="M18 8h.001" />
+    <path d="M8 12h.001" />
+    <path d="M12 12h.001" />
+    <path d="M16 12h.001" />
+    <path d="M7 16h10" />
+  </Svg>
+);
+
 export const RefreshCw = (p) => (
   <Svg strokeWidth={2} {...p}>
     <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />

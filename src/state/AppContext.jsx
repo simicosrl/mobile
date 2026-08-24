@@ -9,7 +9,7 @@ import { checkForUpdate, openDownload } from '../lib/updateCheck';
 
 const AppCtx = createContext(null);
 
-const INITIAL_API_CONFIG = { baseUrl: '', apiKey: '', autoPush: false, autoPull: false };
+const INITIAL_API_CONFIG = { baseUrl: '', apiKey: '', autoPush: false, autoPull: false, keySecured: false };
 
 export function AppProvider({ children }) {
   const [ready, setReady] = useState(false);
@@ -471,7 +471,9 @@ export function AppProvider({ children }) {
 
   // ---- API tab ----
   const setApiBaseUrl = useCallback((v) => setApiConfig((c) => ({ ...c, baseUrl: v })), []);
-  const setApiKey = useCallback((v) => setApiConfig((c) => ({ ...c, apiKey: v })), []);
+  // Editing the key by hand always exits the "secured" (hidden-after-copy)
+  // state — the operator typing/pasting a value already knows what it is.
+  const setApiKey = useCallback((v) => setApiConfig((c) => ({ ...c, apiKey: v, keySecured: false })), []);
   const togglePush = useCallback(() => setApiConfig((c) => ({ ...c, autoPush: !c.autoPush })), []);
   const togglePull = useCallback(() => setApiConfig((c) => ({ ...c, autoPull: !c.autoPull })), []);
   const toggleShowKey = useCallback(() => setApiShowKey((v) => !v), []);
@@ -485,11 +487,25 @@ export function AppProvider({ children }) {
     crypto.getRandomValues(bytes);
     const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
     const key = `whs_${hex}`;
-    setApiConfig((c) => ({ ...c, apiKey: key }));
+    setApiConfig((c) => ({ ...c, apiKey: key, keySecured: false }));
     setApiShowKey(true);
-    showToast('New key generated — register it with the WMS backend, then save');
+    showToast('New key generated — copy it now, then it will be hidden for security');
     return key;
   }, [showToast]);
+  // One-time reveal: once the freshly generated (or currently shown) key
+  // has been copied out, hide it and lock the Show/Hide toggle — a phone
+  // left unlocked shouldn't let anyone re-reveal a secret that's already
+  // been handed off. Editing the field or generating a new key unlocks it.
+  const copyApiKey = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(apiConfig.apiKey);
+      showToast('Copied — key is now hidden for security');
+    } catch {
+      showToast('Could not copy automatically — select and copy manually');
+    }
+    setApiShowKey(false);
+    setApiConfig((c) => ({ ...c, keySecured: true }));
+  }, [apiConfig.apiKey, showToast]);
 
   // `silent` is used for the automatic pull right after login — no need to
   // nag with "enable this first" on every login for installs that simply
@@ -564,7 +580,7 @@ export function AppProvider({ children }) {
     signatureDataUrl, setSignatureDataUrl, sigInk, setSigInk, clearSignature, signReady, toSign, finish,
     confirmedDoc, printDocument, emailDocument,
     history, historyQuery, setHistoryQuery, historyFilter, setHistoryFilter, selectedDocNo, openSession, backToHistory,
-    apiConfig, apiShowKey, setApiBaseUrl, setApiKey, generateApiKey, togglePush, togglePull, toggleShowKey,
+    apiConfig, apiShowKey, setApiBaseUrl, setApiKey, generateApiKey, copyApiKey, togglePush, togglePull, toggleShowKey,
     manifest, pulling, pullManifestNow, syncing, syncNow, retrySync,
     orgSettings, updateOrgSettings,
     driverProfiles, applyDriverProfile,
@@ -579,7 +595,7 @@ export function AppProvider({ children }) {
     damageSheet, openDamage, closeDamage, toggleDamageType, setDamageNote, setDamagePhoto, saveDamage,
     courierName, plate, agreed, toggleAgree, signatureDataUrl, sigInk, clearSignature, signReady, toSign, finish,
     confirmedDoc, printDocument, emailDocument, history, historyQuery, historyFilter, selectedDocNo, openSession, backToHistory,
-    apiConfig, apiShowKey, setApiBaseUrl, setApiKey, generateApiKey, togglePush, togglePull, toggleShowKey,
+    apiConfig, apiShowKey, setApiBaseUrl, setApiKey, generateApiKey, copyApiKey, togglePush, togglePull, toggleShowKey,
     manifest, pulling, pullManifestNow, syncing, syncNow, retrySync,
     orgSettings, updateOrgSettings, driverProfiles, applyDriverProfile, viewingPhoto, openPhoto, closePhoto,
     updateInfo, updateDismissed, checkUpdateNow, dismissUpdate, downloadUpdate, toast, showToast,

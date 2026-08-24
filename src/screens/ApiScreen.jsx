@@ -13,7 +13,7 @@ function Toggle({ on, onClick }) {
 
 export default function ApiScreen() {
   const {
-    apiConfig, apiShowKey, setApiBaseUrl, setApiKey, generateApiKey, togglePush, togglePull, toggleShowKey,
+    apiConfig, apiShowKey, setApiBaseUrl, setApiKey, generateApiKey, copyApiKey, togglePush, togglePull, toggleShowKey,
     manifest, pulling, pullManifestNow, syncing, syncNow, retrySync, history,
   } = useApp();
   const [showManifestList, setShowManifestList] = useState(false);
@@ -62,19 +62,34 @@ export default function ApiScreen() {
             placeholder="whs_…"
             className="min-h-12 min-w-0 flex-1 rounded-xl border border-inputborder bg-page px-4 font-mono text-[12.5px] text-ink"
           />
-          <button onClick={toggleShowKey} className="min-h-12 w-[52px] flex-none rounded-xl border border-[rgba(148,163,184,.35)] bg-white text-[11px] font-bold text-secondary">
+          <button
+            onClick={toggleShowKey}
+            disabled={apiConfig.keySecured}
+            className="min-h-12 w-[52px] flex-none rounded-xl border border-[rgba(148,163,184,.35)] bg-white text-[11px] font-bold text-secondary disabled:opacity-40"
+          >
             {apiShowKey ? 'Hide' : 'Show'}
           </button>
         </div>
-        <button
-          onClick={generateApiKey}
-          className="mt-2 flex min-h-11 w-full items-center justify-center rounded-xl border border-[rgba(31,111,235,.35)] bg-[rgba(31,111,235,.06)] text-[12.5px] font-extrabold text-primary"
-        >
-          Generate new key
-        </button>
+        <div className="mt-2 flex gap-2">
+          <button
+            onClick={generateApiKey}
+            className="flex min-h-11 flex-1 items-center justify-center rounded-xl border border-[rgba(31,111,235,.35)] bg-[rgba(31,111,235,.06)] text-[12.5px] font-extrabold text-primary"
+          >
+            Generate new key
+          </button>
+          {apiShowKey && !apiConfig.keySecured && apiConfig.apiKey && (
+            <button
+              onClick={copyApiKey}
+              className="flex min-h-11 flex-none items-center justify-center rounded-xl bg-primary px-4 text-[12.5px] font-extrabold text-white"
+            >
+              Copy
+            </button>
+          )}
+        </div>
         <div className="mt-1.5 text-[10.5px] leading-snug text-secondary">
-          Generates a random key on this device and saves it here. It only works once someone registers it
-          for this warehouse/country on the WMS backend — copy it (tap Show) and send it over.
+          {apiConfig.keySecured
+            ? 'Hidden for security after being copied — generate a new key, or retype it, to view it again.'
+            : 'Generates a random key on this device and saves it here. It only works once someone registers it for this warehouse/country on the WMS backend — tap Copy, then it hides itself.'}
         </div>
       </div>
 
