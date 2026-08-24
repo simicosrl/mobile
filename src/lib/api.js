@@ -52,6 +52,11 @@ export function sessionToPayload(document) {
   return {
     document: document.doc,
     direction: document.direction === 'out' ? 'outbound' : 'inbound',
+    // Redundant with the backend's own key→country lookup, but useful as
+    // an audit trail — if a key is ever mixed up between warehouses this
+    // shows up as a mismatch in the payload rather than silently landing
+    // in the wrong country's tables.
+    country: document.country || null,
     carrier: document.carrier,
     driver: { name: document.driverName || null, plate: document.plate || null },
     operator: document.operatorBadge || document.operator,

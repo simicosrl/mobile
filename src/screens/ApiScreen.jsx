@@ -73,7 +73,7 @@ export default function ApiScreen() {
             // event (autofill, IME quirks) can write the masked text itself
             // back as the "real" key, corrupting it with characters that
             // later break fetch()'s header encoding entirely.
-            readOnly={!apiConfig.keySecured && !apiShowKey}
+            readOnly={!apiConfig.keySecured && !apiShowKey && apiConfig.apiKey.length > 0}
             placeholder="whs_…"
             className="min-h-12 min-w-0 flex-1 rounded-xl border border-inputborder bg-page px-4 font-mono text-[12.5px] text-ink"
           />
