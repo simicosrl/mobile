@@ -74,6 +74,32 @@ Deno.serve(async (req: Request) => {
   const schema = `wh_${country}`;
 
   try {
+    // GET /admin/badge-country/{badgeId} — looks up which country a badge
+    // belongs to, so the app can log an operator straight into the right
+    // country with no manual picker. Authenticated the same way as every
+    // other route (a valid per-country scanner key), but deliberately
+    // ignores which country that key resolves to — any of the three keys
+    // works here, since a badge's country isn't known yet at login time.
+    // Note: this means a leaked key now also grants read access to the
+    // *whole* cross-country badge roster (badge id -> country code), not
+    // just its own country's data — a minor widening of the "a leaked key
+    // only exposes one country" story. Acceptable: read-only, no PII beyond
+    // a badge id and a country code.
+    const badgeCountryMatch = path.match(/^\/admin\/badge-country\/([^/]+)$/);
+    if (req.method === "GET" && badgeCountryMatch) {
+      const badgeId = decodeURIComponent(badgeCountryMatch[1]);
+      const { data, error } = await supabase
+        .schema("admin")
+        .from("badge_countries")
+        .select("country")
+        .eq("badge_id", badgeId)
+        .eq("active", true)
+        .maybeSingle();
+      if (error) return json({ error: error.message }, 500);
+      if (!data) return json({ error: "not found" }, 404);
+      return json({ country: data.country });
+    }
+
     // POST /warehouse/next-doc-number — reserves the next progressive
     // document number for this country+direction *before* the app builds
     // and prints the handover PDF, so the number on the printed/archived

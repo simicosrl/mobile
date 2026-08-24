@@ -9,21 +9,11 @@ import { checkForUpdate, openDownload } from '../lib/updateCheck';
 
 const AppCtx = createContext(null);
 
-// Our own dedicated backend (a Supabase Edge Function backed by a
-// per-country-isolated database — see docs/WMS-App-API-Integration-Guide.pdf)
-// rather than a generic "bring your own ERP" placeholder. Still editable —
-// this is just the default so a fresh install doesn't need it typed in.
-const DEFAULT_BASE_URL = 'https://piafchajbkfkyftumxke.supabase.co/functions/v1/wms-api';
-// One static key per country, registered server-side against that
-// country's schema only (see admin.scanner_keys) — baked in so the app is
-// connected to its own database out of the box, with zero setup from the
-// operator. The visible API screen is reserved for a separate, optional
-// connection (e.g. Prep-Center) — it has nothing to do with this pipeline.
-const DEFAULT_SCANNER_KEYS = {
-  IT: 'whs_ab0c2b8f5ee0ec80f413ceb86820af732db6ebe051b8a213',
-  FR: 'whs_32a0096bcf9ae40ca05ac891dd237540c6367908a8b0c7fa',
-  DE: 'whs_03f62f08e77cf839176692d5e92badddf53db34651c69cd0',
-};
+// DEFAULT_BASE_URL / DEFAULT_SCANNER_KEYS live in lib/api.js now (so
+// api.fetchBadgeCountry can use them without a circular import back into
+// this file) — re-exported here under the same names since the rest of
+// this file already refers to them by these names throughout.
+const { DEFAULT_BASE_URL, DEFAULT_SCANNER_KEYS } = api;
 const INITIAL_API_CONFIG = { baseUrl: DEFAULT_BASE_URL, apiKey: '', autoPush: true, autoPull: false, keySecured: false };
 
 export function AppProvider({ children }) {
@@ -216,23 +206,47 @@ export function AppProvider({ children }) {
     setApiConfig((c) => ({ ...c, baseUrl: DEFAULT_BASE_URL, apiKey: key, autoPush: true, keySecured: false }));
     pullDriverProfilesNowRef.current({ baseUrl: DEFAULT_BASE_URL, apiKey: key });
   }, []);
-  const loginWithBadge = useCallback((badgeId, operatorName) => {
+  // Country is no longer something the operator picks — it's a fact of the
+  // badge, looked up server-side on every login (admin.badge_countries).
+  // `badgeCountries` stays as a local read-through cache, keyed by badge id:
+  // a country code once confirmed, or `null` for "confirmed unassigned as of
+  // last check" (distinct from "never checked", i.e. the key absent
+  // entirely) — that distinction lets an offline retry of a never-assigned
+  // badge still show "contact the office" instead of "no connection".
+  // Returns { ok: true } on success, or { ok: false, reason: 'unassigned' |
+  // 'offline' } so BadgeLogin can render the right blocking message —
+  // deliberately never navigates to 'home' except on a real, live-confirmed
+  // (or offline-with-prior-confirmation) success, since the whole point of
+  // this change is an authoritative check, not an optimistic guess.
+  const loginWithBadge = useCallback(async (badgeId, operatorName) => {
     const id = badgeId || 'BADGE-0000';
-    const country = badgeCountries[id] || null;
+    const hasCached = Object.prototype.hasOwnProperty.call(badgeCountries, id);
+    const cachedCountry = badgeCountries[id];
+    const res = await api.fetchBadgeCountry(id);
+    let country;
+    if (res.ok) {
+      country = res.country;
+      setBadgeCountries((c) => ({ ...c, [id]: country }));
+    } else if (res.notFound) {
+      setBadgeCountries((c) => ({ ...c, [id]: null }));
+      return { ok: false, reason: 'unassigned' };
+    } else if (hasCached && cachedCountry) {
+      // Couldn't reach the server, but this badge's country was confirmed
+      // before — proceed offline rather than blocking someone mid-shift
+      // over a transient network blip.
+      country = cachedCountry;
+    } else if (hasCached && cachedCountry === null) {
+      return { ok: false, reason: 'unassigned' };
+    } else {
+      return { ok: false, reason: 'offline' };
+    }
     const s = { badgeId: id, operatorName: operatorName || 'Operator', startedAt: Date.now(), country };
     setShift(s);
     setScreen('home');
-    if (country) applyCountryConnection(country);
+    applyCountryConnection(country);
     pullManifestNowRef.current({ silent: true });
+    return { ok: true };
   }, [badgeCountries, applyCountryConnection]);
-  // Remembers the choice per badge, so the same operator gets it back
-  // automatically next time they scan in — different people sharing the
-  // same device (e.g. across depots) each keep their own default.
-  const setOperatorCountry = useCallback((countryCode) => {
-    setShift((s) => (s ? { ...s, country: countryCode } : s));
-    setBadgeCountries((c) => (shift?.badgeId ? { ...c, [shift.badgeId]: countryCode } : c));
-    applyCountryConnection(countryCode);
-  }, [shift?.badgeId, applyCountryConnection]);
   const endShift = useCallback(() => {
     setShift(null);
     kvSet('shift', null);
@@ -669,7 +683,7 @@ export function AppProvider({ children }) {
 
   const value = useMemo(() => ({
     ready, now,
-    shift, loginWithBadge, endShift, updateOperatorName, setOperatorCountry,
+    shift, loginWithBadge, endShift, updateOperatorName,
     screen, setScreen, canGoBack, goBack, goHome, goToHistoryTab, goToDocsTab, goToApiTab, goToSettings,
     direction, carrier, setCarrier, courierCompany, setCourierCompany, shipment, setShipment,
     parcels, sessionStartedAt, startSession, toScan, docSeq,
@@ -689,7 +703,7 @@ export function AppProvider({ children }) {
     toast, showToast,
     inputRef,
   }), [
-    ready, now, shift, loginWithBadge, endShift, updateOperatorName, setOperatorCountry, screen, canGoBack, goBack, goHome, goToHistoryTab, goToDocsTab, goToApiTab, goToSettings,
+    ready, now, shift, loginWithBadge, endShift, updateOperatorName, screen, canGoBack, goBack, goHome, goToHistoryTab, goToDocsTab, goToApiTab, goToSettings,
     direction, carrier, courierCompany, shipment, parcels, sessionStartedAt, startSession, toScan, docSeq,
     submitScan, accept, dupCode, dupTime, closeDup, dupAddBox, boxPlus, boxMinus, removeLast, removeParcel, flash,
     damageSheet, openDamage, closeDamage, toggleDamageType, setDamageNote, setDamagePhoto, saveDamage,

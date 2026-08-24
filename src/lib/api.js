@@ -5,6 +5,22 @@
 // That failure path is itself part of the feature (queue shows "failed",
 // Retry re-sends).
 
+// Our own dedicated backend (a Supabase Edge Function backed by a
+// per-country-isolated database — see docs/WMS-App-API-Integration-Guide.pdf)
+// rather than a generic "bring your own ERP" placeholder. Still editable —
+// this is just the default so a fresh install doesn't need it typed in.
+export const DEFAULT_BASE_URL = 'https://piafchajbkfkyftumxke.supabase.co/functions/v1/wms-api';
+// One static key per country, registered server-side against that
+// country's schema only (see admin.scanner_keys) — baked in so the app is
+// connected to its own database out of the box, with zero setup from the
+// operator. The visible API screen is reserved for a separate, optional
+// connection (e.g. Prep-Center) — it has nothing to do with this pipeline.
+export const DEFAULT_SCANNER_KEYS = {
+  IT: 'whs_ab0c2b8f5ee0ec80f413ceb86820af732db6ebe051b8a213',
+  FR: 'whs_32a0096bcf9ae40ca05ac891dd237540c6367908a8b0c7fa',
+  DE: 'whs_03f62f08e77cf839176692d5e92badddf53db34651c69cd0',
+};
+
 export const ENDPOINTS = [
   { method: 'POST', path: '/warehouse/sessions', note: 'Sends a confirmed document: header, parcel list, damage photos, signature and the rendered handover PDF (all base64).' },
   { method: 'GET', path: '/warehouse/manifest?date=today', note: 'Returns the tracking IDs expected for the day, per carrier.' },
@@ -108,6 +124,25 @@ export async function pullManifest(config) {
   if (res.ok && Array.isArray(res.data)) return { ok: true, codes: res.data };
   if (res.ok && Array.isArray(res.data?.tracking_ids)) return { ok: true, codes: res.data.tracking_ids };
   return { ok: false, error: describeError(res) };
+}
+
+// Looks up which country a badge belongs to — the authoritative,
+// server-side source now that operators can no longer pick their own
+// country. Any of the three per-country keys works here (the route isn't
+// schema-scoped); IT is just an arbitrary fixed choice. A strict 404 is the
+// only thing treated as "this badge really has no assignment" — every other
+// outcome (network error, timeout, 500, malformed response) must be treated
+// as "couldn't check", never misread as "unassigned", or a bad deploy/DB
+// hiccup would fleet-lock every operator out with a false "contact the
+// office" message.
+export async function fetchBadgeCountry(badgeId) {
+  const res = await request(
+    { baseUrl: DEFAULT_BASE_URL, apiKey: DEFAULT_SCANNER_KEYS.IT },
+    `/admin/badge-country/${encodeURIComponent(badgeId)}`,
+  );
+  if (res.status === 404) return { ok: false, notFound: true };
+  if (res.ok && res.data?.country) return { ok: true, country: res.data.country };
+  return { ok: false, notFound: false };
 }
 
 export async function pushDamage(config, trackingId, payload) {

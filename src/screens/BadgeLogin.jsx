@@ -13,27 +13,45 @@ export default function BadgeLogin() {
   const { loginWithBadge } = useApp();
   const [pendingBadge, setPendingBadge] = useState(null);
   const [name, setName] = useState('');
+  const [busy, setBusy] = useState(false);
+  // { badgeId, reason: 'unassigned' | 'offline' } | null — country is
+  // looked up server-side on every login now (no more manual picker), so a
+  // badge with nothing assigned yet, or a lookup that couldn't be reached at
+  // all, both need to block here rather than let the operator through.
+  const [loginError, setLoginError] = useState(null);
   const hiddenRef = useRef(null);
   const debounceRef = useRef(null);
   const { scan, scanning, error } = useBarcodeScanner();
 
   useEffect(() => {
     const refocus = () => {
-      if (!pendingBadge && hiddenRef.current && document.activeElement !== hiddenRef.current) {
+      if (!pendingBadge && !busy && !loginError && hiddenRef.current && document.activeElement !== hiddenRef.current) {
         try { hiddenRef.current.focus({ preventScroll: true }); } catch { /* ignore */ }
       }
     };
     refocus();
     const t = setInterval(refocus, 400);
     return () => clearInterval(t);
-  }, [pendingBadge]);
+  }, [pendingBadge, busy, loginError]);
+
+  const attemptLogin = async (badgeId, operatorName) => {
+    setBusy(true);
+    const res = await loginWithBadge(badgeId, operatorName);
+    setBusy(false);
+    if (!res.ok) setLoginError({ badgeId, reason: res.reason });
+  };
 
   const handleBadge = async (raw) => {
+    // Re-entrancy guard — the hidden input stays live (and its 400ms
+    // no-terminator fallback can still fire) while a lookup is in flight;
+    // without this a second scan mid-await would fire an overlapping login.
+    if (busy) return;
     const badgeId = String(raw || '').trim().toUpperCase();
     if (!badgeId) return;
+    setLoginError(null);
     const knownNames = (await kvGet('badgeNames', {})) || {};
     if (knownNames[badgeId]) {
-      loginWithBadge(badgeId, knownNames[badgeId]);
+      await attemptLogin(badgeId, knownNames[badgeId]);
     } else {
       setPendingBadge(badgeId);
     }
@@ -45,11 +63,17 @@ export default function BadgeLogin() {
   };
 
   const confirmName = async () => {
-    if (!pendingBadge || name.trim().length < 2) return;
+    if (busy || !pendingBadge || name.trim().length < 2) return;
     const knownNames = (await kvGet('badgeNames', {})) || {};
     knownNames[pendingBadge] = name.trim();
     await kvSet('badgeNames', knownNames);
-    loginWithBadge(pendingBadge, name.trim());
+    await attemptLogin(pendingBadge, name.trim());
+  };
+
+  const tryAgain = () => {
+    setLoginError(null);
+    setPendingBadge(null);
+    setName('');
   };
 
   return (
@@ -101,7 +125,28 @@ export default function BadgeLogin() {
         </div>
       </div>
 
-      {!pendingBadge ? (
+      {loginError ? (
+        <div className="flex flex-col gap-3">
+          <div>
+            <div className="text-[20px] font-extrabold leading-[1.25] tracking-[-.02em]">Badge {loginError.badgeId}</div>
+            {loginError.reason === 'unassigned' ? (
+              <div className="mt-2 text-[13px] text-white/75">
+                This badge has no country assigned yet. Contact the office to get it set up before scanning.
+              </div>
+            ) : (
+              <div className="mt-2 text-[13px] text-white/75">
+                Couldn't reach the server to check this badge — check the connection and try again.
+              </div>
+            )}
+          </div>
+          <button
+            onClick={tryAgain}
+            className="flex min-h-[52px] w-full items-center justify-center gap-2 rounded-xl bg-white text-[15px] font-extrabold text-primary"
+          >
+            Try again
+          </button>
+        </div>
+      ) : !pendingBadge ? (
         <>
           <div>
             <div className="text-[22px] font-extrabold leading-[1.25] tracking-[-.02em]">Scan your badge to start the shift</div>
@@ -109,12 +154,14 @@ export default function BadgeLogin() {
           </div>
           <div className="flex flex-col items-center gap-2.5 rounded-[14px] border-2 border-dashed border-white/40 p-5">
             <ScanLine size={34} strokeWidth={1.6} className="text-white/90" />
-            <div className="font-mono text-xs uppercase tracking-[.08em] text-white/65">Waiting for badge…</div>
+            <div className="font-mono text-xs uppercase tracking-[.08em] text-white/65">
+              {busy ? 'Checking badge…' : 'Waiting for badge…'}
+            </div>
           </div>
           {isCameraScanSupported() && (
             <button
               onClick={scanWithCamera}
-              disabled={scanning}
+              disabled={scanning || busy}
               className="flex min-h-[52px] w-full items-center justify-center gap-2 rounded-xl bg-white text-[15px] font-extrabold text-primary disabled:opacity-60"
             >
               <Camera size={18} strokeWidth={2} /> {scanning ? 'Opening camera…' : 'No Zebra scanner — scan with camera'}
@@ -138,10 +185,10 @@ export default function BadgeLogin() {
           />
           <button
             onClick={confirmName}
-            disabled={name.trim().length < 2}
+            disabled={name.trim().length < 2 || busy}
             className="flex min-h-[52px] w-full items-center justify-center gap-2 rounded-xl bg-white text-[15px] font-extrabold text-primary disabled:opacity-50"
           >
-            Start shift <ArrowRight size={17} strokeWidth={2.2} />
+            {busy ? 'Checking…' : (<>Start shift <ArrowRight size={17} strokeWidth={2.2} /></>)}
           </button>
         </div>
       )}
