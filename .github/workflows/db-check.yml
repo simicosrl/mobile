@@ -72,6 +72,16 @@ jobs:
             curl -sS -i -m 20 "https://piafchajbkfkyftumxke.supabase.co/functions/v1/wms-api/warehouse/drivers" \
               -H "Origin: https://localhost" -H "Authorization: Bearer ${IT_KEY}"
             echo
+            echo
+            echo "== GET /admin/badge-country/BADGE-IONUT (expect 200, IT) =="
+            curl -sS -i -m 20 "https://piafchajbkfkyftumxke.supabase.co/functions/v1/wms-api/admin/badge-country/BADGE-IONUT" \
+              -H "Origin: https://localhost" -H "Authorization: Bearer ${IT_KEY}"
+            echo
+            echo
+            echo "== GET /admin/badge-country/BADGE-DOES-NOT-EXIST (expect 404) =="
+            curl -sS -i -m 20 "https://piafchajbkfkyftumxke.supabase.co/functions/v1/wms-api/admin/badge-country/BADGE-DOES-NOT-EXIST" \
+              -H "Origin: https://localhost" -H "Authorization: Bearer ${IT_KEY}"
+            echo
           } > edge-function-probe.txt 2>&1
           cat edge-function-probe.txt
 
