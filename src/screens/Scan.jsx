@@ -10,7 +10,7 @@ export default function Scan() {
   const app = useApp();
   const {
     direction, carrier, parcels, sessionStartedAt, flash,
-    submitScan, boxPlus, boxMinus, removeLast, removeParcel, openDamage, toSign, docSeq, openPhoto,
+    submitScan, removeLast, removeParcel, openDamage, toSign, docSeq, openPhoto,
   } = app;
   const isOut = direction === 'out';
   const nextDoc = docNumber(direction, docSeq[direction]);
@@ -112,6 +112,11 @@ export default function Scan() {
             <div className={'break-all font-mono font-bold leading-tight tracking-[-.01em] text-ink ' + codeSize}>{last.code}</div>
             <div className="mt-2.5 flex flex-wrap items-center gap-2">
               <div className="text-[13px] font-bold text-ink">{last.carrier}</div>
+              {last.boxes > 1 && (
+                <div className="rounded-full bg-[rgba(15,23,42,.06)] px-2 py-[3px] text-[10px] font-extrabold uppercase tracking-[.06em] text-ink">
+                  {last.boxes} boxes
+                </div>
+              )}
               {last.expected !== null && last.expected !== undefined && (
                 <div
                   className="rounded-full px-2 py-[3px] text-[10px] font-extrabold uppercase tracking-[.06em]"
@@ -120,14 +125,6 @@ export default function Scan() {
                   {last.expected ? 'Expected' : 'Not on manifest'}
                 </div>
               )}
-            </div>
-            <div className="mt-3.5 flex items-center gap-2.5 border-t border-[rgba(148,163,184,.25)] pt-3">
-              <div className="text-[11px] font-bold uppercase tracking-[.06em] text-secondary">Boxes</div>
-              <div className="ml-auto flex items-center gap-2.5">
-                <button onClick={boxMinus} className="flex h-11 w-11 items-center justify-center rounded-[11px] border border-[rgba(148,163,184,.35)] bg-white text-xl font-bold leading-none text-ink">−</button>
-                <div className="min-w-[34px] text-center text-[22px] font-extrabold tracking-[-.02em]">{last.boxes}</div>
-                <button onClick={boxPlus} className="flex h-11 w-11 items-center justify-center rounded-[11px] border border-[rgba(148,163,184,.35)] bg-white text-xl font-bold leading-none text-ink">+</button>
-              </div>
             </div>
             {last.damage && (
               <div className="mt-3 flex items-start gap-2 rounded-[11px] border border-[rgba(220,38,38,.25)] bg-danger-tint2 p-2.5">

@@ -1,13 +1,15 @@
 import { useApp } from '../state/AppContext';
-import { CARRIERS } from '../lib/carriers';
+import { carriersForCountry, COUNTRIES } from '../lib/carriers';
 import { docNumber } from '../lib/format';
 import { ArrowRight } from '../components/icons';
 
 export default function SessionSetup() {
   const app = useApp();
-  const { direction, carrier, setCarrier, courierCompany, setCourierCompany, shipment, setShipment, toScan } = app;
+  const { direction, carrier, setCarrier, courierCompany, setCourierCompany, shipment, setShipment, toScan, shift } = app;
   const isOut = direction === 'out';
   const nextDoc = docNumber(direction, app.docSeq?.[direction] ?? 1);
+  const carriers = carriersForCountry(shift?.country);
+  const countryName = COUNTRIES.find((c) => c.code === shift?.country)?.name;
 
   return (
     <div className="flex flex-col gap-4 px-3.5 pb-[22px] pt-4">
@@ -22,9 +24,11 @@ export default function SessionSetup() {
       </div>
 
       <div>
-        <div className="mb-2 text-[11px] font-bold uppercase tracking-[.06em] text-secondary">Courier</div>
+        <div className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[.06em] text-secondary">
+          Courier {countryName && <span className="normal-case text-light">· {countryName}</span>}
+        </div>
         <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill,minmax(96px,1fr))' }}>
-          {CARRIERS.map((c) => (
+          {carriers.map((c) => (
             <button
               key={c}
               onClick={() => setCarrier(c)}
