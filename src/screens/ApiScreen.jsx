@@ -20,7 +20,15 @@ export default function ApiScreen() {
 
   const hostLabel = apiConfig.baseUrl.replace(/^https?:\/\//, '') || 'no endpoint configured';
   const online = !!apiConfig.baseUrl;
-  const keyShown = apiShowKey ? apiConfig.apiKey : apiConfig.apiKey.slice(0, 8) + (apiConfig.apiKey.length > 8 ? '••••••••••••' : '');
+  // Secured (already copied) keys show as blank rather than a masked
+  // preview — typing directly into that blank replaces the key outright
+  // (the escape hatch back out of "secured" mode), so there's never a
+  // masked placeholder sitting in the field that could get saved as-is.
+  const keyShown = apiConfig.keySecured
+    ? ''
+    : apiShowKey
+      ? apiConfig.apiKey
+      : apiConfig.apiKey.slice(0, 8) + (apiConfig.apiKey.length > 8 ? '••••••••••••' : '');
 
   const okCount = history.filter((d) => d.syncStatus === 'ok').length;
   const pendingCount = history.filter((d) => d.syncStatus === 'pending' || d.syncStatus === undefined).length;
@@ -59,6 +67,13 @@ export default function ApiScreen() {
           <input
             value={keyShown}
             onChange={(e) => setApiKey(e.target.value)}
+            // While masked, the field shows a placeholder string with •
+            // bullet characters — those aren't real key content, so the
+            // field must not be editable in that state, or a stray change
+            // event (autofill, IME quirks) can write the masked text itself
+            // back as the "real" key, corrupting it with characters that
+            // later break fetch()'s header encoding entirely.
+            readOnly={!apiConfig.keySecured && !apiShowKey}
             placeholder="whs_…"
             className="min-h-12 min-w-0 flex-1 rounded-xl border border-inputborder bg-page px-4 font-mono text-[12.5px] text-ink"
           />
