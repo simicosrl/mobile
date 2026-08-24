@@ -19,39 +19,9 @@ jobs:
 
       - name: Query database
         env:
-          DB_PASS: "HDOT8GxPoyn70PWs"
-          PROJECT_REF: "piafchajbkfkyftumxke"
+          CONN: "postgresql://postgres.piafchajbkfkyftumxke:b96CYVJYG1tVV5nF@aws-1-eu-west-1.pooler.supabase.com:6543/postgres"
         run: |
           set +e
-          {
-            echo "== candidate pooler hosts, probing each =="
-          } > db-check-result.txt
-          CONN=""
-          for region in eu-west-1 eu-west-2 eu-west-3 eu-central-1 eu-north-1 us-east-1 us-east-2 us-west-1 us-west-2 ap-southeast-1 ap-southeast-2 ap-northeast-1 ap-south-1 sa-east-1 ca-central-1; do
-            for slot in 0 1 2; do
-              HOST="aws-${slot}-${region}.pooler.supabase.com"
-              CANDIDATE="postgresql://postgres.${PROJECT_REF}:${DB_PASS}@${HOST}:5432/postgres?connect_timeout=5"
-              OUT=$(psql "$CANDIDATE" -c "select 1;" -t 2>&1)
-              STATUS=$?
-              echo "-- ${HOST}: exit ${STATUS} --" >> db-check-result.txt
-              if [ $STATUS -eq 0 ]; then
-                echo "FOUND WORKING HOST: ${HOST}" >> db-check-result.txt
-                CONN="$CANDIDATE"
-                break 2
-              fi
-              # Stop probing slots for a region once we get a definitive
-              # "tenant/user not found" (means host resolves fine, wrong
-              # tenant — no point trying other slot numbers for it) vs a
-              # DNS/unreachable error (try other slots, host might differ).
-              if echo "$OUT" | grep -q "not found"; then
-                break
-              fi
-            done
-          done
-          if [ -z "$CONN" ]; then
-            echo "No working pooler host found among candidates." >> db-check-result.txt
-            exit 0
-          fi
           {
             echo
             echo "== connection actually used below =="
@@ -73,7 +43,7 @@ jobs:
             psql "$CONN" -c "select 'it' as country, (select count(*) from wh_it.sessions) as sessions, (select count(*) from wh_it.parcels) as parcels;"
             psql "$CONN" -c "select 'fr' as country, (select count(*) from wh_fr.sessions) as sessions, (select count(*) from wh_fr.parcels) as parcels;"
             psql "$CONN" -c "select 'de' as country, (select count(*) from wh_de.sessions) as sessions, (select count(*) from wh_de.parcels) as parcels;"
-          } >> db-check-result.txt 2>&1
+          } > db-check-result.txt 2>&1
           cat db-check-result.txt
 
       - name: Commit result back to repo
