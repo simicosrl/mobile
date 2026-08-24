@@ -274,6 +274,13 @@ export function AppProvider({ children }) {
     showToast('Last scan removed');
     setParcels((arr) => arr.slice(0, -1));
   }, [parcels.length, showToast]);
+  // Removes any single parcel from the session list, not just the last
+  // one — tracking codes are unique within a session (duplicates are
+  // merged into "+1 box" elsewhere), so the code is a safe key to delete by.
+  const removeParcel = useCallback((code) => {
+    setParcels((arr) => arr.filter((p) => p.code !== code));
+    showToast(`${code} removed`);
+  }, [showToast]);
 
   // ---- damage sheet ----
   const openDamage = useCallback(() => {
@@ -516,7 +523,7 @@ export function AppProvider({ children }) {
     direction, carrier, setCarrier, courierCompany, setCourierCompany, shipment, setShipment,
     parcels, sessionStartedAt, startSession, toScan, docSeq,
     submitScan, accept, dupCode, dupTime, closeDup, dupAddBox,
-    boxPlus, boxMinus, removeLast, flash,
+    boxPlus, boxMinus, removeLast, removeParcel, flash,
     damageSheet, openDamage, closeDamage, toggleDamageType, setDamageNote, setDamagePhoto, saveDamage, damageTypes: DAMAGE_TYPES,
     courierName, setCourierName, plate, setPlate, agreed, toggleAgree,
     signatureDataUrl, setSignatureDataUrl, sigInk, setSigInk, clearSignature, signReady, toSign, finish,
@@ -533,7 +540,7 @@ export function AppProvider({ children }) {
   }), [
     ready, now, shift, loginWithBadge, endShift, updateOperatorName, screen, canGoBack, goBack, goHome, goToHistoryTab, goToDocsTab, goToApiTab, goToSettings,
     direction, carrier, courierCompany, shipment, parcels, sessionStartedAt, startSession, toScan, docSeq,
-    submitScan, accept, dupCode, dupTime, closeDup, dupAddBox, boxPlus, boxMinus, removeLast, flash,
+    submitScan, accept, dupCode, dupTime, closeDup, dupAddBox, boxPlus, boxMinus, removeLast, removeParcel, flash,
     damageSheet, openDamage, closeDamage, toggleDamageType, setDamageNote, setDamagePhoto, saveDamage,
     courierName, plate, agreed, toggleAgree, signatureDataUrl, sigInk, clearSignature, signReady, toSign, finish,
     confirmedDoc, printDocument, emailDocument, history, historyQuery, historyFilter, selectedDocNo, openSession, backToHistory,
