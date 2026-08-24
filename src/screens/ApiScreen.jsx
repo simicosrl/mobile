@@ -42,7 +42,7 @@ export default function ApiScreen() {
             <Globe size={19} strokeWidth={1.9} />
           </div>
           <div className="min-w-0">
-            <div className="text-[15px] font-extrabold tracking-[-.015em]">ERP connection</div>
+            <div className="text-[15px] font-extrabold tracking-[-.015em]">Your database</div>
             <div className="truncate text-[11px] text-secondary">{hostLabel}</div>
           </div>
           <div className="ml-auto flex flex-none items-center gap-1.5 rounded-full px-2.5 py-1" style={{ background: online ? 'rgba(22,163,74,.1)' : 'rgba(220,38,38,.1)' }}>
@@ -50,6 +50,13 @@ export default function ApiScreen() {
             <div className="text-[10px] font-extrabold uppercase tracking-[.06em]" style={{ color: online ? '#16A34A' : '#DC2626' }}>{online ? 'Configured' : 'Not set'}</div>
           </div>
         </div>
+      </div>
+
+      <div className="border-l-[3px] border-primary bg-[rgba(31,111,235,.06)] px-3 py-2.5 text-[11px] leading-normal text-secondary">
+        Every session is saved to this warehouse's own database automatically — set once your country is
+        picked in Settings, no setup needed here. The fields below are for troubleshooting only. Other
+        systems (e.g. Prep-Center) read their data from this database on their own schedule; the app never
+        sends anything to them directly.
       </div>
 
       <div>
@@ -104,7 +111,7 @@ export default function ApiScreen() {
         <div className="mt-1.5 text-[10.5px] leading-snug text-secondary">
           {apiConfig.keySecured
             ? 'Hidden for security after being copied — generate a new key, or retype it, to view it again.'
-            : 'Generates a random key on this device and saves it here. It only works once someone registers it for this warehouse/country on the WMS backend — tap Copy, then it hides itself.'}
+            : "This device's key is already set automatically from its country — only replace it if you're wiring up a separate, additional connection. Generating one here won't work until it's registered on the backend, and picking a country again in Settings restores the working default."}
         </div>
       </div>
 
@@ -112,7 +119,7 @@ export default function ApiScreen() {
         <button onClick={togglePush} className="flex w-full items-center gap-2.5 border-b border-[rgba(148,163,184,.15)] p-[13px] text-left">
           <div className="min-w-0 flex-1">
             <div className="text-[13.5px] font-bold">Send sessions automatically</div>
-            <div className="text-[11px] leading-snug text-secondary">POST every confirmed document to the ERP</div>
+            <div className="text-[11px] leading-snug text-secondary">On by default — saves every confirmed document to your database</div>
           </div>
           <Toggle on={apiConfig.autoPush} />
         </button>
