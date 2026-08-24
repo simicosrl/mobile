@@ -34,7 +34,7 @@ jobs:
             psql "$CONN" -x -c "select * from wh_it.sessions order by 1 desc limit 10;"
             echo
             echo "== wh_it.parcels, any row with tracking code containing 8007404018060 =="
-            psql "$CONN" -x -c "select * from wh_it.parcels where tracking_code::text like '%8007404018060%';"
+            psql "$CONN" -x -c "select * from wh_it.parcels where tracking::text like '%8007404018060%';"
             echo
             echo "== wh_it.parcels (last 10, any code) =="
             psql "$CONN" -x -c "select * from wh_it.parcels order by 1 desc limit 10;"
@@ -54,7 +54,19 @@ jobs:
           git add -f db-check-result.txt
           if git diff --cached --quiet; then
             echo "Nothing changed"
-          else
-            git commit -m "ci: db-check result [skip dbcheck]"
-            git push origin HEAD:main
+            exit 0
           fi
+          git commit -m "ci: db-check result [skip dbcheck]"
+          # The APK-build workflow runs on the same push and also commits
+          # back to main — retry with rebase instead of failing outright
+          # on the resulting non-fast-forward race.
+          for i in 1 2 3 4 5; do
+            if git push origin HEAD:main; then
+              exit 0
+            fi
+            git fetch origin main
+            git rebase origin/main
+            sleep $((i * 3))
+          done
+          echo "Giving up after 5 attempts" >&2
+          exit 1
