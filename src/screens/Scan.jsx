@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
+import { Capacitor } from '@capacitor/core';
+import { Keyboard } from '@capacitor/keyboard';
 import { useApp } from '../state/AppContext';
 import { docNumber, elapsedLabel } from '../lib/format';
-import { Check, TriangleAlert, ScanLine, Trash2, PenLine, Camera, X } from '../components/icons';
+import { Check, TriangleAlert, ScanLine, Trash2, PenLine, Camera, X, Keyboard as KeyboardIcon } from '../components/icons';
 import { useBarcodeScanner, isCameraScanSupported } from '../hooks/useBarcodeScanner';
 
 export default function Scan() {
@@ -16,17 +18,35 @@ export default function Scan() {
   const [buffer, setBuffer] = useState('');
   const inputRef = useRef(null);
   const { scan, scanning, error: scanError } = useBarcodeScanner();
+  // The tracking field stays auto-focused so a hardware scanner-wedge can
+  // always type into it (DataWedge injects text via the field's
+  // InputConnection regardless of whether the on-screen keyboard is
+  // visible), but the on-screen keyboard should only ever appear because
+  // the operator explicitly asked for it via the Keyboard button below —
+  // Keyboard.hide() is a native call that dismisses just the visual IME,
+  // it doesn't blur the field or touch any input attribute, so it has no
+  // effect on real scanner input (unlike inputMode/readOnly, which do).
+  const [manualKeyboard, setManualKeyboard] = useState(false);
 
   useEffect(() => {
     const refocus = () => {
       if (!scanning && inputRef.current && document.activeElement !== inputRef.current) {
         try { inputRef.current.focus({ preventScroll: true }); } catch { /* ignore */ }
       }
+      if (!manualKeyboard && Capacitor.isNativePlatform()) {
+        Keyboard.hide().catch(() => {});
+      }
     };
     refocus();
     const t = setInterval(refocus, 400);
     return () => clearInterval(t);
-  }, [scanning, parcels.length]);
+  }, [scanning, parcels.length, manualKeyboard]);
+
+  const openManualKeyboard = () => {
+    setManualKeyboard(true);
+    inputRef.current?.focus();
+    if (Capacitor.isNativePlatform()) Keyboard.show().catch(() => {});
+  };
 
   // Fallback for scanners/DataWedge configs that commit the scanned text
   // without sending an Enter/newline terminator at all: submit once the
@@ -59,7 +79,11 @@ export default function Scan() {
   const codeSize = last && last.code.length > 18 ? 'text-[17px]' : 'text-[21px]';
 
   return (
-    <div className="flex flex-col gap-3 px-3.5 pb-5 pt-3">
+    <div className="flex flex-col gap-3 pb-5">
+      {/* Pinned to the top of the screen so the just-scanned code stays in
+          view no matter how long the parcel list below grows — the operator
+          shouldn't have to scroll up to confirm what was just scanned. */}
+      <div className="sticky top-0 z-10 flex flex-col gap-3 bg-page px-3.5 pb-1 pt-3">
       <div className="flex items-center gap-2">
         <div className="rounded-full px-2 py-[3px] text-[10px] font-extrabold uppercase tracking-[.1em] text-white" style={{ background: isOut ? '#FF7A00' : '#1F6FEB' }}>
           {isOut ? 'Outbound' : 'Inbound'}
@@ -128,7 +152,9 @@ export default function Scan() {
           </div>
         )}
       </div>
+      </div>
 
+      <div className="flex flex-col gap-3 px-3.5">
       <div className="flex gap-2.5">
         <button onClick={openDamage} className="flex min-h-[48px] flex-1 items-center justify-center gap-1.5 rounded-xl border border-[rgba(220,38,38,.3)] bg-white text-[13px] font-bold text-danger">
           <TriangleAlert size={16} strokeWidth={2} /> Damage
@@ -167,17 +193,23 @@ export default function Scan() {
       <div className="rounded-[14px] border border-[rgba(148,163,184,.25)] bg-white p-3">
         <div className="mb-2 flex items-center justify-between">
           <div className="text-[10px] font-bold uppercase tracking-[.08em] text-secondary">Tracking ID · scanner ready</div>
-          {isCameraScanSupported() && (
-            <button onClick={scanWithCamera} disabled={scanning} className="flex items-center gap-1 text-[10.5px] font-bold text-primary disabled:opacity-60">
-              <Camera size={13} strokeWidth={2} /> {scanning ? 'Opening…' : 'Camera'}
+          <div className="flex items-center gap-2.5">
+            <button onClick={openManualKeyboard} className="flex items-center gap-1 text-[10.5px] font-bold text-primary">
+              <KeyboardIcon size={13} strokeWidth={2} /> Keyboard
             </button>
-          )}
+            {isCameraScanSupported() && (
+              <button onClick={scanWithCamera} disabled={scanning} className="flex items-center gap-1 text-[10.5px] font-bold text-primary disabled:opacity-60">
+                <Camera size={13} strokeWidth={2} /> {scanning ? 'Opening…' : 'Camera'}
+              </button>
+            )}
+          </div>
         </div>
         <input
           ref={inputRef}
           value={buffer}
           onChange={(e) => setBuffer(e.target.value)}
           onKeyDown={onKey}
+          onBlur={() => setManualKeyboard(false)}
           placeholder="waiting for scan…"
           className="min-h-[50px] w-full rounded-xl border-2 border-primary bg-white px-4 font-mono text-[15px] tracking-[.02em] text-ink shadow-focusring"
         />
@@ -187,6 +219,7 @@ export default function Scan() {
       <button onClick={toSign} className="flex min-h-[56px] w-full items-center justify-center gap-2.5 rounded-xl bg-ink text-[15px] font-extrabold text-white">
         <PenLine size={18} strokeWidth={2} /> Close session &amp; sign
       </button>
+      </div>
     </div>
   );
 }
