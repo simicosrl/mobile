@@ -1,0 +1,47 @@
+== OPTIONS preflight (what the WebView sends before the real POST) ==
+HTTP/2 204 
+date: Mon, 24 Aug 2026 12:09:23 GMT
+cf-ray: a3023f6cb9ef5122-MSP
+cf-cache-status: DYNAMIC
+access-control-allow-origin: *
+server: cloudflare
+vary: Accept-Encoding
+access-control-allow-headers: authorization, x-client-info, apikey, content-type
+access-control-allow-methods: GET, POST, OPTIONS
+endpoint-load-metrics: application_utilization:8,named_metrics.queue_depth:8
+sb-gateway-version: 1
+sb-project-ref: piafchajbkfkyftumxke
+sb-request-id: 01a033ac-e003-7303-b61c-221194f43caf
+x-deno-execution-id: 0ce31f85-0aaf-4b6f-a3cf-519ab6ea3568
+x-sb-edge-region: us-east-2
+x-served-by: supabase-edge-runtime
+strict-transport-security: max-age=31536000; includeSubDomains; preload
+set-cookie: __cf_bm=YDir6i7JMJU_eaUnhFQjKd6ZWIm93feWPhNxL7oTCPk-1787573362.6805558-1.0.1.1-HEqZ708EF4YSXeoqQ3U_Q5RxQ_V1ZUIcCQiKdkeW8ktOzfFMPO65DxSjOJndKqmuPjGYS9RO1v7dOP7o5yR7foQs7GRfNVB52ntGOPX7Mr3nIM59oYeRGTRrU1muNeif; HttpOnly; SameSite=None; Secure; Path=/; Domain=supabase.co; Expires=Mon, 24 Aug 2026 12:39:23 GMT
+alt-svc: h3=":443"; ma=86400
+
+
+
+== GET /warehouse/manifest with the Italy default key ==
+HTTP/2 200 
+date: Mon, 24 Aug 2026 12:09:24 GMT
+content-type: application/json
+cf-ray: a3023f6f58ef4ca2-MSP
+cf-cache-status: DYNAMIC
+access-control-allow-origin: *
+set-cookie: __cf_bm=GuRX1CWQIBTtAYX9cKlIQMaUKsLSL3exbPDvyYGgYUQ-1787573363.101269-1.0.1.1-NbVt5wzByf.aufGHo2BDe9rBeMCGbYGTgI3Zx_H58.WlOq_UmGZLUSVrnh6VUwafZgOuJ4Ul.pmyS0gnELENL85u3AGgEOChl5eLg9wK4o9deKwUVXNzw3vR6UF2oCxK; HttpOnly; SameSite=None; Secure; Path=/; Domain=supabase.co; Expires=Mon, 24 Aug 2026 12:39:24 GMT
+server: cloudflare
+vary: Accept-Encoding
+x-content-type-options: nosniff
+access-control-allow-headers: authorization, x-client-info, apikey, content-type
+access-control-allow-methods: GET, POST, OPTIONS
+endpoint-load-metrics: application_utilization:8,named_metrics.queue_depth:8
+sb-gateway-version: 1
+sb-project-ref: piafchajbkfkyftumxke
+sb-request-id: 01a033ac-e1aa-7731-944f-87baef3785d7
+x-deno-execution-id: 26a057d5-0a76-4e0b-a58a-5a9ad557f6e7
+x-sb-edge-region: us-east-2
+x-served-by: supabase-edge-runtime
+strict-transport-security: max-age=31536000; includeSubDomains; preload
+alt-svc: h3=":443"; ma=86400
+
+{"tracking_ids":[]}
