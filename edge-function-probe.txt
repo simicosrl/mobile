@@ -1,45 +1,45 @@
 == OPTIONS preflight (what the WebView sends before the real POST) ==
 HTTP/2 204 
-date: Mon, 24 Aug 2026 11:24:10 GMT
-cf-ray: a301fd340ac81425-MSP
+date: Mon, 24 Aug 2026 11:54:15 GMT
+cf-ray: a30229427fb28e40-IAD
 cf-cache-status: DYNAMIC
 access-control-allow-origin: *
 server: cloudflare
 vary: Accept-Encoding
 access-control-allow-headers: authorization, x-client-info, apikey, content-type
 access-control-allow-methods: GET, POST, OPTIONS
-endpoint-load-metrics: application_utilization:21,named_metrics.queue_depth:21
+endpoint-load-metrics: application_utilization:13,named_metrics.queue_depth:13
 sb-gateway-version: 1
 sb-project-ref: piafchajbkfkyftumxke
-sb-request-id: 01a03383-7c92-7ea9-b1e7-12617984f79b
-x-deno-execution-id: 764b838e-291d-4b61-84b9-e7dee674034e
-x-sb-edge-region: us-east-2
+sb-request-id: 01a0339f-058e-7d52-9a4c-84aa8ac3adac
+x-deno-execution-id: 2cea982c-33dc-4dca-9f82-0fc72d863ed7
+x-sb-edge-region: us-east-1
 x-served-by: supabase-edge-runtime
 strict-transport-security: max-age=31536000; includeSubDomains; preload
-set-cookie: __cf_bm=TnfYopwDzbE7souwrxZuSxz0UekJa5lKq0jDzHtJuqk-1787570650.250456-1.0.1.1-4iEvkx2OnDk_uq25AdVs6ffSHXQ.l1ogpwu5_RLJwxmb2N3_7u5OynDW045YONWjjilYSqiIp2JQcWJPn7QNEL0pWPidsMmYHfLT6dl_fplKNTSSCYB8j_DMkQzhWK_K; HttpOnly; SameSite=None; Secure; Path=/; Domain=supabase.co; Expires=Mon, 24 Aug 2026 11:54:10 GMT
+set-cookie: __cf_bm=YjR6LDfBk0PUwk8Sp6TGoPTfQpcYwAVayg4J16zeqbc-1787572454.7927685-1.0.1.1-jdYRKst6LVDOJ5a0u9wqArZis_pVz0N_oQULOrVCdNYk0kjzYGlegEhtVzCWVa6WMLGjeFh12SyagwMHT98VEAM1oGs.mCq8wwGrpKn_GQH7rnRMSI5hRwBzsap7IYkx; HttpOnly; SameSite=None; Secure; Path=/; Domain=supabase.co; Expires=Mon, 24 Aug 2026 12:24:15 GMT
 alt-svc: h3=":443"; ma=86400
 
 
 
 == GET /warehouse/manifest with the Italy default key ==
 HTTP/2 200 
-date: Mon, 24 Aug 2026 11:24:11 GMT
+date: Mon, 24 Aug 2026 11:54:16 GMT
 content-type: application/json
-cf-ray: a301fd36482919ca-MSP
+cf-ray: a3022944a86fbb25-IAD
 cf-cache-status: DYNAMIC
 access-control-allow-origin: *
-set-cookie: __cf_bm=oBnXh0nvny_RMeqT8hP17iANR3YOJ6YARZgzu54txew-1787570650.615518-1.0.1.1-_fTkrtp962ihiE8MBvPluRCiYhdVka6.mfGl3z6b_L5dCm4zR4UVa5mGoVKOBu2i8AMQq1t4WPqULt2qkifuSgcQ82C07v4eAOachdH_EIx0YmcxPZZodUuipgfmuCl9; HttpOnly; SameSite=None; Secure; Path=/; Domain=supabase.co; Expires=Mon, 24 Aug 2026 11:54:11 GMT
+set-cookie: __cf_bm=Ch9r8uROMMyHh7o8eloFNgcfNDkU2nImyQavbK5m0fY-1787572455.1432252-1.0.1.1-T3qt0cc19i032eW5T4yOMMDQ96Kz8hJZR0nXw3EnbYrlDh.s2N.ejYGVCI0dIkaL8BDCihtWjdamvfpkK4m3BbGGXzCD9zCUYC6HEUcIuGZmU8joJVegxtNx4SB2VmuP; HttpOnly; SameSite=None; Secure; Path=/; Domain=supabase.co; Expires=Mon, 24 Aug 2026 12:24:16 GMT
 server: cloudflare
 vary: Accept-Encoding
 x-content-type-options: nosniff
 access-control-allow-headers: authorization, x-client-info, apikey, content-type
 access-control-allow-methods: GET, POST, OPTIONS
-endpoint-load-metrics: application_utilization:9,named_metrics.queue_depth:9
+endpoint-load-metrics: application_utilization:13,named_metrics.queue_depth:13
 sb-gateway-version: 1
 sb-project-ref: piafchajbkfkyftumxke
-sb-request-id: 01a03383-7e29-7eeb-80cb-ee6d4ba571e8
-x-deno-execution-id: 1a2786ea-91e1-4295-92ac-5a50295af622
-x-sb-edge-region: us-east-2
+sb-request-id: 01a0339f-06ef-71bf-ac45-ca91e8a88a9b
+x-deno-execution-id: 55dbe6d5-f360-4d7b-a4a8-bb89656c8df9
+x-sb-edge-region: us-east-1
 x-served-by: supabase-edge-runtime
 strict-transport-security: max-age=31536000; includeSubDomains; preload
 alt-svc: h3=":443"; ma=86400

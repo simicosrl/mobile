@@ -7,87 +7,26 @@ postgresql://postgres.piafchajbkfkyftumxke:<redacted>@aws-1-eu-west-1.pooler.sup
 --------------------------------------+------------------------------------------------------------------+---------+-----------+---------------------------+--------+-------------------------------+----------------------------
  ebf1f1bb-ec3e-4164-846c-a365830ca28b | 17740cbd77645d7b7e6325bfc537bd495435abd7fbded38a6e01c8c020961641 | DE      |           | App default key — Germany | t      | 2026-08-24 08:14:54.159429+00 | 
  59193ed3-9610-49f4-9bd4-39ce5a4c99d6 | 3d5dce486b540a744c2faa6e2c402df07f3e8d7d4107a595386e424ce89b20c1 | FR      |           | App default key — France  | t      | 2026-08-24 08:14:54.159429+00 | 
- ff00f80c-7a2c-4a8d-9f42-51bab573960f | 0e9189cf65b98c81bfa78d34de97f5090f902ea57556170595c3fd83271c0bde | IT      |           | Test key — Italy          | t      | 2026-08-24 07:54:43.290641+00 | 2026-08-24 11:24:11.466+00
+ ff00f80c-7a2c-4a8d-9f42-51bab573960f | 0e9189cf65b98c81bfa78d34de97f5090f902ea57556170595c3fd83271c0bde | IT      |           | Test key — Italy          | t      | 2026-08-24 07:54:43.290641+00 | 2026-08-24 11:54:16.161+00
 (3 rows)
 
 
 == wh_it.sessions (last 10) ==
--[ RECORD 1 ]+-------------------------------------
-id           | 7c9566b8-b4a2-4251-8d4c-5a7659893ea7
-doc          | WH-IT-IN-000001
-direction    | inbound
-carrier      | CI-PROBE
-driver_name  | 
-driver_plate | 
-operator     | ci-probe
-closed_at    | 2026-08-24 00:00:00+00
-signature    | 
-pdf          | 
-created_at   | 2026-08-24 11:11:01.209445+00
--[ RECORD 2 ]+-------------------------------------
-id           | 2494b1d3-abc4-4c69-9f02-9a88411c0dd4
-doc          | WH-IT-IN-000002
-direction    | inbound
-carrier      | CI-PROBE-2
-driver_name  | 
-driver_plate | 
-operator     | ci-probe-2
-closed_at    | 2026-08-24 00:00:00+00
-signature    | 
-pdf          | 
-created_at   | 2026-08-24 11:21:58.786781+00
+(0 rows)
 
 
 == wh_it.parcels, any row with tracking code containing 8007404018060 ==
--[ RECORD 1 ]+-------------------------------------
-id           | 4aae262a-5d8c-44f2-bfd1-62ee16a015c9
-session_id   | 7c9566b8-b4a2-4251-8d4c-5a7659893ea7
-scan_order   | 1
-tracking     | CIPROBE-8007404018060
-boxes        | 1
-expected     | 
-damage_type  | 
-damage_photo | 
-created_at   | 2026-08-24 11:11:01.56869+00
--[ RECORD 2 ]+-------------------------------------
-id           | cbdfee01-9bb3-4b36-af97-42a5d4bb1e0a
-session_id   | 2494b1d3-abc4-4c69-9f02-9a88411c0dd4
-scan_order   | 1
-tracking     | CIPROBE2-8007404018060
-boxes        | 1
-expected     | 
-damage_type  | 
-damage_photo | 
-created_at   | 2026-08-24 11:21:58.932205+00
+(0 rows)
 
 
 == wh_it.parcels (last 10, any code) ==
--[ RECORD 1 ]+-------------------------------------
-id           | cbdfee01-9bb3-4b36-af97-42a5d4bb1e0a
-session_id   | 2494b1d3-abc4-4c69-9f02-9a88411c0dd4
-scan_order   | 1
-tracking     | CIPROBE2-8007404018060
-boxes        | 1
-expected     | 
-damage_type  | 
-damage_photo | 
-created_at   | 2026-08-24 11:21:58.932205+00
--[ RECORD 2 ]+-------------------------------------
-id           | 4aae262a-5d8c-44f2-bfd1-62ee16a015c9
-session_id   | 7c9566b8-b4a2-4251-8d4c-5a7659893ea7
-scan_order   | 1
-tracking     | CIPROBE-8007404018060
-boxes        | 1
-expected     | 
-damage_type  | 
-damage_photo | 
-created_at   | 2026-08-24 11:11:01.56869+00
+(0 rows)
 
 
 == row counts per country schema ==
  country | sessions | parcels 
 ---------+----------+---------
- it      |        2 |       2
+ it      |        0 |       0
 (1 row)
 
  country | sessions | parcels 
@@ -108,8 +47,8 @@ created_at   | 2026-08-24 11:11:01.56869+00
 
 
 == deleting CI-PROBE test rows from wh_it ==
-DELETE 2
-DELETE 2
+DELETE 0
+DELETE 0
 
 == resetting IT/inbound doc sequence back to 0 (only test docs existed) ==
  setval 
