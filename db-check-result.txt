@@ -16,9 +16,8 @@ postgresql://postgres.piafchajbkfkyftumxke:<redacted>@aws-1-eu-west-1.pooler.sup
 
 
 == wh_it.parcels, any row with tracking code containing 8007404018060 ==
-ERROR:  column "tracking_code" does not exist
-LINE 1: select * from wh_it.parcels where tracking_code::text like '...
-                                          ^
+(0 rows)
+
 
 == wh_it.parcels (last 10, any code) ==
 (0 rows)
