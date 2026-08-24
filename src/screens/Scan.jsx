@@ -16,14 +16,6 @@ export default function Scan() {
   const [buffer, setBuffer] = useState('');
   const inputRef = useRef(null);
   const { scan, scanning, error: scanError } = useBarcodeScanner();
-  // This field is kept auto-focused so a hardware scanner-wedge can always
-  // type into it, but that must not pop the on-screen keyboard by itself —
-  // only an explicit tap should. inputMode="none" hides the OS keyboard
-  // (a physical/HID scanner is unaffected by it); a real tap flips it to
-  // "text" so someone can type a tracking ID by hand, then resets on blur.
-  const [keyboardOpen, setKeyboardOpen] = useState(false);
-  const openKeyboard = () => setKeyboardOpen(true);
-  const closeKeyboard = () => setKeyboardOpen(false);
 
   useEffect(() => {
     const refocus = () => {
@@ -35,6 +27,20 @@ export default function Scan() {
     const t = setInterval(refocus, 400);
     return () => clearInterval(t);
   }, [scanning, parcels.length]);
+
+  // Fallback for scanners/DataWedge configs that commit the scanned text
+  // without sending an Enter/newline terminator at all: submit once the
+  // buffer has stopped changing for a moment. 400ms is well past a
+  // scanner's burst-typed characters, but doesn't get in the way of the
+  // explicit-Enter path below, which still fires immediately.
+  useEffect(() => {
+    if (!buffer) return undefined;
+    const t = setTimeout(() => {
+      submitScan(buffer);
+      setBuffer('');
+    }, 400);
+    return () => clearTimeout(t);
+  }, [buffer, submitScan]);
 
   const scanWithCamera = async () => {
     const code = await scan();
@@ -172,10 +178,6 @@ export default function Scan() {
           value={buffer}
           onChange={(e) => setBuffer(e.target.value)}
           onKeyDown={onKey}
-          onMouseDown={openKeyboard}
-          onTouchStart={openKeyboard}
-          onBlur={closeKeyboard}
-          inputMode={keyboardOpen ? 'text' : 'none'}
           placeholder="waiting for scan…"
           className="min-h-[50px] w-full rounded-xl border-2 border-primary bg-white px-4 font-mono text-[15px] tracking-[.02em] text-ink shadow-focusring"
         />
