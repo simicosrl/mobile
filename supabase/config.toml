@@ -1,0 +1,4 @@
+project_id = "piafchajbkfkyftumxke"
+
+[functions.wms-api]
+verify_jwt = false
