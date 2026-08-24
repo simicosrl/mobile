@@ -1,17 +1,42 @@
-== candidate pooler hosts, probing each ==
--- aws-0-eu-west-1.pooler.supabase.com: exit 2 --
--- aws-0-eu-west-2.pooler.supabase.com: exit 2 --
--- aws-0-eu-west-3.pooler.supabase.com: exit 2 --
--- aws-0-eu-central-1.pooler.supabase.com: exit 2 --
--- aws-0-eu-north-1.pooler.supabase.com: exit 2 --
--- aws-0-us-east-1.pooler.supabase.com: exit 2 --
--- aws-0-us-east-2.pooler.supabase.com: exit 2 --
--- aws-0-us-west-1.pooler.supabase.com: exit 2 --
--- aws-0-us-west-2.pooler.supabase.com: exit 2 --
--- aws-0-ap-southeast-1.pooler.supabase.com: exit 2 --
--- aws-0-ap-southeast-2.pooler.supabase.com: exit 2 --
--- aws-0-ap-northeast-1.pooler.supabase.com: exit 2 --
--- aws-0-ap-south-1.pooler.supabase.com: exit 2 --
--- aws-0-sa-east-1.pooler.supabase.com: exit 2 --
--- aws-0-ca-central-1.pooler.supabase.com: exit 2 --
-No working pooler host found among candidates.
+
+== connection actually used below ==
+postgresql://postgres.piafchajbkfkyftumxke:<redacted>@aws-1-eu-west-1.pooler.supabase.com:6543/postgres
+
+== admin.scanner_keys ==
+                  id                  |                             key_hash                             | country | warehouse |           label           | active |          created_at           | last_used_at 
+--------------------------------------+------------------------------------------------------------------+---------+-----------+---------------------------+--------+-------------------------------+--------------
+ ebf1f1bb-ec3e-4164-846c-a365830ca28b | 17740cbd77645d7b7e6325bfc537bd495435abd7fbded38a6e01c8c020961641 | DE      |           | App default key — Germany | t      | 2026-08-24 08:14:54.159429+00 | 
+ 59193ed3-9610-49f4-9bd4-39ce5a4c99d6 | 3d5dce486b540a744c2faa6e2c402df07f3e8d7d4107a595386e424ce89b20c1 | FR      |           | App default key — France  | t      | 2026-08-24 08:14:54.159429+00 | 
+ ff00f80c-7a2c-4a8d-9f42-51bab573960f | 0e9189cf65b98c81bfa78d34de97f5090f902ea57556170595c3fd83271c0bde | IT      |           | Test key — Italy          | t      | 2026-08-24 07:54:43.290641+00 | 
+(3 rows)
+
+
+== wh_it.sessions (last 10) ==
+(0 rows)
+
+
+== wh_it.parcels, any row with tracking code containing 8007404018060 ==
+ERROR:  column "tracking_code" does not exist
+LINE 1: select * from wh_it.parcels where tracking_code::text like '...
+                                          ^
+
+== wh_it.parcels (last 10, any code) ==
+(0 rows)
+
+
+== row counts per country schema ==
+ country | sessions | parcels 
+---------+----------+---------
+ it      |        0 |       0
+(1 row)
+
+ country | sessions | parcels 
+---------+----------+---------
+ fr      |        0 |       0
+(1 row)
+
+ country | sessions | parcels 
+---------+----------+---------
+ de      |        0 |       0
+(1 row)
+
