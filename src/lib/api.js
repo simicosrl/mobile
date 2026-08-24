@@ -114,6 +114,34 @@ export async function pushDamage(config, trackingId, payload) {
   return request(config, `/warehouse/parcels/${encodeURIComponent(trackingId)}/damage`, { method: 'POST', body: payload, timeoutMs: 30000 });
 }
 
+// Reserves the next progressive document number for this country+direction
+// *before* the app builds/prints the handover PDF, so the printed number is
+// guaranteed to match what actually lands in the database — a locally
+// generated placeholder could otherwise drift from the real counter (e.g.
+// after a reinstall, or a second device active on the same country).
+export async function reserveDocNumber(config, direction) {
+  const res = await request(config, '/warehouse/next-doc-number', { method: 'POST', body: { direction }, timeoutMs: 10000 });
+  if (res.ok && res.data?.document) return { ok: true, document: res.data.document };
+  return { ok: false, error: describeError(res) };
+}
+
+// Pulls this country's remembered driver profiles — shared across every
+// device/operator logged into it, so a driver's details survive an app
+// reinstall instead of living only in that one phone's local storage.
+export async function fetchDriverProfiles(config) {
+  const res = await request(config, '/warehouse/drivers');
+  if (res.ok && Array.isArray(res.data?.drivers)) return { ok: true, drivers: res.data.drivers };
+  return { ok: false, error: describeError(res) };
+}
+
+export async function pushDriverProfile(config, profile) {
+  return request(config, '/warehouse/drivers', {
+    method: 'POST',
+    body: { name: profile.name, courierCompany: profile.courierCompany, plate: profile.plate, lastUsedAt: profile.lastUsedAt },
+    timeoutMs: 10000,
+  });
+}
+
 /**
  * Fetches the ERP's own archived PDF for a document, as a base64 data URL.
  * Deliberately doesn't go through request() — that helper decodes bodies as

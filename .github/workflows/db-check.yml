@@ -17,7 +17,16 @@ jobs:
       - name: Install postgresql client
         run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
 
-      - name: Deploy the edge function (CORS fix)
+      - name: Apply pending SQL migrations
+        env:
+          CONN: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          for f in supabase/migrations/*.sql; do
+            echo "== applying $f =="
+            psql "$CONN" -v ON_ERROR_STOP=1 -f "$f"
+          done
+
+      - name: Deploy the edge function (CORS fix + doc reservation + drivers)
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
@@ -45,6 +54,23 @@ jobs:
             curl -sS -i -m 20 "https://piafchajbkfkyftumxke.supabase.co/functions/v1/wms-api/warehouse/manifest?date=today" \
               -H "Origin: https://localhost" \
               -H "Authorization: Bearer ${IT_KEY}"
+            echo
+            echo
+            echo "== POST /warehouse/next-doc-number (inbound) =="
+            curl -sS -i -m 20 -X POST "https://piafchajbkfkyftumxke.supabase.co/functions/v1/wms-api/warehouse/next-doc-number" \
+              -H "Origin: https://localhost" -H "Authorization: Bearer ${IT_KEY}" -H "Content-Type: application/json" \
+              -d '{"direction":"inbound"}'
+            echo
+            echo
+            echo "== POST /warehouse/drivers (upsert a CI-PROBE test driver) =="
+            curl -sS -i -m 20 -X POST "https://piafchajbkfkyftumxke.supabase.co/functions/v1/wms-api/warehouse/drivers" \
+              -H "Origin: https://localhost" -H "Authorization: Bearer ${IT_KEY}" -H "Content-Type: application/json" \
+              -d '{"name":"CI-PROBE Driver","courierCompany":"CI Test Co","plate":"CI-000-CI"}'
+            echo
+            echo
+            echo "== GET /warehouse/drivers =="
+            curl -sS -i -m 20 "https://piafchajbkfkyftumxke.supabase.co/functions/v1/wms-api/warehouse/drivers" \
+              -H "Origin: https://localhost" -H "Authorization: Bearer ${IT_KEY}"
             echo
           } > edge-function-probe.txt 2>&1
           cat edge-function-probe.txt
@@ -91,6 +117,7 @@ jobs:
             echo "== deleting CI-PROBE test rows from wh_it =="
             psql "$CONN" -c "delete from wh_it.parcels where session_id in (select id from wh_it.sessions where carrier like 'CI-PROBE%');"
             psql "$CONN" -c "delete from wh_it.sessions where carrier like 'CI-PROBE%';"
+            psql "$CONN" -c "delete from wh_it.driver_profiles where name like 'CI-PROBE%';"
             echo
             echo "== resetting IT/inbound doc sequence back to 0 (only test docs existed) =="
             psql "$CONN" -c "select setval(s.sequencename::regclass, 0, false) from pg_sequences s where s.schemaname = 'admin' and s.sequencename ilike '%it%in%';"

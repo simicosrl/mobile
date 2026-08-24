@@ -74,13 +74,83 @@ Deno.serve(async (req: Request) => {
   const schema = `wh_${country}`;
 
   try {
-    // POST /warehouse/sessions — confirmed handover, header + parcels.
-    if (req.method === "POST" && path === "/warehouse/sessions") {
-      const body = await req.json();
+    // POST /warehouse/next-doc-number — reserves the next progressive
+    // document number for this country+direction *before* the app builds
+    // and prints the handover PDF, so the number on the printed/archived
+    // document always matches the one this row gets. Without reserving it
+    // up front, the app would show a locally-generated placeholder that
+    // could drift from the database's real counter (e.g. after a reinstall
+    // resets the local counter, or a second operator/device is mid-session
+    // at the same time) — the database number was always correct, but the
+    // printed one wasn't guaranteed to match it.
+    if (req.method === "POST" && path === "/warehouse/next-doc-number") {
+      const body = await req.json().catch(() => ({}));
       const { data: doc, error: docErr } = await supabase
         .schema("admin")
         .rpc("next_doc_number", { p_country: auth.country, p_direction: body.direction });
       if (docErr) return json({ error: docErr.message }, 500);
+      return json({ document: doc });
+    }
+
+    // GET /warehouse/drivers — this country's remembered driver profiles
+    // (name, company, plate), shared across every device/operator logged
+    // into it — so a driver's details survive an app reinstall and show up
+    // the same way on any phone, not just the one they were first typed on.
+    if (req.method === "GET" && path === "/warehouse/drivers") {
+      const { data, error } = await supabase
+        .schema(schema)
+        .from("driver_profiles")
+        .select("name, courier_company, plate, last_used_at")
+        .order("last_used_at", { ascending: false });
+      if (error) return json({ error: error.message }, 500);
+      return json({
+        drivers: (data || []).map((d) => ({
+          name: d.name,
+          courierCompany: d.courier_company,
+          plate: d.plate,
+          lastUsedAt: d.last_used_at,
+        })),
+      });
+    }
+
+    // POST /warehouse/drivers — upsert one driver profile, keyed
+    // case-insensitively on name (matches the app's own local dedup rule).
+    if (req.method === "POST" && path === "/warehouse/drivers") {
+      const body = await req.json();
+      const name = String(body.name || "").trim();
+      if (!name) return json({ error: "name is required" }, 400);
+      const { error } = await supabase
+        .schema(schema)
+        .from("driver_profiles")
+        .upsert(
+          {
+            name,
+            courier_company: body.courierCompany ?? null,
+            plate: body.plate ?? null,
+            last_used_at: body.lastUsedAt ? new Date(body.lastUsedAt).toISOString() : new Date().toISOString(),
+          },
+          { onConflict: "name_lower" },
+        );
+      if (error) return json({ error: error.message }, 500);
+      return json({ ok: true });
+    }
+
+    // POST /warehouse/sessions — confirmed handover, header + parcels.
+    if (req.method === "POST" && path === "/warehouse/sessions") {
+      const body = await req.json();
+      // Use the number the app already reserved via /next-doc-number when
+      // present (the normal path) — only call next_doc_number here as a
+      // fallback for a session that never got to reserve one (e.g. it was
+      // built while offline), so a document is never rejected outright for
+      // missing a pre-reserved number.
+      let doc = body.document;
+      if (!doc) {
+        const { data: freshDoc, error: docErr } = await supabase
+          .schema("admin")
+          .rpc("next_doc_number", { p_country: auth.country, p_direction: body.direction });
+        if (docErr) return json({ error: docErr.message }, 500);
+        doc = freshDoc;
+      }
 
       const { data: session, error: sessErr } = await supabase
         .schema(schema)
