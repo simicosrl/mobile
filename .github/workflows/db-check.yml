@@ -24,14 +24,16 @@ jobs:
         run: |
           set +e
           CONN="$DB_URL_DIRECT"
-          psql "$CONN" -c "select 1;" -t > /dev/null 2>/tmp/direct_err.log
-          if [ $? -ne 0 ]; then
-            echo "Direct host failed, trying pooler..." 
-            cat /tmp/direct_err.log
+          psql "$CONN" -c "select 1;" -t > /tmp/direct_out.log 2>/tmp/direct_err.log
+          DIRECT_STATUS=$?
+          if [ $DIRECT_STATUS -ne 0 ]; then
             CONN="$DB_URL_POOLER"
           fi
           {
-            echo "== connection used =="
+            echo "== direct-host attempt (exit $DIRECT_STATUS) =="
+            cat /tmp/direct_err.log
+            echo
+            echo "== connection actually used below =="
             echo "$CONN" | sed -E 's#(://[^:]+:)[^@]+#\1<redacted>#'
             echo
             echo "== admin.scanner_keys =="
