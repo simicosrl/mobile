@@ -17,6 +17,26 @@ jobs:
       - name: Install postgresql client
         run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
 
+      - name: Test the deployed edge function directly (bypassing the app entirely)
+        env:
+          IT_KEY: "whs_ab0c2b8f5ee0ec80f413ceb86820af732db6ebe051b8a213"
+        run: |
+          {
+            echo "== POST /warehouse/sessions with the Italy default key =="
+            curl -sS -i -m 20 -X POST \
+              "https://piafchajbkfkyftumxke.supabase.co/functions/v1/wms-api/warehouse/sessions" \
+              -H "Authorization: Bearer ${IT_KEY}" \
+              -H "Content-Type: application/json" \
+              -d '{"direction":"inbound","carrier":"CI-PROBE","operator":"ci-probe","closed_at":"2026-08-24T00:00:00.000Z","parcels":[{"tracking":"CIPROBE-8007404018060","boxes":1}]}'
+            echo
+            echo
+            echo "== GET /warehouse/manifest with the Italy default key =="
+            curl -sS -i -m 20 "https://piafchajbkfkyftumxke.supabase.co/functions/v1/wms-api/warehouse/manifest?date=today" \
+              -H "Authorization: Bearer ${IT_KEY}"
+            echo
+          } > edge-function-probe.txt 2>&1
+          cat edge-function-probe.txt
+
       - name: Query database
         env:
           CONN: "postgresql://postgres.piafchajbkfkyftumxke:b96CYVJYG1tVV5nF@aws-1-eu-west-1.pooler.supabase.com:6543/postgres"
@@ -51,7 +71,7 @@ jobs:
           set -e
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -f db-check-result.txt
+          git add -f db-check-result.txt edge-function-probe.txt
           if git diff --cached --quiet; then
             echo "Nothing changed"
             exit 0
