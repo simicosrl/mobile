@@ -105,6 +105,13 @@ export default function History() {
           <div className="mt-1 text-[11.5px] text-secondary">No session contains that tracking ID or document number.</div>
         </div>
       )}
+
+      {!q && filtered.length === 0 && (
+        <div className="rounded-[13px] border border-[rgba(148,163,184,.25)] bg-white p-[22px_14px] text-center">
+          <div className="text-[13px] font-bold">No documents yet</div>
+          <div className="mt-1 text-[11.5px] text-secondary">Close and sign a session to see it here.</div>
+        </div>
+      )}
     </div>
   );
 }

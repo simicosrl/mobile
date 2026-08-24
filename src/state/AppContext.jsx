@@ -76,7 +76,7 @@ export function AppProvider({ children }) {
   // ---- initial load ----
   useEffect(() => {
     (async () => {
-      const [savedShift, savedApi, savedManifest, savedSeq, savedOrg, docs, docSeqReset, historyWiped, savedDriverProfiles, savedBadgeCountries] = await Promise.all([
+      const [savedShift, savedApi, savedManifest, savedSeq, savedOrg, docs, docSeqReset, historyWiped, savedDriverProfiles, savedBadgeCountries, driverProfilesCountryTagged] = await Promise.all([
         kvGet('shift', null),
         kvGet('apiConfig', INITIAL_API_CONFIG),
         kvGet('manifest', { codes: [], lastPulledAt: null }),
@@ -87,6 +87,7 @@ export function AppProvider({ children }) {
         kvGet('historyWipeV1', false),
         kvGet('driverProfiles', []),
         kvGet('badgeCountries', {}),
+        kvGet('driverProfilesCountryTaggedV1', false),
       ]);
       // One-time reset of the document counter to start numbering at 1
       // (WH-IN-000001 / WH-OUT-000001) — installs from before this change
@@ -135,12 +136,21 @@ export function AppProvider({ children }) {
       setManifest(manifestState);
       setDocSeq(seqToUse);
       setOrgSettings({ ...DEFAULT_ORG_SETTINGS, ...savedOrg });
-      setDriverProfiles(savedDriverProfiles);
+      // One-time wipe of driver profiles saved before they carried a
+      // `country` tag — left untagged, they'd silently fail the new
+      // per-country filter and vanish from the picker forever instead of
+      // just being re-pulled fresh for whichever country is active below.
+      let driverProfilesToUse = savedDriverProfiles;
+      if (!driverProfilesCountryTagged) {
+        driverProfilesToUse = [];
+        await kvSet('driverProfilesCountryTaggedV1', true);
+      }
+      setDriverProfiles(driverProfilesToUse);
       // Catch this phone up with the country's full driver list on every
       // cold start where a connection already exists — a fresh install (no
       // local drivers at all yet) or a device that's been offline for a
       // while both need this, not just a brand-new badge login.
-      if (apiToUse.apiKey) pullDriverProfilesNowRef.current(apiToUse);
+      if (apiToUse.apiKey && savedShift?.country) pullDriverProfilesNowRef.current(apiToUse, savedShift.country);
       setBadgeCountries(savedBadgeCountries);
       if (savedShift) {
         setShift(savedShift);
@@ -204,7 +214,13 @@ export function AppProvider({ children }) {
     const key = DEFAULT_SCANNER_KEYS[countryCode];
     if (!key) return;
     setApiConfig((c) => ({ ...c, baseUrl: DEFAULT_BASE_URL, apiKey: key, autoPush: true, keySecured: false }));
-    pullDriverProfilesNowRef.current({ baseUrl: DEFAULT_BASE_URL, apiKey: key });
+    pullDriverProfilesNowRef.current({ baseUrl: DEFAULT_BASE_URL, apiKey: key }, countryCode);
+    // Cosmetic, but avoids a stale "next document" preview number carried
+    // over from whichever country was last active on this device — the
+    // real, authoritative number always comes from the server reservation
+    // when online; this only ever shows up in the rare offline-fallback
+    // path, but should still read as "this country starts clean".
+    setDocSeq({ in: 1, out: 1 });
   }, []);
   // Country is no longer something the operator picks — it's a fact of the
   // badge, looked up server-side on every login (admin.badge_countries).
@@ -440,19 +456,21 @@ export function AppProvider({ children }) {
     const trimmedName = (name || '').trim();
     if (!trimmedName) return;
     const key = trimmedName.toLowerCase();
-    const updated = { name: trimmedName, courierCompany: (company || '').trim(), plate: (plateNo || '').trim(), lastUsedAt: Date.now() };
+    const updated = { name: trimmedName, courierCompany: (company || '').trim(), plate: (plateNo || '').trim(), lastUsedAt: Date.now(), country: shift?.country || null };
     setDriverProfiles((list) => {
       const others = list.filter((p) => p.name.toLowerCase() !== key);
       return [updated, ...others].sort((a, b) => b.lastUsedAt - a.lastUsedAt);
     });
     if (apiConfig.apiKey) api.pushDriverProfile(apiConfig, updated).catch(() => {});
-  }, [apiConfig]);
+  }, [apiConfig, shift]);
   // Pulls this country's driver list from the database and merges it with
   // whatever's local (by name, keeping whichever copy was touched more
   // recently) — called on login and whenever the country connection is
   // (re)established, so a fresh install or a different phone catches up
-  // with every driver already known to this warehouse.
-  const pullDriverProfilesNow = useCallback(async (config) => {
+  // with every driver already known to this warehouse. `countryCode` is
+  // passed explicitly by every caller (rather than read from `shift` here)
+  // so this stays safe to call before `shift` itself has been updated yet.
+  const pullDriverProfilesNow = useCallback(async (config, countryCode) => {
     if (!config?.apiKey) return;
     const res = await api.fetchDriverProfiles(config);
     if (!res.ok) return;
@@ -462,7 +480,7 @@ export function AppProvider({ children }) {
         const key = remote.name.toLowerCase();
         const local = byName.get(key);
         const remoteTime = new Date(remote.lastUsedAt).getTime() || 0;
-        if (!local || remoteTime > (local.lastUsedAt || 0)) byName.set(key, { ...remote, lastUsedAt: remoteTime });
+        if (!local || remoteTime > (local.lastUsedAt || 0)) byName.set(key, { ...remote, lastUsedAt: remoteTime, country: countryCode });
       }
       return Array.from(byName.values()).sort((a, b) => b.lastUsedAt - a.lastUsedAt);
     });
@@ -549,8 +567,8 @@ export function AppProvider({ children }) {
       const syncError = res.ok ? null : api.describeError(res);
       const updated = { ...document, syncStatus: res.ok ? 'ok' : 'failed', syncError };
       await docPut(updated);
-      setHistory((h) => h.map((d) => (d.doc === doc ? updated : d)));
-      setConfirmedDoc((c) => (c && c.doc === doc ? updated : c));
+      setHistory((h) => h.map((d) => (d.doc === doc && d.country === document.country ? updated : d)));
+      setConfirmedDoc((c) => (c && c.doc === doc && c.country === document.country ? updated : c));
       showToast(res.ok ? `${doc} sent to the ERP` : `${doc} failed to send — ${syncError}`);
     }
   }, [signReady, direction, docSeq, carrier, courierCompany, shipment, courierName, plate, shift, parcels, signatureDataUrl, apiConfig, showToast, renderPdfDataUrl, saveDriverProfile]);
@@ -648,7 +666,14 @@ export function AppProvider({ children }) {
   const syncNow = useCallback(async () => {
     if (!apiConfig.autoPush) { showToast('Enable "Send sessions automatically" first'); return; }
     setSyncing(true);
-    const pending = history.filter((d) => d.syncStatus !== 'ok');
+    // Only ever push documents that belong to the country currently
+    // connected — `history` here is the raw, unfiltered state (this
+    // function closes over it directly, not the country-filtered value
+    // exposed to screens), so without this a stale unsynced document from
+    // a country this device used earlier could get pushed into whichever
+    // country is connected right now (the backend trusts the auth key for
+    // schema routing, not the payload's own country field).
+    const pending = history.filter((d) => d.syncStatus !== 'ok' && d.country === shift?.country);
     let okCount = 0;
     let failCount = 0;
     let lastError = null;
@@ -659,7 +684,7 @@ export function AppProvider({ children }) {
       if (res.ok) okCount++; else { failCount++; lastError = syncError; }
       const updated = { ...d, syncStatus: res.ok ? 'ok' : 'failed', syncError };
       await docPut(updated);
-      setHistory((h) => h.map((x) => (x.doc === d.doc ? updated : x)));
+      setHistory((h) => h.map((x) => (x.doc === d.doc && x.country === d.country ? updated : x)));
     }
     setSyncing(false);
     showToast(
@@ -667,19 +692,30 @@ export function AppProvider({ children }) {
         : failCount ? `${okCount} sent · ${failCount} failed — ${lastError}`
         : `${okCount} sent`
     );
-  }, [apiConfig, history, showToast, renderPdfDataUrl]);
+  }, [apiConfig, history, shift, showToast, renderPdfDataUrl]);
 
   const retrySync = useCallback(async (doc) => {
-    const d = history.find((x) => x.doc === doc);
+    const d = history.find((x) => x.doc === doc && x.country === shift?.country);
     if (!d) return;
     const pdfDataUrl = await renderPdfDataUrl(d);
     const res = await api.pushSession(apiConfig, { ...d, pdfDataUrl });
     const syncError = res.ok ? null : api.describeError(res);
     const updated = { ...d, syncStatus: res.ok ? 'ok' : 'failed', syncError };
     await docPut(updated);
-    setHistory((h) => h.map((x) => (x.doc === doc ? updated : x)));
+    setHistory((h) => h.map((x) => (x.doc === doc && x.country === d.country ? updated : x)));
     showToast(res.ok ? `${doc} sent` : `${doc} failed — ${syncError}`);
-  }, [apiConfig, history, showToast, renderPdfDataUrl]);
+  }, [apiConfig, history, shift, showToast, renderPdfDataUrl]);
+
+  // Every screen reads `history`/`driverProfiles` through this context —
+  // filtering once, here, means each country only ever sees its own data
+  // (documents, sync queue, driver picker) on a device that gets reused
+  // across countries over time, with zero changes needed in the screens
+  // themselves. The raw, unfiltered state stays available to the functions
+  // above (`syncNow`, `retrySync`, the init-load effect, etc.) that
+  // legitimately need to see or migrate every country's data on this
+  // device, not just the currently active one.
+  const visibleHistory = useMemo(() => history.filter((d) => d.country === shift?.country), [history, shift]);
+  const visibleDriverProfiles = useMemo(() => driverProfiles.filter((p) => p.country === shift?.country), [driverProfiles, shift]);
 
   const value = useMemo(() => ({
     ready, now,
@@ -693,11 +729,11 @@ export function AppProvider({ children }) {
     courierName, setCourierName, plate, setPlate, agreed, toggleAgree,
     signatureDataUrl, setSignatureDataUrl, sigInk, setSigInk, clearSignature, signReady, toSign, finish,
     confirmedDoc, printDocument, emailDocument,
-    history, historyQuery, setHistoryQuery, historyFilter, setHistoryFilter, selectedDocNo, openSession, backToHistory,
+    history: visibleHistory, historyQuery, setHistoryQuery, historyFilter, setHistoryFilter, selectedDocNo, openSession, backToHistory,
     apiConfig, apiShowKey, setApiBaseUrl, setApiKey, generateApiKey, copyApiKey, togglePush, togglePull, toggleShowKey,
     manifest, pulling, pullManifestNow, syncing, syncNow, retrySync,
     orgSettings, updateOrgSettings,
-    driverProfiles, applyDriverProfile,
+    driverProfiles: visibleDriverProfiles, applyDriverProfile,
     viewingPhoto, openPhoto, closePhoto,
     updateInfo, updateDismissed, checkUpdateNow, dismissUpdate, downloadUpdate,
     toast, showToast,
@@ -708,10 +744,10 @@ export function AppProvider({ children }) {
     submitScan, accept, dupCode, dupTime, closeDup, dupAddBox, boxPlus, boxMinus, removeLast, removeParcel, flash,
     damageSheet, openDamage, closeDamage, toggleDamageType, setDamageNote, setDamagePhoto, saveDamage,
     courierName, plate, agreed, toggleAgree, signatureDataUrl, sigInk, clearSignature, signReady, toSign, finish,
-    confirmedDoc, printDocument, emailDocument, history, historyQuery, historyFilter, selectedDocNo, openSession, backToHistory,
+    confirmedDoc, printDocument, emailDocument, visibleHistory, historyQuery, historyFilter, selectedDocNo, openSession, backToHistory,
     apiConfig, apiShowKey, setApiBaseUrl, setApiKey, generateApiKey, copyApiKey, togglePush, togglePull, toggleShowKey,
     manifest, pulling, pullManifestNow, syncing, syncNow, retrySync,
-    orgSettings, updateOrgSettings, driverProfiles, applyDriverProfile, viewingPhoto, openPhoto, closePhoto,
+    orgSettings, updateOrgSettings, visibleDriverProfiles, applyDriverProfile, viewingPhoto, openPhoto, closePhoto,
     updateInfo, updateDismissed, checkUpdateNow, dismissUpdate, downloadUpdate, toast, showToast,
   ]);
 
