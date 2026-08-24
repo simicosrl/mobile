@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useApp } from '../state/AppContext';
 import { docNumber } from '../lib/format';
 import SignaturePad from '../components/SignaturePad';
@@ -10,11 +10,18 @@ export default function Signature() {
     direction, carrier, courierCompany, setCourierCompany, plate, setPlate,
     courierName, setCourierName, parcels, docSeq, agreed, toggleAgree,
     sigInk, setSignatureDataUrl, setSigInk, clearSignature, signReady, finish,
+    driverProfiles, applyDriverProfile,
   } = app;
   const isOut = direction === 'out';
   const nextDoc = docNumber(direction, docSeq[direction]);
   const boxes = parcels.reduce((a, p) => a + p.boxes, 0);
   const padRef = useRef(null);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const nameMatches = useMemo(() => {
+    const q = courierName.trim().toLowerCase();
+    const list = q ? driverProfiles.filter((p) => p.name.toLowerCase().includes(q)) : driverProfiles;
+    return list.slice(0, 5);
+  }, [courierName, driverProfiles]);
 
   const onSigChange = (dataUrl, hasInk) => {
     setSignatureDataUrl(dataUrl);
@@ -33,14 +40,32 @@ export default function Signature() {
         <div className="mt-2 text-sm font-bold">{parcels.length} parcels / {boxes} boxes · {carrier}</div>
       </div>
 
-      <div>
+      <div className="relative">
         <div className="mb-[7px] text-[11px] font-bold uppercase tracking-[.06em] text-secondary">Driver name</div>
         <input
           value={courierName}
           onChange={(e) => setCourierName(e.target.value)}
+          onFocus={() => setShowSuggestions(true)}
+          onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
           placeholder="Full name, printed"
           className="min-h-[50px] w-full rounded-xl border border-inputborder bg-page px-4 text-[15px] text-ink"
         />
+        {showSuggestions && nameMatches.length > 0 && (
+          <div className="absolute left-0 right-0 top-[74px] z-10 max-h-[190px] overflow-y-auto rounded-xl border border-[rgba(148,163,184,.35)] bg-white shadow-card">
+            {nameMatches.map((p) => (
+              <button
+                key={p.name}
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => { applyDriverProfile(p); setShowSuggestions(false); }}
+                className="flex w-full items-center justify-between gap-2 border-b border-[rgba(148,163,184,.15)] px-4 py-2.5 text-left last:border-b-0"
+              >
+                <span className="min-w-0 truncate text-[13.5px] font-bold text-ink">{p.name}</span>
+                <span className="flex-none font-mono text-[11px] text-secondary">{p.plate || '—'}</span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
       <div className="flex gap-2.5">
         <div className="flex-1">

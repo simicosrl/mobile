@@ -52,6 +52,7 @@ export function AppProvider({ children }) {
   const [syncing, setSyncing] = useState(false);
   const [docSeq, setDocSeq] = useState({ in: 1, out: 1 });
   const [orgSettings, setOrgSettings] = useState(DEFAULT_ORG_SETTINGS);
+  const [driverProfiles, setDriverProfiles] = useState([]); // [{ name, courierCompany, plate, lastUsedAt }]
   const [viewingPhoto, setViewingPhoto] = useState(null);
   const [updateInfo, setUpdateInfo] = useState(null); // { available, versionName, apkUrl } | null
   const [updateDismissed, setUpdateDismissed] = useState(false);
@@ -69,7 +70,7 @@ export function AppProvider({ children }) {
   // ---- initial load ----
   useEffect(() => {
     (async () => {
-      const [savedShift, savedApi, savedManifest, savedSeq, savedOrg, docs, docSeqReset, historyWiped] = await Promise.all([
+      const [savedShift, savedApi, savedManifest, savedSeq, savedOrg, docs, docSeqReset, historyWiped, savedDriverProfiles] = await Promise.all([
         kvGet('shift', null),
         kvGet('apiConfig', INITIAL_API_CONFIG),
         kvGet('manifest', { codes: [], lastPulledAt: null }),
@@ -78,6 +79,7 @@ export function AppProvider({ children }) {
         docsGetAll(),
         kvGet('docSeqResetV2', false),
         kvGet('historyWipeV1', false),
+        kvGet('driverProfiles', []),
       ]);
       // One-time reset of the document counter to start numbering at 1
       // (WH-IN-000001 / WH-OUT-000001) — installs from before this change
@@ -108,6 +110,7 @@ export function AppProvider({ children }) {
       setManifest(manifestState);
       setDocSeq(seqToUse);
       setOrgSettings({ ...DEFAULT_ORG_SETTINGS, ...savedOrg });
+      setDriverProfiles(savedDriverProfiles);
       if (savedShift) {
         setShift(savedShift);
         setScreen('home');
@@ -121,6 +124,7 @@ export function AppProvider({ children }) {
   useEffect(() => { if (ready) kvSet('docSeq', docSeq); }, [ready, docSeq]);
   useEffect(() => { if (ready && shift) kvSet('shift', shift); }, [ready, shift]);
   useEffect(() => { if (ready) kvSet('orgSettings', orgSettings); }, [ready, orgSettings]);
+  useEffect(() => { if (ready) kvSet('driverProfiles', driverProfiles); }, [ready, driverProfiles]);
 
   // ---- update check (once per app open) ----
   useEffect(() => {
@@ -320,6 +324,24 @@ export function AppProvider({ children }) {
 
   const signReady = courierName.trim().length > 1 && sigInk && agreed;
 
+  // ---- driver profiles (remembered so the office doesn't retype the same
+  // driver/plate every time that person shows up again) ----
+  const saveDriverProfile = useCallback((name, company, plateNo) => {
+    const trimmedName = (name || '').trim();
+    if (!trimmedName) return;
+    const key = trimmedName.toLowerCase();
+    setDriverProfiles((list) => {
+      const others = list.filter((p) => p.name.toLowerCase() !== key);
+      const updated = { name: trimmedName, courierCompany: (company || '').trim(), plate: (plateNo || '').trim(), lastUsedAt: Date.now() };
+      return [updated, ...others].sort((a, b) => b.lastUsedAt - a.lastUsedAt);
+    });
+  }, []);
+  const applyDriverProfile = useCallback((profile) => {
+    setCourierName(profile.name);
+    setCourierCompany(profile.courierCompany || '');
+    setPlate(profile.plate || '');
+  }, []);
+
   // Renders the exact same A4 handover PDF the app can print/share, as a
   // base64 data URL, to attach to the outgoing session payload — so the ERP
   // gets the real document instead of having to re-derive its own from the
@@ -336,6 +358,7 @@ export function AppProvider({ children }) {
 
   const finish = useCallback(async () => {
     if (!signReady) { showToast('Name, signature and confirmation are required'); return; }
+    saveDriverProfile(courierName, courierCompany, plate);
     const now2 = new Date();
     const doc = docNumber(direction, docSeq[direction]);
     const document = {
@@ -385,7 +408,7 @@ export function AppProvider({ children }) {
       setConfirmedDoc((c) => (c && c.doc === doc ? updated : c));
       showToast(res.ok ? `${doc} sent to the ERP` : `${doc} failed to send — ${syncError}`);
     }
-  }, [signReady, direction, docSeq, carrier, courierCompany, shipment, courierName, plate, shift, parcels, signatureDataUrl, apiConfig, showToast, renderPdfDataUrl]);
+  }, [signReady, direction, docSeq, carrier, courierCompany, shipment, courierName, plate, shift, parcels, signatureDataUrl, apiConfig, showToast, renderPdfDataUrl, saveDriverProfile]);
 
   // ---- document export ----
   const printDocument = useCallback(async (document) => {
@@ -502,6 +525,7 @@ export function AppProvider({ children }) {
     apiConfig, apiShowKey, setApiBaseUrl, setApiKey, generateApiKey, togglePush, togglePull, toggleShowKey,
     manifest, pulling, pullManifestNow, syncing, syncNow, retrySync,
     orgSettings, updateOrgSettings,
+    driverProfiles, applyDriverProfile,
     viewingPhoto, openPhoto, closePhoto,
     updateInfo, updateDismissed, checkUpdateNow, dismissUpdate, downloadUpdate,
     toast, showToast,
@@ -515,7 +539,7 @@ export function AppProvider({ children }) {
     confirmedDoc, printDocument, emailDocument, history, historyQuery, historyFilter, selectedDocNo, openSession, backToHistory,
     apiConfig, apiShowKey, setApiBaseUrl, setApiKey, generateApiKey, togglePush, togglePull, toggleShowKey,
     manifest, pulling, pullManifestNow, syncing, syncNow, retrySync,
-    orgSettings, updateOrgSettings, viewingPhoto, openPhoto, closePhoto,
+    orgSettings, updateOrgSettings, driverProfiles, applyDriverProfile, viewingPhoto, openPhoto, closePhoto,
     updateInfo, updateDismissed, checkUpdateNow, dismissUpdate, downloadUpdate, toast, showToast,
   ]);
 
