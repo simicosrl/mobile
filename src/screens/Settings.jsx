@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import { useApp } from '../state/AppContext';
-import { COUNTRIES, carriersForCountry } from '../lib/carriers';
 import { Check, Download } from '../components/icons';
 
 function Field({ label, ...props }) {
@@ -27,7 +26,7 @@ function Section({ title, children }) {
 }
 
 export default function Settings() {
-  const { shift, updateOperatorName, setOperatorCountry, orgSettings, updateOrgSettings, showToast, updateInfo, checkUpdateNow, downloadUpdate } = useApp();
+  const { shift, updateOperatorName, orgSettings, updateOrgSettings, showToast, updateInfo, checkUpdateNow, downloadUpdate } = useApp();
   const [name, setName] = useState(shift?.operatorName || '');
   const [org, setOrg] = useState(orgSettings);
   const [saved, setSaved] = useState(false);
@@ -65,38 +64,6 @@ export default function Settings() {
           <div className="min-h-[48px] w-full rounded-xl border border-inputborder bg-page px-4 py-3 font-mono text-sm text-secondary">
             {shift?.badgeId || '—'}
           </div>
-        </div>
-        <div>
-          <div className="mb-2 text-[11px] font-bold uppercase tracking-[.06em] text-secondary">Country</div>
-          <div className="grid grid-cols-3 gap-2">
-            {COUNTRIES.map((c) => (
-              <button
-                key={c.code}
-                onClick={() => { setOperatorCountry(c.code); showToast(`Country set to ${c.name}`); }}
-                className={
-                  'min-h-[44px] rounded-[11px] border text-[12.5px] font-bold ' +
-                  (shift?.country === c.code
-                    ? 'border-primary bg-[rgba(31,111,235,.08)] text-primary'
-                    : 'border-[rgba(148,163,184,.35)] bg-white text-ink')
-                }
-              >
-                {c.name}
-              </button>
-            ))}
-          </div>
-          <div className="mt-2 text-[10.5px] leading-snug text-secondary">
-            Sets which couriers show up on the courier picker when starting a session — each country has its
-            own carriers.
-          </div>
-          {shift?.country && (
-            <div className="mt-2.5 flex flex-wrap gap-1.5">
-              {carriersForCountry(shift.country).map((c) => (
-                <div key={c} className="rounded-full bg-page px-2.5 py-1 font-mono text-[10.5px] font-bold text-secondary">
-                  {c}
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       </Section>
 
