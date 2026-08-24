@@ -1,0 +1,26 @@
+== connection used ==
+postgresql://postgres.piafchajbkfkyftumxke:<redacted>@aws-0-eu-west-1.pooler.supabase.com:5432/postgres
+
+== admin.scanner_keys ==
+psql: error: connection to server at "aws-0-eu-west-1.pooler.supabase.com" (34.241.16.247), port 5432 failed: FATAL:  (ENOTFOUND) tenant/user postgres.piafchajbkfkyftumxke not found
+connection to server at "aws-0-eu-west-1.pooler.supabase.com" (34.241.16.247), port 5432 failed: FATAL:  (ENOTFOUND) tenant/user postgres.piafchajbkfkyftumxke not found
+
+== wh_it.sessions (last 10) ==
+psql: error: connection to server at "aws-0-eu-west-1.pooler.supabase.com" (108.128.216.176), port 5432 failed: FATAL:  (ENOTFOUND) tenant/user postgres.piafchajbkfkyftumxke not found
+connection to server at "aws-0-eu-west-1.pooler.supabase.com" (108.128.216.176), port 5432 failed: FATAL:  (ENOTFOUND) tenant/user postgres.piafchajbkfkyftumxke not found
+
+== wh_it.parcels, any row with tracking code containing 8007404018060 ==
+psql: error: connection to server at "aws-0-eu-west-1.pooler.supabase.com" (34.241.16.247), port 5432 failed: FATAL:  (ENOTFOUND) tenant/user postgres.piafchajbkfkyftumxke not found
+connection to server at "aws-0-eu-west-1.pooler.supabase.com" (34.241.16.247), port 5432 failed: FATAL:  (ENOTFOUND) tenant/user postgres.piafchajbkfkyftumxke not found
+
+== wh_it.parcels (last 10, any code) ==
+psql: error: connection to server at "aws-0-eu-west-1.pooler.supabase.com" (108.128.216.176), port 5432 failed: FATAL:  (ENOTFOUND) tenant/user postgres.piafchajbkfkyftumxke not found
+connection to server at "aws-0-eu-west-1.pooler.supabase.com" (108.128.216.176), port 5432 failed: FATAL:  (ENOTFOUND) tenant/user postgres.piafchajbkfkyftumxke not found
+
+== row counts per country schema ==
+psql: error: connection to server at "aws-0-eu-west-1.pooler.supabase.com" (34.241.16.247), port 5432 failed: FATAL:  (ENOTFOUND) tenant/user postgres.piafchajbkfkyftumxke not found
+connection to server at "aws-0-eu-west-1.pooler.supabase.com" (34.241.16.247), port 5432 failed: FATAL:  (ENOTFOUND) tenant/user postgres.piafchajbkfkyftumxke not found
+psql: error: connection to server at "aws-0-eu-west-1.pooler.supabase.com" (34.241.16.247), port 5432 failed: FATAL:  (ENOTFOUND) tenant/user postgres.piafchajbkfkyftumxke not found
+connection to server at "aws-0-eu-west-1.pooler.supabase.com" (34.241.16.247), port 5432 failed: FATAL:  (ENOTFOUND) tenant/user postgres.piafchajbkfkyftumxke not found
+psql: error: connection to server at "aws-0-eu-west-1.pooler.supabase.com" (108.128.216.176), port 5432 failed: FATAL:  (ENOTFOUND) tenant/user postgres.piafchajbkfkyftumxke not found
+connection to server at "aws-0-eu-west-1.pooler.supabase.com" (108.128.216.176), port 5432 failed: FATAL:  (ENOTFOUND) tenant/user postgres.piafchajbkfkyftumxke not found
