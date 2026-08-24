@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { useApp } from '../state/AppContext';
 import { docNumber, elapsedLabel } from '../lib/format';
-import { Check, TriangleAlert, ScanLine, Trash2, PenLine, Camera } from '../components/icons';
+import { Check, TriangleAlert, ScanLine, Trash2, PenLine, Camera, X } from '../components/icons';
 import { useBarcodeScanner, isCameraScanSupported } from '../hooks/useBarcodeScanner';
 
 export default function Scan() {
   const app = useApp();
   const {
     direction, carrier, parcels, sessionStartedAt, flash,
-    submitScan, boxPlus, boxMinus, removeLast, openDamage, toSign, docSeq, openPhoto,
+    submitScan, boxPlus, boxMinus, removeLast, removeParcel, openDamage, toSign, docSeq, openPhoto,
   } = app;
   const isOut = direction === 'out';
   const nextDoc = docNumber(direction, docSeq[direction]);
@@ -138,6 +138,13 @@ export default function Scan() {
               <div className="min-w-0 flex-1 truncate font-mono text-[11.5px] font-semibold">{r.code}</div>
               {r.damage && <div className="flex-none text-[11px] font-bold text-danger">DMG</div>}
               <div className="flex-none text-[11px] font-bold text-ink">{r.boxes}×</div>
+              <button
+                onClick={() => removeParcel(r.code)}
+                aria-label={`Remove ${r.code}`}
+                className="flex h-7 w-7 flex-none items-center justify-center rounded-full text-light"
+              >
+                <X size={15} strokeWidth={2.2} />
+              </button>
             </div>
           ))
         )}
