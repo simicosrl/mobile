@@ -146,6 +146,11 @@ export function AppProvider({ children }) {
       setDocSeq(seqToUse);
       setOrgSettings({ ...DEFAULT_ORG_SETTINGS, ...savedOrg });
       setDriverProfiles(savedDriverProfiles);
+      // Catch this phone up with the country's full driver list on every
+      // cold start where a connection already exists — a fresh install (no
+      // local drivers at all yet) or a device that's been offline for a
+      // while both need this, not just a brand-new badge login.
+      if (apiToUse.apiKey) pullDriverProfilesNowRef.current(apiToUse);
       setBadgeCountries(savedBadgeCountries);
       if (savedShift) {
         setShift(savedShift);
@@ -209,6 +214,7 @@ export function AppProvider({ children }) {
     const key = DEFAULT_SCANNER_KEYS[countryCode];
     if (!key) return;
     setApiConfig((c) => ({ ...c, baseUrl: DEFAULT_BASE_URL, apiKey: key, autoPush: true, keySecured: false }));
+    pullDriverProfilesNowRef.current({ baseUrl: DEFAULT_BASE_URL, apiKey: key });
   }, []);
   const loginWithBadge = useCallback((badgeId, operatorName) => {
     const id = badgeId || 'BADGE-0000';
@@ -412,17 +418,43 @@ export function AppProvider({ children }) {
   const signReady = courierName.trim().length > 1 && sigInk && agreed;
 
   // ---- driver profiles (remembered so the office doesn't retype the same
-  // driver/plate every time that person shows up again) ----
+  // driver/plate every time that person shows up again) — kept in this
+  // country's own database, not just on this one phone, so the same driver
+  // list is there after a reinstall and shows up the same way on any other
+  // device logged into this country. ----
   const saveDriverProfile = useCallback((name, company, plateNo) => {
     const trimmedName = (name || '').trim();
     if (!trimmedName) return;
     const key = trimmedName.toLowerCase();
+    const updated = { name: trimmedName, courierCompany: (company || '').trim(), plate: (plateNo || '').trim(), lastUsedAt: Date.now() };
     setDriverProfiles((list) => {
       const others = list.filter((p) => p.name.toLowerCase() !== key);
-      const updated = { name: trimmedName, courierCompany: (company || '').trim(), plate: (plateNo || '').trim(), lastUsedAt: Date.now() };
       return [updated, ...others].sort((a, b) => b.lastUsedAt - a.lastUsedAt);
     });
+    if (apiConfig.apiKey) api.pushDriverProfile(apiConfig, updated).catch(() => {});
+  }, [apiConfig]);
+  // Pulls this country's driver list from the database and merges it with
+  // whatever's local (by name, keeping whichever copy was touched more
+  // recently) — called on login and whenever the country connection is
+  // (re)established, so a fresh install or a different phone catches up
+  // with every driver already known to this warehouse.
+  const pullDriverProfilesNow = useCallback(async (config) => {
+    if (!config?.apiKey) return;
+    const res = await api.fetchDriverProfiles(config);
+    if (!res.ok) return;
+    setDriverProfiles((list) => {
+      const byName = new Map(list.map((p) => [p.name.toLowerCase(), p]));
+      for (const remote of res.drivers) {
+        const key = remote.name.toLowerCase();
+        const local = byName.get(key);
+        const remoteTime = new Date(remote.lastUsedAt).getTime() || 0;
+        if (!local || remoteTime > (local.lastUsedAt || 0)) byName.set(key, { ...remote, lastUsedAt: remoteTime });
+      }
+      return Array.from(byName.values()).sort((a, b) => b.lastUsedAt - a.lastUsedAt);
+    });
   }, []);
+  const pullDriverProfilesNowRef = useRef(() => {});
+  useEffect(() => { pullDriverProfilesNowRef.current = pullDriverProfilesNow; }, [pullDriverProfilesNow]);
   const applyDriverProfile = useCallback((profile) => {
     setCourierName(profile.name);
     setCourierCompany(profile.courierCompany || '');
@@ -447,7 +479,18 @@ export function AppProvider({ children }) {
     if (!signReady) { showToast('Name, signature and confirmation are required'); return; }
     saveDriverProfile(courierName, courierCompany, plate);
     const now2 = new Date();
-    const doc = docNumber(direction, docSeq[direction]);
+    // Reserve the real progressive number from the database up front,
+    // before the PDF is even rendered — that way the number the operator
+    // sees and prints always matches what actually lands in the database,
+    // instead of a locally-generated placeholder that could drift (e.g.
+    // after a reinstall resets the local counter, or a second device is
+    // active on the same country at the same time). Falls back to the old
+    // local counter only when there's no connection to reserve from.
+    let doc = docNumber(direction, docSeq[direction]);
+    if (apiConfig.apiKey) {
+      const reserved = await api.reserveDocNumber(apiConfig, direction === 'out' ? 'outbound' : 'inbound');
+      if (reserved.ok) doc = reserved.document;
+    }
     const document = {
       doc,
       direction,
