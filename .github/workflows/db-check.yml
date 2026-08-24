@@ -41,15 +41,6 @@ jobs:
               -H "Access-Control-Request-Headers: authorization,content-type"
             echo
             echo
-            echo "== POST /warehouse/sessions with the Italy default key, simulating a browser Origin =="
-            curl -sS -i -m 20 -X POST \
-              "https://piafchajbkfkyftumxke.supabase.co/functions/v1/wms-api/warehouse/sessions" \
-              -H "Origin: https://localhost" \
-              -H "Authorization: Bearer ${IT_KEY}" \
-              -H "Content-Type: application/json" \
-              -d '{"direction":"inbound","carrier":"CI-PROBE-2","operator":"ci-probe-2","closed_at":"2026-08-24T00:00:00.000Z","parcels":[{"tracking":"CIPROBE2-8007404018060","boxes":1}]}'
-            echo
-            echo
             echo "== GET /warehouse/manifest with the Italy default key =="
             curl -sS -i -m 20 "https://piafchajbkfkyftumxke.supabase.co/functions/v1/wms-api/warehouse/manifest?date=today" \
               -H "Origin: https://localhost" \
@@ -85,6 +76,29 @@ jobs:
             psql "$CONN" -c "select 'fr' as country, (select count(*) from wh_fr.sessions) as sessions, (select count(*) from wh_fr.parcels) as parcels;"
             psql "$CONN" -c "select 'de' as country, (select count(*) from wh_de.sessions) as sessions, (select count(*) from wh_de.parcels) as parcels;"
           } > db-check-result.txt 2>&1
+          cat db-check-result.txt
+
+      - name: Clean up CI probe test data
+        env:
+          CONN: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set +e
+          {
+            echo
+            echo "== sequences owned by schema admin (for doc numbering) =="
+            psql "$CONN" -c "select sequencename from pg_sequences where schemaname = 'admin';"
+            echo
+            echo "== deleting CI-PROBE test rows from wh_it =="
+            psql "$CONN" -c "delete from wh_it.parcels where session_id in (select id from wh_it.sessions where carrier like 'CI-PROBE%');"
+            psql "$CONN" -c "delete from wh_it.sessions where carrier like 'CI-PROBE%';"
+            echo
+            echo "== resetting IT/inbound doc sequence back to 0 (only test docs existed) =="
+            psql "$CONN" -c "select setval(s.sequencename::regclass, 0, false) from pg_sequences s where s.schemaname = 'admin' and s.sequencename ilike '%it%in%';"
+            echo
+            echo "== wh_it state after cleanup =="
+            psql "$CONN" -c "select count(*) as sessions from wh_it.sessions;"
+            psql "$CONN" -c "select count(*) as parcels from wh_it.parcels;"
+          } >> db-check-result.txt 2>&1
           cat db-check-result.txt
 
       - name: Commit result back to repo
