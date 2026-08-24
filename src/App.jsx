@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
 import { AppProvider, useApp } from './state/AppContext';
 import Header from './components/Header';
@@ -34,6 +34,7 @@ const SCREENS = {
 
 function Shell() {
   const { ready, screen, goBack, goHome, canGoBack } = useApp();
+  const scrollRef = useRef(null);
 
   useEffect(() => {
     let handle;
@@ -44,6 +45,15 @@ function Shell() {
     }).then((h) => { handle = h; });
     return () => { handle?.remove(); };
   }, [canGoBack, goBack, goHome, screen]);
+
+  // Every screen should open scrolled to its top — without this, whatever
+  // scroll position was left on the previous screen (e.g. scrolled down a
+  // long parcel list on Scan) carries straight over, so "Close session &
+  // sign" could land on Signature already scrolled past the driver-name
+  // field instead of showing it first.
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: 0 });
+  }, [screen]);
 
   if (!ready) {
     return (
@@ -60,7 +70,7 @@ function Shell() {
   return (
     <div className="relative flex h-full flex-col overflow-hidden bg-page">
       <Header />
-      <div className="flex-1 overflow-y-auto">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto">
         <Screen />
       </div>
       <BottomNav />

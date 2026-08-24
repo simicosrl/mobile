@@ -53,6 +53,7 @@ export function AppProvider({ children }) {
   const [docSeq, setDocSeq] = useState({ in: 1, out: 1 });
   const [orgSettings, setOrgSettings] = useState(DEFAULT_ORG_SETTINGS);
   const [driverProfiles, setDriverProfiles] = useState([]); // [{ name, courierCompany, plate, lastUsedAt }]
+  const [badgeCountries, setBadgeCountries] = useState({}); // { [badgeId]: 'IT' | 'FR' | 'DE' }
   const [viewingPhoto, setViewingPhoto] = useState(null);
   const [updateInfo, setUpdateInfo] = useState(null); // { available, versionName, apkUrl } | null
   const [updateDismissed, setUpdateDismissed] = useState(false);
@@ -70,7 +71,7 @@ export function AppProvider({ children }) {
   // ---- initial load ----
   useEffect(() => {
     (async () => {
-      const [savedShift, savedApi, savedManifest, savedSeq, savedOrg, docs, docSeqReset, historyWiped, savedDriverProfiles] = await Promise.all([
+      const [savedShift, savedApi, savedManifest, savedSeq, savedOrg, docs, docSeqReset, historyWiped, savedDriverProfiles, savedBadgeCountries] = await Promise.all([
         kvGet('shift', null),
         kvGet('apiConfig', INITIAL_API_CONFIG),
         kvGet('manifest', { codes: [], lastPulledAt: null }),
@@ -80,6 +81,7 @@ export function AppProvider({ children }) {
         kvGet('docSeqResetV2', false),
         kvGet('historyWipeV1', false),
         kvGet('driverProfiles', []),
+        kvGet('badgeCountries', {}),
       ]);
       // One-time reset of the document counter to start numbering at 1
       // (WH-IN-000001 / WH-OUT-000001) — installs from before this change
@@ -111,6 +113,7 @@ export function AppProvider({ children }) {
       setDocSeq(seqToUse);
       setOrgSettings({ ...DEFAULT_ORG_SETTINGS, ...savedOrg });
       setDriverProfiles(savedDriverProfiles);
+      setBadgeCountries(savedBadgeCountries);
       if (savedShift) {
         setShift(savedShift);
         setScreen('home');
@@ -125,6 +128,7 @@ export function AppProvider({ children }) {
   useEffect(() => { if (ready && shift) kvSet('shift', shift); }, [ready, shift]);
   useEffect(() => { if (ready) kvSet('orgSettings', orgSettings); }, [ready, orgSettings]);
   useEffect(() => { if (ready) kvSet('driverProfiles', driverProfiles); }, [ready, driverProfiles]);
+  useEffect(() => { if (ready) kvSet('badgeCountries', badgeCountries); }, [ready, badgeCountries]);
 
   // ---- update check (once per app open) ----
   useEffect(() => {
@@ -166,11 +170,19 @@ export function AppProvider({ children }) {
 
   // ---- shift / badge login ----
   const loginWithBadge = useCallback((badgeId, operatorName) => {
-    const s = { badgeId: badgeId || 'BADGE-0000', operatorName: operatorName || 'Operator', startedAt: Date.now() };
+    const id = badgeId || 'BADGE-0000';
+    const s = { badgeId: id, operatorName: operatorName || 'Operator', startedAt: Date.now(), country: badgeCountries[id] || null };
     setShift(s);
     setScreen('home');
     pullManifestNowRef.current({ silent: true });
-  }, []);
+  }, [badgeCountries]);
+  // Remembers the choice per badge, so the same operator gets it back
+  // automatically next time they scan in — different people sharing the
+  // same device (e.g. across depots) each keep their own default.
+  const setOperatorCountry = useCallback((countryCode) => {
+    setShift((s) => (s ? { ...s, country: countryCode } : s));
+    setBadgeCountries((c) => (shift?.badgeId ? { ...c, [shift.badgeId]: countryCode } : c));
+  }, [shift?.badgeId]);
   const endShift = useCallback(() => {
     setShift(null);
     kvSet('shift', null);
@@ -569,7 +581,7 @@ export function AppProvider({ children }) {
 
   const value = useMemo(() => ({
     ready, now,
-    shift, loginWithBadge, endShift, updateOperatorName,
+    shift, loginWithBadge, endShift, updateOperatorName, setOperatorCountry,
     screen, setScreen, canGoBack, goBack, goHome, goToHistoryTab, goToDocsTab, goToApiTab, goToSettings,
     direction, carrier, setCarrier, courierCompany, setCourierCompany, shipment, setShipment,
     parcels, sessionStartedAt, startSession, toScan, docSeq,
@@ -589,7 +601,7 @@ export function AppProvider({ children }) {
     toast, showToast,
     inputRef,
   }), [
-    ready, now, shift, loginWithBadge, endShift, updateOperatorName, screen, canGoBack, goBack, goHome, goToHistoryTab, goToDocsTab, goToApiTab, goToSettings,
+    ready, now, shift, loginWithBadge, endShift, updateOperatorName, setOperatorCountry, screen, canGoBack, goBack, goHome, goToHistoryTab, goToDocsTab, goToApiTab, goToSettings,
     direction, carrier, courierCompany, shipment, parcels, sessionStartedAt, startSession, toScan, docSeq,
     submitScan, accept, dupCode, dupTime, closeDup, dupAddBox, boxPlus, boxMinus, removeLast, removeParcel, flash,
     damageSheet, openDamage, closeDamage, toggleDamageType, setDamageNote, setDamagePhoto, saveDamage,
