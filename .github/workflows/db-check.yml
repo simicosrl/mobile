@@ -1,0 +1,67 @@
+name: One-off DB check (debug tool)
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  check:
+    if: contains(github.event.head_commit.message, '[dbcheck]')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install postgresql client
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+
+      - name: Query database
+        env:
+          DB_URL_DIRECT: "postgresql://postgres:HDOT8GxPoyn70PWs@db.piafchajbkfkyftumxke.supabase.co:5432/postgres"
+          DB_URL_POOLER: "postgresql://postgres.piafchajbkfkyftumxke:HDOT8GxPoyn70PWs@aws-0-eu-west-1.pooler.supabase.com:5432/postgres"
+        run: |
+          set +e
+          CONN="$DB_URL_DIRECT"
+          psql "$CONN" -c "select 1;" -t > /dev/null 2>/tmp/direct_err.log
+          if [ $? -ne 0 ]; then
+            echo "Direct host failed, trying pooler..." 
+            cat /tmp/direct_err.log
+            CONN="$DB_URL_POOLER"
+          fi
+          {
+            echo "== connection used =="
+            echo "$CONN" | sed -E 's#(://[^:]+:)[^@]+#\1<redacted>#'
+            echo
+            echo "== admin.scanner_keys =="
+            psql "$CONN" -c "select * from admin.scanner_keys order by country;"
+            echo
+            echo "== wh_it.sessions (last 10) =="
+            psql "$CONN" -x -c "select * from wh_it.sessions order by 1 desc limit 10;"
+            echo
+            echo "== wh_it.parcels, any row with tracking code containing 8007404018060 =="
+            psql "$CONN" -x -c "select * from wh_it.parcels where tracking_code::text like '%8007404018060%';"
+            echo
+            echo "== wh_it.parcels (last 10, any code) =="
+            psql "$CONN" -x -c "select * from wh_it.parcels order by 1 desc limit 10;"
+            echo
+            echo "== row counts per country schema =="
+            psql "$CONN" -c "select 'it' as country, (select count(*) from wh_it.sessions) as sessions, (select count(*) from wh_it.parcels) as parcels;"
+            psql "$CONN" -c "select 'fr' as country, (select count(*) from wh_fr.sessions) as sessions, (select count(*) from wh_fr.parcels) as parcels;"
+            psql "$CONN" -c "select 'de' as country, (select count(*) from wh_de.sessions) as sessions, (select count(*) from wh_de.parcels) as parcels;"
+          } > db-check-result.txt 2>&1
+          cat db-check-result.txt
+
+      - name: Commit result back to repo
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -f db-check-result.txt
+          if git diff --cached --quiet; then
+            echo "Nothing changed"
+          else
+            git commit -m "ci: db-check result [skip dbcheck]"
+            git push origin HEAD:main
+          fi
