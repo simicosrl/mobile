@@ -14,6 +14,7 @@ export default function BadgeLogin() {
   const [pendingBadge, setPendingBadge] = useState(null);
   const [name, setName] = useState('');
   const hiddenRef = useRef(null);
+  const debounceRef = useRef(null);
   const { scan, scanning, error } = useBarcodeScanner();
 
   useEffect(() => {
@@ -64,20 +65,29 @@ export default function BadgeLogin() {
           e.preventDefault();
           handleBadge(e.target.value);
           e.target.value = '';
+          clearTimeout(debounceRef.current);
         }}
         onInput={(e) => {
-          if (e.target.value.includes('\n')) {
-            handleBadge(e.target.value.replace('\n', ''));
+          const val = e.target.value;
+          if (val.includes('\n')) {
+            handleBadge(val.replace('\n', ''));
             e.target.value = '';
+            clearTimeout(debounceRef.current);
+            return;
+          }
+          // Fallback for scanners/DataWedge configs that commit the scanned
+          // text without any Enter/newline terminator at all: submit once
+          // the value has stopped changing for a moment. 400ms is well past
+          // a scanner's burst-typed characters, but still short enough not
+          // to feel laggy if this genuinely needs to fire.
+          clearTimeout(debounceRef.current);
+          if (val) {
+            debounceRef.current = setTimeout(() => {
+              handleBadge(e.target.value);
+              e.target.value = '';
+            }, 400);
           }
         }}
-        // This field is invisible and never meant to be tapped by a human —
-        // it only exists so a hardware scanner-wedge (Zebra engine or
-        // Bluetooth ring scanner, which the OS treats as a real keyboard)
-        // can type into it. inputMode="none" tells the OS not to pop the
-        // on-screen keyboard just because this gets auto-focused; it has no
-        // effect on a genuine physical/HID keyboard device.
-        inputMode="none"
         className="absolute h-px w-px opacity-0"
         aria-hidden="true"
         tabIndex={-1}
