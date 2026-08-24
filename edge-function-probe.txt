@@ -1,0 +1,42 @@
+== POST /warehouse/sessions with the Italy default key ==
+HTTP/2 200 
+date: Mon, 24 Aug 2026 11:11:01 GMT
+content-type: application/json
+cf-ray: a301e9e51ed5a207-MSP
+cf-cache-status: DYNAMIC
+set-cookie: __cf_bm=zj4xiX4nrCWSJniaoeQy1VNlbjbizxKhHmU_p9SY.nU-1787569859.3740733-1.0.1.1-W9EFNgtLWBO6vcJ8FjQI3sGrwYxVE2DdmWpDnK2eaIiz2O2ygEro5LfQZCIcUkFGUyT2PDnbvTTknHoPgYKf5YyrGyKbPQdgU9rpqfDdzmPfpxCLImgJ3zcttCL1WxPY; HttpOnly; SameSite=None; Secure; Path=/; Domain=supabase.co; Expires=Mon, 24 Aug 2026 11:41:01 GMT
+server: cloudflare
+vary: Accept-Encoding
+endpoint-load-metrics: application_utilization:7,named_metrics.queue_depth:7
+sb-gateway-version: 1
+sb-project-ref: piafchajbkfkyftumxke
+sb-request-id: 01a03377-6b3b-713a-ac94-9c39576873e1
+x-deno-execution-id: 8ab61c8e-6c83-4311-b5a2-319224f27f69
+x-sb-edge-region: us-east-2
+x-served-by: supabase-edge-runtime
+strict-transport-security: max-age=31536000; includeSubDomains; preload
+alt-svc: h3=":443"; ma=86400
+
+{"ok":true,"document":"WH-IT-IN-000001"}
+
+== GET /warehouse/manifest with the Italy default key ==
+HTTP/2 200 
+date: Mon, 24 Aug 2026 11:11:02 GMT
+content-type: application/json
+cf-ray: a301e9f3dbfbad20-MSP
+cf-cache-status: DYNAMIC
+set-cookie: __cf_bm=d1ILjaabHc1L0oyFLkBhHluXrAqLlT9lUrocPZVDcKI-1787569861.739476-1.0.1.1-ZZZU8qktAm4hq4LxvryEE21T0ieBVh901aH4YHPRTC4EaWSW4IHnZbinmL4lKZkzS_WFe9YkWMRjk7BuO92gisPIjAksSeh7eCgKyIm1NoDMsUFD9t1HvzQqQPEJR_HY; HttpOnly; SameSite=None; Secure; Path=/; Domain=supabase.co; Expires=Mon, 24 Aug 2026 11:41:02 GMT
+server: cloudflare
+vary: Accept-Encoding
+x-content-type-options: nosniff
+endpoint-load-metrics: application_utilization:7,named_metrics.queue_depth:7
+sb-gateway-version: 1
+sb-project-ref: piafchajbkfkyftumxke
+sb-request-id: 01a03377-7483-78d8-8bd9-52d58141dfdc
+x-deno-execution-id: ba318c65-1f13-437e-9f97-7cc64f337c21
+x-sb-edge-region: us-east-2
+x-served-by: supabase-edge-runtime
+strict-transport-security: max-age=31536000; includeSubDomains; preload
+alt-svc: h3=":443"; ma=86400
+
+{"tracking_ids":[]}
