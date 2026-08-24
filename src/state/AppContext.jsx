@@ -169,12 +169,36 @@ export function AppProvider({ children }) {
     const s = { badgeId: badgeId || 'BADGE-0000', operatorName: operatorName || 'Operator', startedAt: Date.now() };
     setShift(s);
     setScreen('home');
+    pullManifestNowRef.current({ silent: true });
   }, []);
   const endShift = useCallback(() => {
     setShift(null);
     kvSet('shift', null);
     setScreen('login');
   }, []);
+
+  // ---- auto-logout after 5 minutes of inactivity ----
+  const INACTIVITY_LIMIT_MS = 5 * 60 * 1000;
+  const lastActivityRef = useRef(Date.now());
+  useEffect(() => {
+    if (!shift) return undefined;
+    const markActive = () => { lastActivityRef.current = Date.now(); };
+    markActive();
+    const events = ['touchstart', 'mousedown', 'keydown', 'scroll'];
+    events.forEach((ev) => window.addEventListener(ev, markActive, { passive: true }));
+    const t = setInterval(() => {
+      if (Date.now() - lastActivityRef.current >= INACTIVITY_LIMIT_MS) {
+        setShift(null);
+        kvSet('shift', null);
+        setScreen('login');
+        showToast('Signed out after 5 minutes of inactivity');
+      }
+    }, 10000);
+    return () => {
+      events.forEach((ev) => window.removeEventListener(ev, markActive));
+      clearInterval(t);
+    };
+  }, [shift, showToast]);
   const updateOperatorName = useCallback(async (name) => {
     const trimmed = name.trim();
     if (!trimmed || !shift) return;
@@ -467,8 +491,15 @@ export function AppProvider({ children }) {
     return key;
   }, [showToast]);
 
-  const pullManifestNow = useCallback(async () => {
-    if (!apiConfig.autoPull) { showToast('Enable "Receive expected manifest" first'); return; }
+  // `silent` is used for the automatic pull right after login — no need to
+  // nag with "enable this first" on every login for installs that simply
+  // don't use this feature; a manual tap on "Pull manifest now" still gets
+  // the full explanation either way.
+  const pullManifestNow = useCallback(async ({ silent = false } = {}) => {
+    if (!apiConfig.autoPull || !apiConfig.baseUrl) {
+      if (!silent) showToast('Enable "Receive expected manifest" first');
+      return;
+    }
     setPulling(true);
     const res = await api.pullManifest(apiConfig);
     setPulling(false);
@@ -479,6 +510,10 @@ export function AppProvider({ children }) {
       showToast('Manifest pull failed: ' + res.error);
     }
   }, [apiConfig, showToast]);
+  // Lets loginWithBadge (defined earlier in this file) trigger a pull
+  // without a stale closure over apiConfig/showToast.
+  const pullManifestNowRef = useRef(() => {});
+  useEffect(() => { pullManifestNowRef.current = pullManifestNow; }, [pullManifestNow]);
 
   const syncNow = useCallback(async () => {
     if (!apiConfig.autoPush) { showToast('Enable "Send sessions automatically" first'); return; }

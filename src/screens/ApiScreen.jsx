@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useApp } from '../state/AppContext';
 import { Globe, Download, RefreshCw } from '../components/icons';
 import { ENDPOINTS, PAYLOAD_SAMPLE } from '../lib/api';
@@ -15,6 +16,7 @@ export default function ApiScreen() {
     apiConfig, apiShowKey, setApiBaseUrl, setApiKey, generateApiKey, togglePush, togglePull, toggleShowKey,
     manifest, pulling, pullManifestNow, syncing, syncNow, retrySync, history,
   } = useApp();
+  const [showManifestList, setShowManifestList] = useState(false);
 
   const hostLabel = apiConfig.baseUrl.replace(/^https?:\/\//, '') || 'no endpoint configured';
   const online = !!apiConfig.baseUrl;
@@ -106,9 +108,27 @@ export default function ApiScreen() {
               <div className="font-mono text-xs font-bold">{apiConfig.autoPull ? manifest.lastPulledAt || '—' : '—'}</div>
             </div>
           </div>
-          <button onClick={pullManifestNow} className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-[rgba(31,111,235,.35)] bg-[rgba(31,111,235,.06)] text-[13.5px] font-extrabold text-primary">
-            <Download size={17} strokeWidth={2} /> {pulling ? 'Pulling…' : 'Pull manifest now'}
-          </button>
+          <div className="flex gap-2">
+            <button onClick={() => pullManifestNow()} className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl border border-[rgba(31,111,235,.35)] bg-[rgba(31,111,235,.06)] text-[13.5px] font-extrabold text-primary">
+              <Download size={17} strokeWidth={2} /> {pulling ? 'Pulling…' : 'Pull manifest now'}
+            </button>
+            <button
+              onClick={() => setShowManifestList((v) => !v)}
+              disabled={!apiConfig.autoPull || !manifest.codes.length}
+              className="min-h-12 flex-none rounded-xl border border-[rgba(148,163,184,.35)] bg-white px-3.5 text-[13.5px] font-bold text-ink disabled:opacity-40"
+            >
+              {showManifestList ? 'Hide list' : 'View list'}
+            </button>
+          </div>
+          {showManifestList && (
+            <div className="max-h-[220px] overflow-y-auto rounded-xl border border-[rgba(148,163,184,.25)] bg-page">
+              {manifest.codes.map((code) => (
+                <div key={code} className="border-b border-[rgba(148,163,184,.15)] px-3 py-2 font-mono text-[11.5px] text-ink last:border-b-0">
+                  {code}
+                </div>
+              ))}
+            </div>
+          )}
           <div className="border-l-[3px] border-primary pl-2.5 text-[11px] leading-normal text-secondary">
             A scanned code on the manifest shows <b>Expected</b>. Anything else is still accepted and flagged <b>Not on manifest</b> for the office.
           </div>
