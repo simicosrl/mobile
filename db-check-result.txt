@@ -7,7 +7,7 @@ postgresql://postgres.piafchajbkfkyftumxke:<redacted>@aws-1-eu-west-1.pooler.sup
 --------------------------------------+------------------------------------------------------------------+---------+-----------+---------------------------+--------+-------------------------------+---------------------------
  ebf1f1bb-ec3e-4164-846c-a365830ca28b | 17740cbd77645d7b7e6325bfc537bd495435abd7fbded38a6e01c8c020961641 | DE      |           | App default key — Germany | t      | 2026-08-24 08:14:54.159429+00 | 
  59193ed3-9610-49f4-9bd4-39ce5a4c99d6 | 3d5dce486b540a744c2faa6e2c402df07f3e8d7d4107a595386e424ce89b20c1 | FR      |           | App default key — France  | t      | 2026-08-24 08:14:54.159429+00 | 
- ff00f80c-7a2c-4a8d-9f42-51bab573960f | 0e9189cf65b98c81bfa78d34de97f5090f902ea57556170595c3fd83271c0bde | IT      |           | Test key — Italy          | t      | 2026-08-24 07:54:43.290641+00 | 2026-08-24 12:27:46.69+00
+ ff00f80c-7a2c-4a8d-9f42-51bab573960f | 0e9189cf65b98c81bfa78d34de97f5090f902ea57556170595c3fd83271c0bde | IT      |           | Test key — Italy          | t      | 2026-08-24 07:54:43.290641+00 | 2026-08-24 12:29:17.47+00
 (3 rows)
 
 
@@ -78,7 +78,7 @@ created_at   | 2026-08-24 12:06:44.907415+00
 == deleting CI-PROBE test rows from wh_it ==
 DELETE 0
 DELETE 0
-DELETE 0
+DELETE 1
 
 == resetting IT/inbound doc sequence back to 0 (only test docs existed) ==
  setval 
