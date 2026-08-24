@@ -91,7 +91,21 @@ jobs:
           git rm -f --ignore-unmatch SIMICO-Warehouse-Scan-debug.apk
           if git diff --cached --quiet; then
             echo "Nothing changed, nothing to commit"
-          else
-            git commit -m "ci: update compiled debug APK (v1.0.${{ github.run_number }})" -m "Built from ${{ github.sha }} by GitHub Actions. Debug-signed with the project's pinned debug key — fine for sideloading, not for Play Store."
-            git push origin HEAD:main
+            exit 0
           fi
+          git commit -m "ci: update compiled debug APK (v1.0.${{ github.run_number }})" -m "Built from ${{ github.sha }} by GitHub Actions. Debug-signed with the project's pinned debug key — fine for sideloading, not for Play Store."
+          # This workflow and the db-check one can both land a commit on the
+          # same push (or two builds can overlap during a burst of pushes) —
+          # without a retry, whichever finishes second gets a non-fast-forward
+          # rejection and its APK is silently lost, which is exactly what was
+          # happening here.
+          for i in 1 2 3 4 5; do
+            if git push origin HEAD:main; then
+              exit 0
+            fi
+            git fetch origin main
+            git rebase origin/main
+            sleep $((i * 5))
+          done
+          echo "Giving up after 5 attempts" >&2
+          exit 1
