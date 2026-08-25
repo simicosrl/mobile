@@ -177,6 +177,18 @@ export async function pushDriverProfile(config, profile) {
   });
 }
 
+// This country's carrier list — each carrier optionally carries a required
+// tracking-code prefix (e.g. UPS -> "1Z") the app enforces at scan time.
+export async function fetchCarriers(config) {
+  const res = await request(config, '/warehouse/carriers');
+  if (res.ok && Array.isArray(res.data?.carriers)) return { ok: true, carriers: res.data.carriers };
+  return { ok: false, error: describeError(res) };
+}
+
+export async function pushCarrier(config, { name, pattern }) {
+  return request(config, '/warehouse/carriers', { method: 'POST', body: { name, pattern: pattern || null }, timeoutMs: 10000 });
+}
+
 /**
  * Fetches the ERP's own archived PDF for a document, as a base64 data URL.
  * Deliberately doesn't go through request() — that helper decodes bodies as

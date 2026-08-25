@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import { useApp } from '../state/AppContext';
-import { Check, Download } from '../components/icons';
+import { Check, Download, ChevronDown, Plus } from '../components/icons';
 
 function Field({ label, ...props }) {
   return (
@@ -16,22 +16,55 @@ function Field({ label, ...props }) {
   );
 }
 
-function Section({ title, children }) {
+// Collapsible so the settings page doesn't turn into one endless scroll as
+// more sections (carriers, company details, updates...) get added —
+// closed sections default to their summary line only.
+function Section({ title, summary, defaultOpen = false, children }) {
+  const [open, setOpen] = useState(defaultOpen);
   return (
     <div className="rounded-2xl border border-[rgba(148,163,184,.25)] bg-white p-3.5">
-      <div className="mb-3 text-[10px] font-bold uppercase tracking-[.1em] text-light">{title}</div>
-      <div className="flex flex-col gap-3">{children}</div>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center gap-2 text-left"
+      >
+        <div className="min-w-0 flex-1">
+          <div className="text-[10px] font-bold uppercase tracking-[.1em] text-light">{title}</div>
+          {!open && summary && <div className="mt-0.5 truncate text-[11.5px] text-secondary">{summary}</div>}
+        </div>
+        <ChevronDown size={16} strokeWidth={2.2} className={'flex-none text-light transition-transform ' + (open ? 'rotate-180' : '')} />
+      </button>
+      {open && <div className="mt-3 flex flex-col gap-3">{children}</div>}
+    </div>
+  );
+}
+
+function CarrierRow({ carrier, onSave }) {
+  const [pattern, setPattern] = useState(carrier.pattern || '');
+  const [saved, setSaved] = useState(true);
+  return (
+    <div className="flex items-center gap-2 rounded-xl border border-[rgba(148,163,184,.25)] bg-page px-3 py-2">
+      <div className="min-w-0 flex-1 truncate text-[13px] font-bold text-ink">{carrier.name}</div>
+      <input
+        value={pattern}
+        onChange={(e) => { setPattern(e.target.value); setSaved(false); }}
+        onBlur={() => { if (!saved) { onSave(carrier.name, pattern); setSaved(true); } }}
+        placeholder="no restriction"
+        aria-label={`Pattern for ${carrier.name}`}
+        className="min-h-[38px] w-[130px] flex-none rounded-lg border border-inputborder bg-white px-2.5 font-mono text-[12px] uppercase text-ink"
+      />
     </div>
   );
 }
 
 export default function Settings() {
-  const { shift, updateOperatorName, orgSettings, updateOrgSettings, showToast, updateInfo, checkUpdateNow, downloadUpdate } = useApp();
+  const { shift, updateOperatorName, orgSettings, updateOrgSettings, showToast, updateInfo, checkUpdateNow, downloadUpdate, carriers, saveCarrier } = useApp();
   const [name, setName] = useState(shift?.operatorName || '');
   const [org, setOrg] = useState(orgSettings);
   const [saved, setSaved] = useState(false);
   const [appVersion, setAppVersion] = useState(null);
   const [checking, setChecking] = useState(false);
+  const [newCarrierName, setNewCarrierName] = useState('');
+  const [newCarrierPattern, setNewCarrierPattern] = useState('');
 
   useEffect(() => {
     if (Capacitor.isNativePlatform()) {
@@ -55,9 +88,17 @@ export default function Settings() {
     showToast('Settings saved');
   };
 
+  const addCarrier = () => {
+    if (!newCarrierName.trim()) return;
+    saveCarrier(newCarrierName, newCarrierPattern);
+    showToast(`${newCarrierName.trim().toUpperCase()} added`);
+    setNewCarrierName('');
+    setNewCarrierPattern('');
+  };
+
   return (
     <div className="flex flex-col gap-3.5 px-3.5 pb-[22px] pt-3.5">
-      <Section title="Operator profile">
+      <Section title="Operator profile" summary={shift?.operatorName} defaultOpen>
         <Field label="Name" value={name} onChange={(e) => { setName(e.target.value); setSaved(false); }} placeholder="Full name" />
         <div>
           <div className="mb-2 text-[11px] font-bold uppercase tracking-[.06em] text-secondary">Badge</div>
@@ -67,12 +108,12 @@ export default function Settings() {
         </div>
       </Section>
 
-      <Section title="Warehouse">
+      <Section title="Warehouse" summary={org.warehouseLocation}>
         <Field label="Location" value={org.warehouseLocation} onChange={set('warehouseLocation')} placeholder="Casazza (BG)" />
         <Field label="Dock / area" value={org.warehouseDock} onChange={set('warehouseDock')} placeholder="Dock 2" />
       </Section>
 
-      <Section title="Company (printed on the A4 document)">
+      <Section title="Company (printed on the A4 document)" summary={org.companyName}>
         <Field label="Company name" value={org.companyName} onChange={set('companyName')} placeholder="SIMICO SRL" />
         <Field label="Address" value={org.companyAddress} onChange={set('companyAddress')} placeholder="Street, city, country" />
         <div className="flex gap-2.5">
@@ -91,8 +132,43 @@ export default function Settings() {
         </div>
       </Section>
 
+      <Section title="Carriers" summary={`${carriers.length} carrier${carriers.length === 1 ? '' : 's'}`}>
+        <div className="text-[11px] leading-snug text-secondary">
+          Add a required tracking-code prefix to catch a wrong scan before it's added — e.g. UPS codes always
+          start with <span className="font-mono font-bold text-ink">1Z</span>. Leave blank for no restriction.
+          Shared with every device logged into this country.
+        </div>
+        <div className="flex flex-col gap-1.5">
+          {carriers.map((c) => (
+            <CarrierRow key={c.name} carrier={c} onSave={saveCarrier} />
+          ))}
+        </div>
+        <div className="flex items-center gap-2 border-t border-[rgba(148,163,184,.2)] pt-3">
+          <input
+            value={newCarrierName}
+            onChange={(e) => setNewCarrierName(e.target.value)}
+            placeholder="New carrier name"
+            className="min-h-[40px] min-w-0 flex-1 rounded-lg border border-inputborder bg-page px-2.5 text-[12.5px] uppercase text-ink"
+          />
+          <input
+            value={newCarrierPattern}
+            onChange={(e) => setNewCarrierPattern(e.target.value)}
+            placeholder="Prefix (optional)"
+            className="min-h-[40px] w-[110px] flex-none rounded-lg border border-inputborder bg-page px-2.5 font-mono text-[12px] uppercase text-ink"
+          />
+          <button
+            onClick={addCarrier}
+            disabled={!newCarrierName.trim()}
+            aria-label="Add carrier"
+            className="flex h-10 w-10 flex-none items-center justify-center rounded-lg bg-primary text-white disabled:opacity-50"
+          >
+            <Plus size={17} strokeWidth={2.4} />
+          </button>
+        </div>
+      </Section>
+
       {Capacitor.isNativePlatform() && (
-        <Section title="App updates">
+        <Section title="App updates" summary={appVersion ? `v${appVersion.version}` : undefined}>
           <div className="flex items-center gap-2.5">
             <div className="min-w-0 flex-1">
               <div className="text-[13px] font-bold text-ink">

@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { docsGetAll, docPut, docsClearAll, kvGet, kvSet } from '../lib/db';
 import { DEFAULT_BADGE_NAMES, DEFAULT_ORG_SETTINGS } from '../lib/seed';
-import { DAMAGE_TYPES } from '../lib/carriers';
+import { DAMAGE_TYPES, carriersForCountry } from '../lib/carriers';
 import { hhmm, stamp, docNumber } from '../lib/format';
 import { feedback } from '../lib/audio';
 import * as api from '../lib/api';
@@ -58,6 +58,7 @@ export function AppProvider({ children }) {
   const [docSeq, setDocSeq] = useState({ in: 1, out: 1 });
   const [orgSettings, setOrgSettings] = useState(DEFAULT_ORG_SETTINGS);
   const [driverProfiles, setDriverProfiles] = useState([]); // [{ name, courierCompany, plate, lastUsedAt }]
+  const [carriers, setCarriers] = useState([]); // [{ name, pattern, country }] — pattern is a required tracking-code prefix, or null
   const [badgeCountries, setBadgeCountries] = useState({}); // { [badgeId]: 'IT' | 'FR' | 'DE' }
   const [viewingPhoto, setViewingPhoto] = useState(null);
   const [updateInfo, setUpdateInfo] = useState(null); // { available, versionName, apkUrl } | null
@@ -76,7 +77,7 @@ export function AppProvider({ children }) {
   // ---- initial load ----
   useEffect(() => {
     (async () => {
-      const [savedShift, savedApi, savedManifest, savedSeq, savedOrg, docs, docSeqReset, historyWiped, savedDriverProfiles, savedBadgeCountries, driverProfilesCountryTagged] = await Promise.all([
+      const [savedShift, savedApi, savedManifest, savedSeq, savedOrg, docs, docSeqReset, historyWiped, savedDriverProfiles, savedBadgeCountries, driverProfilesCountryTagged, savedCarriers] = await Promise.all([
         kvGet('shift', null),
         kvGet('apiConfig', INITIAL_API_CONFIG),
         kvGet('manifest', { codes: [], lastPulledAt: null }),
@@ -88,6 +89,7 @@ export function AppProvider({ children }) {
         kvGet('driverProfiles', []),
         kvGet('badgeCountries', {}),
         kvGet('driverProfilesCountryTaggedV1', false),
+        kvGet('carriers', []),
       ]);
       // One-time reset of the document counter to start numbering at 1
       // (WH-IN-000001 / WH-OUT-000001) — installs from before this change
@@ -151,6 +153,8 @@ export function AppProvider({ children }) {
       // local drivers at all yet) or a device that's been offline for a
       // while both need this, not just a brand-new badge login.
       if (apiToUse.apiKey && savedShift?.country) pullDriverProfilesNowRef.current(apiToUse, savedShift.country);
+      setCarriers(savedCarriers);
+      if (apiToUse.apiKey && savedShift?.country) pullCarriersNowRef.current(apiToUse, savedShift.country);
       setBadgeCountries(savedBadgeCountries);
       if (savedShift) {
         setShift(savedShift);
@@ -167,6 +171,7 @@ export function AppProvider({ children }) {
   useEffect(() => { if (ready) kvSet('orgSettings', orgSettings); }, [ready, orgSettings]);
   useEffect(() => { if (ready) kvSet('driverProfiles', driverProfiles); }, [ready, driverProfiles]);
   useEffect(() => { if (ready) kvSet('badgeCountries', badgeCountries); }, [ready, badgeCountries]);
+  useEffect(() => { if (ready) kvSet('carriers', carriers); }, [ready, carriers]);
 
   // ---- update check (once per app open) ----
   useEffect(() => {
@@ -215,6 +220,7 @@ export function AppProvider({ children }) {
     if (!key) return;
     setApiConfig((c) => ({ ...c, baseUrl: DEFAULT_BASE_URL, apiKey: key, autoPush: true, keySecured: false }));
     pullDriverProfilesNowRef.current({ baseUrl: DEFAULT_BASE_URL, apiKey: key }, countryCode);
+    pullCarriersNowRef.current({ baseUrl: DEFAULT_BASE_URL, apiKey: key }, countryCode);
     // Cosmetic, but avoids a stale "next document" preview number carried
     // over from whichever country was last active on this device — the
     // real, authoritative number always comes from the server reservation
@@ -333,6 +339,18 @@ export function AppProvider({ children }) {
   const submitScan = useCallback((raw) => {
     const code = String(raw || '').trim().toUpperCase();
     if (!code) return;
+    // A carrier can require its tracking codes to start with a specific
+    // prefix (e.g. UPS -> "1Z") to catch a wrong/stray scan before it ever
+    // enters the session — checked before the duplicate check so a bad
+    // code is rejected outright rather than compared against what's
+    // already been scanned.
+    const carrierRule = carriers.find((c) => c.name.toLowerCase() === carrier.toLowerCase());
+    if (carrierRule?.pattern && !code.startsWith(carrierRule.pattern)) {
+      feedback(true);
+      setFlash('bad');
+      showToast(`Invalid code for ${carrier} — must start with "${carrierRule.pattern}"`);
+      return;
+    }
     const dup = parcels.find((p) => p.code === code);
     if (dup) {
       feedback(true);
@@ -342,7 +360,7 @@ export function AppProvider({ children }) {
       return;
     }
     accept(code);
-  }, [parcels, accept]);
+  }, [parcels, accept, carriers, carrier, showToast]);
 
   const closeDup = useCallback(() => { setDupCode(null); setFlash(null); }, []);
   const dupAddBox = useCallback(() => {
@@ -474,6 +492,33 @@ export function AppProvider({ children }) {
     setCourierCompany(profile.courierCompany || '');
     setPlate(profile.plate || '');
   }, []);
+
+  // ---- carriers (per-country list + optional tracking-code prefix rule)
+  // — same server-backed, database-of-record pattern as driver profiles. ----
+  const saveCarrier = useCallback((name, pattern) => {
+    const trimmedName = (name || '').trim();
+    if (!trimmedName) return;
+    const key = trimmedName.toLowerCase();
+    const normalizedPattern = (pattern || '').trim().toUpperCase() || null;
+    const updated = { name: trimmedName, pattern: normalizedPattern, country: shift?.country || null };
+    setCarriers((list) => {
+      const others = list.filter((c) => c.name.toLowerCase() !== key);
+      return [...others, updated].sort((a, b) => a.name.localeCompare(b.name));
+    });
+    if (apiConfig.apiKey) api.pushCarrier(apiConfig, updated).catch(() => {});
+  }, [apiConfig, shift]);
+  const pullCarriersNow = useCallback(async (config, countryCode) => {
+    if (!config?.apiKey) return;
+    const res = await api.fetchCarriers(config);
+    if (!res.ok) return;
+    setCarriers((list) => {
+      const byName = new Map(list.map((c) => [c.name.toLowerCase(), c]));
+      for (const remote of res.carriers) byName.set(remote.name.toLowerCase(), { ...remote, country: countryCode });
+      return Array.from(byName.values()).sort((a, b) => a.name.localeCompare(b.name));
+    });
+  }, []);
+  const pullCarriersNowRef = useRef(() => {});
+  useEffect(() => { pullCarriersNowRef.current = pullCarriersNow; }, [pullCarriersNow]);
 
   // Renders the exact same A4 handover PDF the app can print/share, as a
   // base64 data URL, to attach to the outgoing session payload — so the ERP
@@ -698,6 +743,21 @@ export function AppProvider({ children }) {
   // device, not just the currently active one.
   const visibleHistory = useMemo(() => history.filter((d) => d.country === shift?.country), [history, shift]);
   const visibleDriverProfiles = useMemo(() => driverProfiles.filter((p) => p.country === shift?.country), [driverProfiles, shift]);
+  // Always merges in the built-in static list (lib/carriers.js) underneath
+  // whatever's been synced/added locally for this country — a fresh
+  // install, or the moment before pullCarriersNow's response lands, still
+  // shows the full default roster instead of an empty/partial list, and a
+  // newly-added custom carrier doesn't make the built-in ones disappear
+  // (an earlier version of this fell back to the static list ONLY when the
+  // synced list was completely empty, which broke the instant a single
+  // custom carrier was added — the static defaults vanished entirely).
+  const visibleCarriers = useMemo(() => {
+    const byName = new Map(carriersForCountry(shift?.country).map((name) => [name.toLowerCase(), { name, pattern: null }]));
+    for (const c of carriers) {
+      if (c.country === shift?.country) byName.set(c.name.toLowerCase(), c);
+    }
+    return Array.from(byName.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [carriers, shift]);
 
   const value = useMemo(() => ({
     ready, now,
@@ -716,6 +776,7 @@ export function AppProvider({ children }) {
     manifest, pulling, pullManifestNow, syncing, syncNow, retrySync,
     orgSettings, updateOrgSettings,
     driverProfiles: visibleDriverProfiles, applyDriverProfile,
+    carriers: visibleCarriers, saveCarrier,
     viewingPhoto, openPhoto, closePhoto,
     updateInfo, updateDismissed, checkUpdateNow, dismissUpdate, downloadUpdate,
     toast, showToast,
@@ -729,7 +790,7 @@ export function AppProvider({ children }) {
     confirmedDoc, printDocument, emailDocument, visibleHistory, historyQuery, historyFilter, selectedDocNo, openSession, backToHistory,
     apiConfig, apiShowKey, setApiBaseUrl, setApiKey, generateApiKey, copyApiKey, togglePush, togglePull, toggleShowKey,
     manifest, pulling, pullManifestNow, syncing, syncNow, retrySync,
-    orgSettings, updateOrgSettings, visibleDriverProfiles, applyDriverProfile, viewingPhoto, openPhoto, closePhoto,
+    orgSettings, updateOrgSettings, visibleDriverProfiles, applyDriverProfile, visibleCarriers, saveCarrier, viewingPhoto, openPhoto, closePhoto,
     updateInfo, updateDismissed, checkUpdateNow, dismissUpdate, downloadUpdate, toast, showToast,
   ]);
 
