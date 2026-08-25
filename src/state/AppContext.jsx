@@ -14,7 +14,14 @@ const AppCtx = createContext(null);
 // this file) — re-exported here under the same names since the rest of
 // this file already refers to them by these names throughout.
 const { DEFAULT_BASE_URL, DEFAULT_SCANNER_KEYS } = api;
-const INITIAL_API_CONFIG = { baseUrl: DEFAULT_BASE_URL, apiKey: '', autoPush: true, autoPull: false, keySecured: false };
+// `apiConfig` (below) is the operator-facing "API" screen connection — a
+// separate, optional, external system (e.g. Prep-Center), starting
+// unconfigured. It has nothing to do with our own database, which is
+// wired up automatically and unconditionally via `internalConfig`
+// (derived from the country's badge lock, never user-editable) — see
+// that definition for why these two used to be conflated and had to be
+// split apart.
+const INITIAL_API_CONFIG = { baseUrl: '', apiKey: '', autoPush: true, autoPull: false, keySecured: false };
 
 export function AppProvider({ children }) {
   const [ready, setReady] = useState(false);
@@ -125,14 +132,20 @@ export function AppProvider({ children }) {
       let apiToUse = /[^ -ÿ]/.test(savedApi.apiKey || '')
         ? { ...savedApi, apiKey: '', keySecured: false }
         : savedApi;
-      // Self-heal the default connection on every cold start, not just on
-      // a fresh badge scan — restoring an already-open shift (the app was
-      // just updated while someone was mid-shift, for example) used to
-      // skip loginWithBadge entirely, leaving whatever apiConfig happened
-      // to be persisted from before instead of this country's real key.
-      const restoredKey = savedShift?.country && DEFAULT_SCANNER_KEYS[savedShift.country];
-      if (restoredKey) {
-        apiToUse = { ...apiToUse, baseUrl: DEFAULT_BASE_URL, apiKey: restoredKey, autoPush: true, keySecured: false };
+      // One-time migration: `apiConfig` used to double as our own database
+      // connection too, force-reset to DEFAULT_BASE_URL + the country's
+      // scanner key on every login. An upgrading install's saved value is
+      // therefore just that internal value reflected back, not a real
+      // Prep-Center connection anyone actually configured — leaving it in
+      // place would silently double-post every session to our own database
+      // a second time, under this now-separate pipeline. Clear it once; a
+      // genuine external connection is typed into Settings going forward.
+      const prepSplit = await kvGet('prepConfigSplitV1', false);
+      if (!prepSplit) {
+        if (apiToUse.baseUrl === DEFAULT_BASE_URL) {
+          apiToUse = { ...apiToUse, baseUrl: '', apiKey: '', keySecured: false };
+        }
+        await kvSet('prepConfigSplitV1', true);
       }
       setApiConfig(apiToUse);
       setManifest(manifestState);
@@ -152,10 +165,15 @@ export function AppProvider({ children }) {
       // cold start where a connection already exists — a fresh install (no
       // local drivers at all yet) or a device that's been offline for a
       // while both need this, not just a brand-new badge login.
-      if (apiToUse.apiKey && savedShift?.country) pullDriverProfilesNowRef.current(apiToUse, savedShift.country);
+      // These three always talk to our own database, never whatever's typed
+      // into the (now fully separate) Prep-Center connection above — built
+      // straight from the country's own scanner key, not `apiToUse`.
+      const savedInternalKey = savedShift?.country && DEFAULT_SCANNER_KEYS[savedShift.country];
+      const savedInternalConfig = savedInternalKey ? { baseUrl: DEFAULT_BASE_URL, apiKey: savedInternalKey } : null;
+      if (savedInternalConfig && savedShift?.country) pullDriverProfilesNowRef.current(savedInternalConfig, savedShift.country);
       setCarriers(savedCarriers);
-      if (apiToUse.apiKey && savedShift?.country) pullCarriersNowRef.current(apiToUse, savedShift.country);
-      if (apiToUse.apiKey && savedShift?.country) pullHistoryNowRef.current(apiToUse, savedShift.country);
+      if (savedInternalConfig && savedShift?.country) pullCarriersNowRef.current(savedInternalConfig, savedShift.country);
+      if (savedInternalConfig && savedShift?.country) pullHistoryNowRef.current(savedInternalConfig, savedShift.country);
       setBadgeCountries(savedBadgeCountries);
       if (savedShift) {
         setShift(savedShift);
@@ -164,6 +182,16 @@ export function AppProvider({ children }) {
       setReady(true);
     })();
   }, []);
+
+  // Wired up automatically from the country's badge lock — never
+  // user-editable, and immune to whatever's typed into the separate
+  // Prep-Center connection (`apiConfig`) below. This is what every
+  // internal operation (doc numbering, our own session save, driver/
+  // carrier/damage sync, history pull) talks to.
+  const internalConfig = useMemo(() => {
+    const key = shift?.country && DEFAULT_SCANNER_KEYS[shift.country];
+    return key ? { baseUrl: DEFAULT_BASE_URL, apiKey: key } : null;
+  }, [shift?.country]);
 
   useEffect(() => { if (ready) kvSet('apiConfig', apiConfig); }, [ready, apiConfig]);
   useEffect(() => { if (ready) kvSet('manifest', manifest); }, [ready, manifest]);
@@ -214,12 +242,11 @@ export function AppProvider({ children }) {
 
   // ---- shift / badge login ----
   // Wires the app up to its own database for this country, with no setup
-  // from the operator — the visible API screen is for something else
-  // entirely (e.g. a future Prep-Center connection), not this pipeline.
+  // from the operator — the visible API screen is a separate, optional
+  // Prep-Center connection and is never touched here.
   const applyCountryConnection = useCallback((countryCode) => {
     const key = DEFAULT_SCANNER_KEYS[countryCode];
     if (!key) return;
-    setApiConfig((c) => ({ ...c, baseUrl: DEFAULT_BASE_URL, apiKey: key, autoPush: true, keySecured: false }));
     pullDriverProfilesNowRef.current({ baseUrl: DEFAULT_BASE_URL, apiKey: key }, countryCode);
     pullCarriersNowRef.current({ baseUrl: DEFAULT_BASE_URL, apiKey: key }, countryCode);
     pullHistoryNowRef.current({ baseUrl: DEFAULT_BASE_URL, apiKey: key }, countryCode);
@@ -427,17 +454,17 @@ export function AppProvider({ children }) {
     });
     setDamageSheet({ open: false, picks: [], note: '', photoDataUrl: null });
 
-    if (apiConfig.autoPush && trackingCode) {
-      api.pushDamage(apiConfig, trackingCode, {
+    if (internalConfig && trackingCode) {
+      api.pushDamage(internalConfig, trackingCode, {
         tracking: trackingCode,
         type: label,
         photo: damageSheet.photoDataUrl,
         recorded_at: new Date().toISOString(),
       }).then((res) => {
-        if (!res.ok) showToast(`Damage push to ERP failed for ${trackingCode} — will still go out with the session`);
+        if (!res.ok) showToast(`Damage push failed for ${trackingCode} — will still go out with the session`);
       });
     }
-  }, [damageSheet, docSeq, direction, parcels, apiConfig, showToast]);
+  }, [damageSheet, docSeq, direction, parcels, internalConfig, showToast]);
 
   // ---- signature ----
   const toSign = useCallback(() => {
@@ -463,8 +490,8 @@ export function AppProvider({ children }) {
       const others = list.filter((p) => p.name.toLowerCase() !== key);
       return [updated, ...others].sort((a, b) => b.lastUsedAt - a.lastUsedAt);
     });
-    if (apiConfig.apiKey) api.pushDriverProfile(apiConfig, updated).catch(() => {});
-  }, [apiConfig, shift]);
+    if (internalConfig) api.pushDriverProfile(internalConfig, updated).catch(() => {});
+  }, [internalConfig, shift]);
   // Pulls this country's driver list from the database and merges it with
   // whatever's local (by name, keeping whichever copy was touched more
   // recently) — called on login and whenever the country connection is
@@ -507,8 +534,8 @@ export function AppProvider({ children }) {
       const others = list.filter((c) => c.name.toLowerCase() !== key);
       return [...others, updated].sort((a, b) => a.name.localeCompare(b.name));
     });
-    if (apiConfig.apiKey) api.pushCarrier(apiConfig, updated).catch(() => {});
-  }, [apiConfig, shift]);
+    if (internalConfig) api.pushCarrier(internalConfig, updated).catch(() => {});
+  }, [internalConfig, shift]);
   const pullCarriersNow = useCallback(async (config, countryCode) => {
     if (!config?.apiKey) return;
     const res = await api.fetchCarriers(config);
@@ -586,8 +613,8 @@ export function AppProvider({ children }) {
     // active on the same country at the same time). Falls back to the old
     // local counter only when there's no connection to reserve from.
     let doc = docNumber(direction, docSeq[direction]);
-    if (apiConfig.apiKey) {
-      const reserved = await api.reserveDocNumber(apiConfig, direction === 'out' ? 'outbound' : 'inbound');
+    if (internalConfig) {
+      const reserved = await api.reserveDocNumber(internalConfig, direction === 'out' ? 'outbound' : 'inbound');
       if (reserved.ok) doc = reserved.document;
     }
     const document = {
@@ -606,7 +633,12 @@ export function AppProvider({ children }) {
       date: stamp(now2),
       docTime: stamp(now2),
       closedAtIso: now2.toISOString(),
-      syncStatus: apiConfig.autoPush ? 'pending' : 'pending',
+      syncStatus: 'pending',
+      // Independent of the DB save above — tracks whether this session has
+      // also gone out to the separate, optional Prep-Center connection.
+      // Starts 'pending' even when that connection isn't configured yet,
+      // so it stays queued and goes out automatically the moment it is.
+      prepSyncStatus: 'pending',
     };
     await docPut(document);
     setHistory((h) => [document, ...h]);
@@ -628,26 +660,41 @@ export function AppProvider({ children }) {
     setShipment('');
     setSessionStartedAt(null);
 
-    if (apiConfig.autoPush) {
-      const pdfDataUrl = await renderPdfDataUrl(document);
-      const res = await api.pushSession(apiConfig, { ...document, pdfDataUrl });
+    const pdfDataUrl = await renderPdfDataUrl(document);
+    let updated = document;
+    const toastParts = [];
+    // Always saved to our own database — this isn't optional, unlike the
+    // Prep-Center push below.
+    if (internalConfig) {
+      const res = await api.pushSession(internalConfig, { ...updated, pdfDataUrl });
       const syncError = res.ok ? null : api.describeError(res);
-      const updated = { ...document, syncStatus: res.ok ? 'ok' : 'failed', syncError };
-      await docPut(updated);
-      setHistory((h) => h.map((d) => (d.doc === doc && d.country === document.country ? updated : d)));
-      setConfirmedDoc((c) => (c && c.doc === doc && c.country === document.country ? updated : c));
-      showToast(res.ok ? `${doc} sent to the ERP` : `${doc} failed to send — ${syncError}`);
+      updated = { ...updated, syncStatus: res.ok ? 'ok' : 'failed', syncError };
+      toastParts.push(res.ok ? `${doc} saved` : `${doc} failed to save — ${syncError}`);
     }
-  }, [signReady, direction, docSeq, carrier, courierCompany, shipment, courierName, plate, shift, parcels, signatureDataUrl, apiConfig, showToast, renderPdfDataUrl, saveDriverProfile]);
+    // Separate, optional: also push to the Prep-Center connection from the
+    // API screen, if one is configured and enabled. If it isn't, this
+    // session just stays queued (`prepSyncStatus: 'pending'`) and goes out
+    // automatically the next time that connection is reachable.
+    if (apiConfig.baseUrl && apiConfig.autoPush) {
+      const res = await api.pushSession(apiConfig, { ...updated, pdfDataUrl });
+      const prepSyncError = res.ok ? null : api.describeError(res);
+      updated = { ...updated, prepSyncStatus: res.ok ? 'ok' : 'failed', prepSyncError };
+      toastParts.push(res.ok ? 'sent to Prep-Center' : `Prep-Center failed — ${prepSyncError}`);
+    }
+    await docPut(updated);
+    setHistory((h) => h.map((d) => (d.doc === doc && d.country === document.country ? { ...d, ...updated } : d)));
+    setConfirmedDoc((c) => (c && c.doc === doc && c.country === document.country ? { ...c, ...updated } : c));
+    if (toastParts.length) showToast(toastParts.join(' · '));
+  }, [signReady, direction, docSeq, carrier, courierCompany, shipment, courierName, plate, shift, parcels, signatureDataUrl, internalConfig, apiConfig, showToast, renderPdfDataUrl, saveDriverProfile]);
 
   // ---- document export ----
   const printDocument = useCallback(async (document) => {
     try {
       const mod = await import('../lib/pdfDoc');
-      // If the ERP already has this document, prefer its own archived PDF
-      // (e.g. it may carry the ERP's official numbering/stamps) over
+      // If Prep-Center already has this document, prefer its own archived
+      // PDF (e.g. it may carry its own official numbering/stamps) over
       // regenerating one locally — falls back silently if that fails.
-      if (apiConfig.baseUrl && document.syncStatus === 'ok') {
+      if (apiConfig.baseUrl && document.prepSyncStatus === 'ok') {
         const archived = await api.fetchArchivedPdf(apiConfig, document.doc);
         if (archived.ok) {
           await mod.exportPdfDataUrl(archived.dataUrl, document);
@@ -730,8 +777,52 @@ export function AppProvider({ children }) {
   const pullManifestNowRef = useRef(() => {});
   useEffect(() => { pullManifestNowRef.current = pullManifestNow; }, [pullManifestNow]);
 
+  // Pushes every not-yet-sent document (for the currently connected
+  // country) to the Prep-Center connection — used both from `syncNow`
+  // below and on its own, whenever there might newly be a working
+  // connection to catch up on (right after the operator finishes typing
+  // one into Settings, or the next time the app opens with one already
+  // saved). A no-op whenever Prep-Center isn't configured/enabled, so it's
+  // always safe to call speculatively. `silent` skips the toast for the
+  // background trigger points, where popping one up would be unexpected.
+  const syncPrepPending = useCallback(async ({ silent = false } = {}) => {
+    if (!apiConfig.baseUrl || !apiConfig.autoPush) return { attempted: 0, ok: 0, fail: 0, lastError: null };
+    const pending = history.filter((d) => d.prepSyncStatus !== 'ok' && d.country === shift?.country);
+    let ok = 0, fail = 0, lastError = null;
+    for (const d of pending) {
+      const pdfDataUrl = await renderPdfDataUrl(d);
+      const res = await api.pushSession(apiConfig, { ...d, pdfDataUrl });
+      const prepSyncError = res.ok ? null : api.describeError(res);
+      if (res.ok) ok++; else { fail++; lastError = prepSyncError; }
+      const updated = { ...d, prepSyncStatus: res.ok ? 'ok' : 'failed', prepSyncError };
+      await docPut(updated);
+      setHistory((h) => h.map((x) => (x.doc === d.doc && x.country === d.country ? { ...x, ...updated } : x)));
+    }
+    if (!silent) {
+      showToast(
+        !pending.length ? 'Prep-Center: up to date'
+          : fail ? `Prep-Center: ${ok} sent, ${fail} failed — ${lastError}`
+          : `Prep-Center: ${ok} sent`
+      );
+    }
+    return { attempted: pending.length, ok, fail, lastError };
+  }, [apiConfig, history, shift, showToast, renderPdfDataUrl]);
+  const syncPrepPendingRef = useRef(() => {});
+  useEffect(() => { syncPrepPendingRef.current = syncPrepPending; }, [syncPrepPending]);
+
+  // Fires once the app has finished loading (cold start with a Prep-Center
+  // connection already saved from before) and again on a genuine country
+  // switch — deliberately NOT keyed on apiConfig.baseUrl/autoPush directly,
+  // or this would re-fire on every keystroke while editing Settings. The
+  // Settings screen instead calls syncPrepPending itself on blur, right
+  // after the operator finishes typing a connection.
+  useEffect(() => {
+    if (!ready) return;
+    syncPrepPendingRef.current({ silent: true });
+  }, [ready, shift?.country]);
+
   const syncNow = useCallback(async () => {
-    if (!apiConfig.autoPush) { showToast('Enable "Send sessions automatically" first'); return; }
+    if (!internalConfig) { showToast('No connection for this country yet'); return; }
     setSyncing(true);
     // Only ever push documents that belong to the country currently
     // connected — `history` here is the raw, unfiltered state (this
@@ -746,32 +837,52 @@ export function AppProvider({ children }) {
     let lastError = null;
     for (const d of pending) {
       const pdfDataUrl = await renderPdfDataUrl(d);
-      const res = await api.pushSession(apiConfig, { ...d, pdfDataUrl });
+      const res = await api.pushSession(internalConfig, { ...d, pdfDataUrl });
       const syncError = res.ok ? null : api.describeError(res);
       if (res.ok) okCount++; else { failCount++; lastError = syncError; }
       const updated = { ...d, syncStatus: res.ok ? 'ok' : 'failed', syncError };
       await docPut(updated);
-      setHistory((h) => h.map((x) => (x.doc === d.doc && x.country === d.country ? updated : x)));
+      setHistory((h) => h.map((x) => (x.doc === d.doc && x.country === d.country ? { ...x, ...updated } : x)));
     }
+    // Same pass, second destination — reported together so "Sync now"
+    // reads as one action even though it talks to two systems.
+    const prepResult = await syncPrepPending({ silent: true });
     setSyncing(false);
-    showToast(
-      !pending.length ? 'Nothing pending'
-        : failCount ? `${okCount} sent · ${failCount} failed — ${lastError}`
-        : `${okCount} sent`
-    );
-  }, [apiConfig, history, shift, showToast, renderPdfDataUrl]);
+    const parts = [
+      !pending.length ? 'DB: nothing pending' : failCount ? `DB: ${okCount} sent, ${failCount} failed — ${lastError}` : `DB: ${okCount} sent`,
+    ];
+    if (apiConfig.baseUrl) {
+      parts.push(
+        !prepResult.attempted ? 'Prep-Center: up to date'
+          : prepResult.fail ? `Prep-Center: ${prepResult.ok} sent, ${prepResult.fail} failed — ${prepResult.lastError}`
+          : `Prep-Center: ${prepResult.ok} sent`
+      );
+    }
+    showToast(parts.join(' · '));
+  }, [internalConfig, apiConfig.baseUrl, history, shift, showToast, renderPdfDataUrl, syncPrepPending]);
 
   const retrySync = useCallback(async (doc) => {
     const d = history.find((x) => x.doc === doc && x.country === shift?.country);
     if (!d) return;
     const pdfDataUrl = await renderPdfDataUrl(d);
-    const res = await api.pushSession(apiConfig, { ...d, pdfDataUrl });
-    const syncError = res.ok ? null : api.describeError(res);
-    const updated = { ...d, syncStatus: res.ok ? 'ok' : 'failed', syncError };
+    let updated = d;
+    const parts = [];
+    if (internalConfig && d.syncStatus !== 'ok') {
+      const res = await api.pushSession(internalConfig, { ...updated, pdfDataUrl });
+      const syncError = res.ok ? null : api.describeError(res);
+      updated = { ...updated, syncStatus: res.ok ? 'ok' : 'failed', syncError };
+      parts.push(res.ok ? 'DB sent' : `DB failed — ${syncError}`);
+    }
+    if (apiConfig.baseUrl && apiConfig.autoPush && d.prepSyncStatus !== 'ok') {
+      const res = await api.pushSession(apiConfig, { ...updated, pdfDataUrl });
+      const prepSyncError = res.ok ? null : api.describeError(res);
+      updated = { ...updated, prepSyncStatus: res.ok ? 'ok' : 'failed', prepSyncError };
+      parts.push(res.ok ? 'Prep-Center sent' : `Prep-Center failed — ${prepSyncError}`);
+    }
     await docPut(updated);
-    setHistory((h) => h.map((x) => (x.doc === doc && x.country === d.country ? updated : x)));
-    showToast(res.ok ? `${doc} sent` : `${doc} failed — ${syncError}`);
-  }, [apiConfig, history, shift, showToast, renderPdfDataUrl]);
+    setHistory((h) => h.map((x) => (x.doc === doc && x.country === d.country ? { ...x, ...updated } : x)));
+    showToast(parts.length ? `${doc}: ${parts.join(' · ')}` : `${doc} already up to date`);
+  }, [internalConfig, apiConfig, history, shift, showToast, renderPdfDataUrl]);
 
   // Every screen reads `history`/`driverProfiles` through this context —
   // filtering once, here, means each country only ever sees its own data
@@ -813,7 +924,7 @@ export function AppProvider({ children }) {
     confirmedDoc, printDocument, emailDocument,
     history: visibleHistory, historyQuery, setHistoryQuery, historyFilter, setHistoryFilter, selectedDocNo, openSession, backToHistory,
     apiConfig, apiShowKey, setApiBaseUrl, setApiKey, generateApiKey, copyApiKey, togglePush, togglePull, toggleShowKey,
-    manifest, pulling, pullManifestNow, syncing, syncNow, retrySync,
+    manifest, pulling, pullManifestNow, syncing, syncNow, retrySync, syncPrepPending,
     orgSettings, updateOrgSettings,
     driverProfiles: visibleDriverProfiles, applyDriverProfile,
     carriers: visibleCarriers, saveCarrier,
@@ -829,7 +940,7 @@ export function AppProvider({ children }) {
     courierName, plate, agreed, toggleAgree, signatureDataUrl, sigInk, clearSignature, signReady, toSign, finish,
     confirmedDoc, printDocument, emailDocument, visibleHistory, historyQuery, historyFilter, selectedDocNo, openSession, backToHistory,
     apiConfig, apiShowKey, setApiBaseUrl, setApiKey, generateApiKey, copyApiKey, togglePush, togglePull, toggleShowKey,
-    manifest, pulling, pullManifestNow, syncing, syncNow, retrySync,
+    manifest, pulling, pullManifestNow, syncing, syncNow, retrySync, syncPrepPending,
     orgSettings, updateOrgSettings, visibleDriverProfiles, applyDriverProfile, visibleCarriers, saveCarrier, viewingPhoto, openPhoto, closePhoto,
     updateInfo, updateDismissed, checkUpdateNow, dismissUpdate, downloadUpdate, toast, showToast,
   ]);
