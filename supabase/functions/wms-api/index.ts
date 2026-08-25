@@ -161,6 +161,58 @@ Deno.serve(async (req: Request) => {
       return json({ ok: true });
     }
 
+    // GET /warehouse/sessions?days=30 — every session this country's
+    // database has for the requested window, so History/Documents show the
+    // same list on any device logged into this country, not just what
+    // that one phone happened to create — and the doc numbers on display
+    // are visibly the real, server-assigned, country-wide progressive
+    // sequence. Deliberately excludes the archived PDF (fetched separately,
+    // on demand, via the existing /warehouse/sessions/{doc}/pdf route) and
+    // damage photos — both can be large, and this list is meant to stay
+    // fast for a 30-day pull on every login.
+    if (req.method === "GET" && path === "/warehouse/sessions") {
+      const days = Number(url.searchParams.get("days")) || 30;
+      const sinceIso = new Date(Date.now() - days * 86400000).toISOString();
+      const { data: sessionsData, error: sessErr } = await supabase
+        .schema(schema)
+        .from("sessions")
+        .select("id, doc, direction, carrier, driver_name, driver_plate, operator, closed_at")
+        .gte("closed_at", sinceIso)
+        .order("closed_at", { ascending: false });
+      if (sessErr) return json({ error: sessErr.message }, 500);
+      const ids = (sessionsData || []).map((s) => s.id);
+      const parcelsBySession: Record<string, any[]> = {};
+      if (ids.length) {
+        const { data: parcelsData, error: parcelErr } = await supabase
+          .schema(schema)
+          .from("parcels")
+          .select("session_id, scan_order, tracking, boxes, expected, damage_type, created_at")
+          .in("session_id", ids)
+          .order("scan_order", { ascending: true });
+        if (parcelErr) return json({ error: parcelErr.message }, 500);
+        for (const p of parcelsData || []) {
+          (parcelsBySession[p.session_id] ||= []).push(p);
+        }
+      }
+      const sessions = (sessionsData || []).map((s) => ({
+        doc: s.doc,
+        direction: s.direction,
+        carrier: s.carrier,
+        driverName: s.driver_name,
+        plate: s.driver_plate,
+        operator: s.operator,
+        closedAtIso: s.closed_at,
+        parcels: (parcelsBySession[s.id] || []).map((p) => ({
+          code: p.tracking,
+          boxes: p.boxes,
+          expected: p.expected,
+          damage: p.damage_type,
+          createdAtIso: p.created_at,
+        })),
+      }));
+      return json({ sessions });
+    }
+
     // GET /warehouse/carriers — this country's carrier list, each with an
     // optional tracking-code prefix rule the app enforces at scan time.
     if (req.method === "GET" && path === "/warehouse/carriers") {
