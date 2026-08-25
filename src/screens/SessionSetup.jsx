@@ -5,7 +5,7 @@ import { ArrowRight } from '../components/icons';
 
 export default function SessionSetup() {
   const app = useApp();
-  const { direction, carrier, setCarrier, courierCompany, setCourierCompany, shipment, setShipment, toScan, shift } = app;
+  const { direction, carrier, setCarrier, shipment, setShipment, toScan, shift } = app;
   const isOut = direction === 'out';
   const nextDoc = docNumber(direction, app.docSeq?.[direction] ?? 1);
   const carriers = carriersForCountry(shift?.country);
@@ -31,7 +31,15 @@ export default function SessionSetup() {
           {carriers.map((c) => (
             <button
               key={c}
-              onClick={() => setCarrier(c)}
+              onClick={() => {
+                setCarrier(c);
+                // Inbound has nothing left to fill in on this screen once a
+                // carrier's picked — jump straight to scanning instead of
+                // making the operator tap a second button. Outbound still
+                // has the shipment ID field below, so it keeps the
+                // "Start scanning" step.
+                if (!isOut) toScan();
+              }}
               className={
                 'min-h-[46px] rounded-[11px] border text-[12.5px] font-bold ' +
                 (carrier === c ? 'border-primary bg-[rgba(31,111,235,.08)] text-primary' : 'border-[rgba(148,163,184,.35)] bg-white text-ink')
@@ -41,16 +49,6 @@ export default function SessionSetup() {
             </button>
           ))}
         </div>
-      </div>
-
-      <div>
-        <div className="mb-2 text-[11px] font-bold uppercase tracking-[.06em] text-secondary">Driver company / notes</div>
-        <input
-          value={courierCompany}
-          onChange={(e) => setCourierCompany(e.target.value)}
-          placeholder="e.g. DHL Express Italy s.r.l."
-          className="min-h-[48px] w-full rounded-xl border border-inputborder bg-page px-4 text-sm text-ink"
-        />
       </div>
 
       {isOut && (
@@ -65,9 +63,11 @@ export default function SessionSetup() {
         </div>
       )}
 
-      <button onClick={toScan} className="flex min-h-[54px] w-full items-center justify-center gap-2 rounded-xl bg-primary text-[15px] font-extrabold text-white">
-        Start scanning <ArrowRight size={17} strokeWidth={2.2} />
-      </button>
+      {isOut && (
+        <button onClick={toScan} className="flex min-h-[54px] w-full items-center justify-center gap-2 rounded-xl bg-primary text-[15px] font-extrabold text-white">
+          Start scanning <ArrowRight size={17} strokeWidth={2.2} />
+        </button>
+      )}
     </div>
   );
 }

@@ -269,28 +269,10 @@ export function AppProvider({ children }) {
     setScreen('login');
   }, []);
 
-  // ---- auto-logout after 5 minutes of inactivity ----
-  const INACTIVITY_LIMIT_MS = 5 * 60 * 1000;
-  const lastActivityRef = useRef(Date.now());
-  useEffect(() => {
-    if (!shift) return undefined;
-    const markActive = () => { lastActivityRef.current = Date.now(); };
-    markActive();
-    const events = ['touchstart', 'mousedown', 'keydown', 'scroll'];
-    events.forEach((ev) => window.addEventListener(ev, markActive, { passive: true }));
-    const t = setInterval(() => {
-      if (Date.now() - lastActivityRef.current >= INACTIVITY_LIMIT_MS) {
-        setShift(null);
-        kvSet('shift', null);
-        setScreen('login');
-        showToast('Signed out after 5 minutes of inactivity');
-      }
-    }, 10000);
-    return () => {
-      events.forEach((ev) => window.removeEventListener(ev, markActive));
-      clearInterval(t);
-    };
-  }, [shift, showToast]);
+  // Login is permanent by design — the operator stays signed in until they
+  // tap "End shift" themselves (previously auto-logged-out after 5 minutes
+  // of inactivity, which was more disruptive than useful on a warehouse
+  // floor where a phone can sit idle between scans for longer than that).
   const updateOperatorName = useCallback(async (name) => {
     const trimmed = name.trim();
     if (!trimmed || !shift) return;
