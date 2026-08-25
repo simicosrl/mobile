@@ -99,12 +99,37 @@ jobs:
           # without a retry, whichever finishes second gets a non-fast-forward
           # rejection and its APK is silently lost, which is exactly what was
           # happening here.
+          #
+          # NOTE: this used to retry with `git rebase origin/main`, which
+          # reliably deadlocks — WMS-App-debug.apk and version.json are the
+          # *only* two files this commit ever touches, and they're also the
+          # only two files any other run of this same workflow ever touches,
+          # so a rebase always has to replay a change to a binary APK and a
+          # JSON file that the new tip already changed differently. Git can't
+          # 3-way merge either, so it lands as an unresolvable conflict and
+          # the whole job dies (confirmed by a real failed run). There is
+          # nothing to actually merge, though — these are pure build
+          # artifacts, not hand-edited content — so instead: reset straight
+          # onto the new tip and recreate the exact same commit there, from
+          # the APK gradle already built (untouched by reset --hard, since
+          # android/*/build/ is gitignored).
           for i in 1 2 3 4 5; do
             if git push origin HEAD:main; then
               exit 0
             fi
             git fetch origin main
-            git rebase origin/main
+            git reset --hard origin/main
+            cp android/app/build/outputs/apk/debug/app-debug.apk WMS-App-debug.apk
+            cat > version.json <<EOF
+          {
+            "versionCode": ${{ github.run_number }},
+            "versionName": "1.0.${{ github.run_number }}",
+            "apkUrl": "https://raw.githubusercontent.com/simicosrl/mobile/main/WMS-App-debug.apk",
+            "commit": "${{ github.sha }}"
+          }
+          EOF
+            git add -f WMS-App-debug.apk version.json
+            git commit -m "ci: update compiled debug APK (v1.0.${{ github.run_number }})" -m "Built from ${{ github.sha }} by GitHub Actions. Debug-signed with the project's pinned debug key — fine for sideloading, not for Play Store."
             sleep $((i * 5))
           done
           echo "Giving up after 5 attempts" >&2
