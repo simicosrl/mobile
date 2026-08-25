@@ -1,14 +1,13 @@
 import { useApp } from '../state/AppContext';
-import { carriersForCountry, COUNTRIES } from '../lib/carriers';
+import { COUNTRIES } from '../lib/carriers';
 import { docNumber } from '../lib/format';
-import { ArrowRight } from '../components/icons';
 
 export default function SessionSetup() {
   const app = useApp();
-  const { direction, carrier, setCarrier, shipment, setShipment, toScan, shift } = app;
+  const { direction, carrier, setCarrier, toScan, shift, carriers: dynamicCarriers } = app;
   const isOut = direction === 'out';
   const nextDoc = docNumber(direction, app.docSeq?.[direction] ?? 1);
-  const carriers = carriersForCountry(shift?.country);
+  const carriers = dynamicCarriers.map((c) => c.name);
   const countryName = COUNTRIES.find((c) => c.code === shift?.country)?.name;
 
   return (
@@ -32,13 +31,12 @@ export default function SessionSetup() {
             <button
               key={c}
               onClick={() => {
+                // Nothing else to fill in on this screen — jump straight to
+                // scanning the moment a carrier's picked, for both
+                // directions, instead of making the operator tap a second
+                // "Start scanning" button.
                 setCarrier(c);
-                // Inbound has nothing left to fill in on this screen once a
-                // carrier's picked — jump straight to scanning instead of
-                // making the operator tap a second button. Outbound still
-                // has the shipment ID field below, so it keeps the
-                // "Start scanning" step.
-                if (!isOut) toScan();
+                toScan();
               }}
               className={
                 'min-h-[46px] rounded-[11px] border text-[12.5px] font-bold ' +
@@ -50,24 +48,6 @@ export default function SessionSetup() {
           ))}
         </div>
       </div>
-
-      {isOut && (
-        <div>
-          <div className="mb-2 text-[11px] font-bold uppercase tracking-[.06em] text-secondary">Destination / shipment ID</div>
-          <input
-            value={shipment}
-            onChange={(e) => setShipment(e.target.value)}
-            placeholder="FBA15KQ8N7X2 · BGY1 Milano"
-            className="min-h-[48px] w-full rounded-xl border border-inputborder bg-page px-4 font-mono text-[13px] text-ink"
-          />
-        </div>
-      )}
-
-      {isOut && (
-        <button onClick={toScan} className="flex min-h-[54px] w-full items-center justify-center gap-2 rounded-xl bg-primary text-[15px] font-extrabold text-white">
-          Start scanning <ArrowRight size={17} strokeWidth={2.2} />
-        </button>
-      )}
     </div>
   );
 }

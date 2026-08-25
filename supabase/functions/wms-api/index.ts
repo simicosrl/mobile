@@ -161,6 +161,33 @@ Deno.serve(async (req: Request) => {
       return json({ ok: true });
     }
 
+    // GET /warehouse/carriers — this country's carrier list, each with an
+    // optional tracking-code prefix rule the app enforces at scan time.
+    if (req.method === "GET" && path === "/warehouse/carriers") {
+      const { data, error } = await supabase
+        .schema(schema)
+        .from("carriers")
+        .select("name, pattern")
+        .order("name", { ascending: true });
+      if (error) return json({ error: error.message }, 500);
+      return json({ carriers: data || [] });
+    }
+
+    // POST /warehouse/carriers — add a new carrier or update an existing
+    // one's rule, keyed case-insensitively on name.
+    if (req.method === "POST" && path === "/warehouse/carriers") {
+      const body = await req.json();
+      const name = String(body.name || "").trim();
+      if (!name) return json({ error: "name is required" }, 400);
+      const pattern = body.pattern ? String(body.pattern).trim().toUpperCase() : null;
+      const { error } = await supabase
+        .schema(schema)
+        .from("carriers")
+        .upsert({ name, pattern: pattern || null }, { onConflict: "name_lower" });
+      if (error) return json({ error: error.message }, 500);
+      return json({ ok: true });
+    }
+
     // POST /warehouse/sessions — confirmed handover, header + parcels.
     if (req.method === "POST" && path === "/warehouse/sessions") {
       const body = await req.json();

@@ -48,6 +48,19 @@ export const ChevronRight = (p) => (
   </Svg>
 );
 
+export const ChevronDown = (p) => (
+  <Svg strokeWidth={2.2} {...p}>
+    <path d="m6 9 6 6 6-6" />
+  </Svg>
+);
+
+export const Plus = (p) => (
+  <Svg strokeWidth={2.2} {...p}>
+    <path d="M5 12h14" />
+    <path d="M12 5v14" />
+  </Svg>
+);
+
 export const ArrowDownToLine = (p) => (
   <Svg strokeWidth={1.8} {...p}>
     <path d="M12 17V3" />
