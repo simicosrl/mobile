@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useApp } from '../state/AppContext';
 import { Globe, Download, RefreshCw } from '../components/icons';
-import { ENDPOINTS, PAYLOAD_SAMPLE } from '../lib/api';
+import { ENDPOINTS, PAYLOAD_SAMPLE, DEFAULT_BASE_URL } from '../lib/api';
 
 function Toggle({ on, onClick }) {
   return (
@@ -13,10 +13,15 @@ function Toggle({ on, onClick }) {
 
 export default function ApiScreen() {
   const {
-    apiConfig, apiShowKey, setApiBaseUrl, setApiKey, generateApiKey, copyApiKey, togglePush, togglePull, toggleShowKey,
-    manifest, pulling, pullManifestNow, syncing, syncNow, retrySync, history,
+    shift, apiConfig, apiShowKey, setApiBaseUrl, setApiKey, generateApiKey, copyApiKey, togglePush, togglePull, toggleShowKey,
+    manifest, pulling, pullManifestNow, syncing, syncNow, retrySync, syncPrepPending, history,
   } = useApp();
   const [showManifestList, setShowManifestList] = useState(false);
+
+  // Our own database — wired up automatically from the badge's country,
+  // never edited here. Always "connected" the moment there's an open
+  // shift at all, since login itself already required a working key.
+  const dbHostLabel = DEFAULT_BASE_URL.replace(/^https?:\/\//, '');
 
   const hostLabel = apiConfig.baseUrl.replace(/^https?:\/\//, '') || 'no endpoint configured';
   const online = !!apiConfig.baseUrl;
@@ -33,6 +38,12 @@ export default function ApiScreen() {
   const okCount = history.filter((d) => d.syncStatus === 'ok').length;
   const pendingCount = history.filter((d) => d.syncStatus === 'pending' || d.syncStatus === undefined).length;
   const failCount = history.filter((d) => d.syncStatus === 'failed').length;
+  const prepOkCount = history.filter((d) => d.prepSyncStatus === 'ok').length;
+  const prepPendingCount = history.filter((d) => d.prepSyncStatus !== 'ok' && d.prepSyncStatus !== 'failed').length;
+  const prepFailCount = history.filter((d) => d.prepSyncStatus === 'failed').length;
+  // Right after the operator finishes typing a connection (blur, not every
+  // keystroke) — sends anything already closed the moment it looks usable.
+  const checkPrepConnection = () => syncPrepPending();
 
   return (
     <div className="flex flex-col gap-3.5 px-3.5 pb-[22px] pt-3.5">
@@ -43,27 +54,38 @@ export default function ApiScreen() {
           </div>
           <div className="min-w-0">
             <div className="text-[15px] font-extrabold tracking-[-.015em]">Your database</div>
-            <div className="truncate text-[11px] text-secondary">{hostLabel}</div>
+            <div className="truncate text-[11px] text-secondary">{dbHostLabel}{shift?.country ? ` · ${shift.country}` : ''}</div>
           </div>
-          <div className="ml-auto flex flex-none items-center gap-1.5 rounded-full px-2.5 py-1" style={{ background: online ? 'rgba(22,163,74,.1)' : 'rgba(220,38,38,.1)' }}>
-            <div className="h-[7px] w-[7px] rounded-full" style={{ background: online ? '#16A34A' : '#DC2626' }} />
-            <div className="text-[10px] font-extrabold uppercase tracking-[.06em]" style={{ color: online ? '#16A34A' : '#DC2626' }}>{online ? 'Configured' : 'Not set'}</div>
+          <div className="ml-auto flex flex-none items-center gap-1.5 rounded-full px-2.5 py-1" style={{ background: 'rgba(22,163,74,.1)' }}>
+            <div className="h-[7px] w-[7px] rounded-full" style={{ background: '#16A34A' }} />
+            <div className="text-[10px] font-extrabold uppercase tracking-[.06em]" style={{ color: '#16A34A' }}>Connected</div>
           </div>
         </div>
       </div>
 
       <div className="border-l-[3px] border-primary bg-[rgba(31,111,235,.06)] px-3 py-2.5 text-[11px] leading-normal text-secondary">
-        Every session is saved to this warehouse's own database automatically — set once your country is
-        picked in Settings, no setup needed here. The fields below are for troubleshooting only. Other
-        systems (e.g. Prep-Center) read their data from this database on their own schedule; the app never
-        sends anything to them directly.
+        Every session is always saved to this warehouse's own database automatically — set once your
+        country is picked in Settings, nothing to configure here.
       </div>
 
       <div>
+        <div className="mb-2 flex items-center gap-2">
+          <div className="text-[10px] font-bold uppercase tracking-[.1em] text-light">Prep-Center connection</div>
+          <div className="ml-auto flex items-center gap-1.5 rounded-full px-2 py-[3px]" style={{ background: online ? 'rgba(22,163,74,.1)' : 'rgba(148,163,184,.15)' }}>
+            <div className="h-[6px] w-[6px] rounded-full" style={{ background: online ? '#16A34A' : '#94A3B8' }} />
+            <div className="text-[9.5px] font-extrabold uppercase tracking-[.06em]" style={{ color: online ? '#16A34A' : '#64748B' }}>{online ? hostLabel : 'Not set'}</div>
+          </div>
+        </div>
+        <div className="mb-2.5 text-[11px] leading-snug text-secondary">
+          Optional — a separate, additional system (e.g. Prep-Center) that also receives every session the
+          moment it's confirmed. Leave blank to skip it entirely; anything closed before a connection is
+          saved here goes out automatically as soon as it is.
+        </div>
         <div className="mb-2 text-[11px] font-bold uppercase tracking-[.06em] text-secondary">Base URL</div>
         <input
           value={apiConfig.baseUrl}
           onChange={(e) => setApiBaseUrl(e.target.value)}
+          onBlur={checkPrepConnection}
           placeholder="https://api.simico.srl/v1"
           className="min-h-12 w-full rounded-xl border border-inputborder bg-page px-4 font-mono text-[12.5px] text-ink"
         />
@@ -74,6 +96,7 @@ export default function ApiScreen() {
           <input
             value={keyShown}
             onChange={(e) => setApiKey(e.target.value)}
+            onBlur={checkPrepConnection}
             // While masked, the field shows a placeholder string with •
             // bullet characters — those aren't real key content, so the
             // field must not be editable in that state, or a stray change
@@ -111,22 +134,22 @@ export default function ApiScreen() {
         <div className="mt-1.5 text-[10.5px] leading-snug text-secondary">
           {apiConfig.keySecured
             ? 'Hidden for security after being copied — generate a new key, or retype it, to view it again.'
-            : "This device's key is already set automatically from its country — only replace it if you're wiring up a separate, additional connection. Generating one here won't work until it's registered on the backend, and picking a country again in Settings restores the working default."}
+            : "Paste the key Prep-Center gave you here. \"Generate new key\" only helps if Prep-Center lets you register one yourself — most systems issue their own instead."}
         </div>
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-[rgba(148,163,184,.25)] bg-white">
         <button onClick={togglePush} className="flex w-full items-center gap-2.5 border-b border-[rgba(148,163,184,.15)] p-[13px] text-left">
           <div className="min-w-0 flex-1">
-            <div className="text-[13.5px] font-bold">Send sessions automatically</div>
-            <div className="text-[11px] leading-snug text-secondary">On by default — saves every confirmed document to your database</div>
+            <div className="text-[13.5px] font-bold">Send sessions to Prep-Center</div>
+            <div className="text-[11px] leading-snug text-secondary">On by default — also pushes every confirmed document there once a connection is set above</div>
           </div>
           <Toggle on={apiConfig.autoPush} />
         </button>
         <button onClick={togglePull} className="flex w-full items-center gap-2.5 p-[13px] text-left">
           <div className="min-w-0 flex-1">
             <div className="text-[13.5px] font-bold">Receive expected manifest</div>
-            <div className="text-[11px] leading-snug text-secondary">GET tracking IDs due today and validate at scan</div>
+            <div className="text-[11px] leading-snug text-secondary">GET tracking IDs due today from Prep-Center and validate at scan</div>
           </div>
           <Toggle on={apiConfig.autoPull} />
         </button>
@@ -173,15 +196,26 @@ export default function ApiScreen() {
       </div>
 
       <div>
-        <div className="mb-2 flex items-center gap-2">
-          <div className="text-[10px] font-bold uppercase tracking-[.1em] text-light">Outgoing · send queue</div>
-          <div className="ml-auto text-[11px] text-secondary">{okCount} sent · {pendingCount} pending · {failCount} failed</div>
+        <div className="mb-2 flex flex-col gap-0.5">
+          <div className="flex items-center gap-2">
+            <div className="text-[10px] font-bold uppercase tracking-[.1em] text-light">Outgoing · your database</div>
+            <div className="ml-auto text-[11px] text-secondary">{okCount} sent · {pendingCount} pending · {failCount} failed</div>
+          </div>
+          {online && (
+            <div className="flex items-center gap-2">
+              <div className="text-[10px] font-bold uppercase tracking-[.1em] text-light">Outgoing · Prep-Center</div>
+              <div className="ml-auto text-[11px] text-secondary">{prepOkCount} sent · {prepPendingCount} pending · {prepFailCount} failed</div>
+            </div>
+          )}
         </div>
         <div className="overflow-hidden rounded-[14px] border border-[rgba(148,163,184,.25)] bg-white">
           {history.map((h) => {
             const status = h.syncStatus || 'pending';
             const bg = status === 'ok' ? 'rgba(22,163,74,.12)' : status === 'failed' ? 'rgba(220,38,38,.12)' : 'rgba(255,122,0,.14)';
             const color = status === 'ok' ? '#15803D' : status === 'failed' ? '#B91C1C' : '#C2410C';
+            const prepStatus = h.prepSyncStatus || 'pending';
+            const prepBg = prepStatus === 'ok' ? 'rgba(22,163,74,.12)' : prepStatus === 'failed' ? 'rgba(220,38,38,.12)' : 'rgba(255,122,0,.14)';
+            const prepColor = prepStatus === 'ok' ? '#15803D' : prepStatus === 'failed' ? '#B91C1C' : '#C2410C';
             const boxes = h.parcels.reduce((a, p) => a + p.boxes, 0);
             return (
               <div key={h.doc} className="flex items-center gap-2.5 border-b border-[rgba(148,163,184,.15)] p-[11px_12px] last:border-b-0">
@@ -189,13 +223,23 @@ export default function ApiScreen() {
                   <div className="truncate font-mono text-xs font-bold">{h.doc}</div>
                   <div className="truncate text-[10.5px] text-secondary">{h.carrier} · {h.parcels.length} parcels · {boxes} boxes</div>
                   {status === 'failed' && h.syncError && (
-                    <div className="truncate text-[10px] font-medium text-[#B91C1C]">{h.syncError}</div>
+                    <div className="truncate text-[10px] font-medium text-[#B91C1C]">DB: {h.syncError}</div>
+                  )}
+                  {online && prepStatus === 'failed' && h.prepSyncError && (
+                    <div className="truncate text-[10px] font-medium text-[#B91C1C]">Prep-Center: {h.prepSyncError}</div>
                   )}
                 </div>
-                <div className="flex-none rounded-full px-2 py-1 text-[10px] font-extrabold uppercase tracking-[.05em]" style={{ background: bg, color }}>
-                  {status === 'ok' ? 'sent' : status}
+                <div className="flex flex-none flex-col items-end gap-1">
+                  <div className="rounded-full px-2 py-1 text-[10px] font-extrabold uppercase tracking-[.05em]" style={{ background: bg, color }}>
+                    {status === 'ok' ? 'DB sent' : `DB ${status}`}
+                  </div>
+                  {online && (
+                    <div className="rounded-full px-2 py-1 text-[10px] font-extrabold uppercase tracking-[.05em]" style={{ background: prepBg, color: prepColor }}>
+                      {prepStatus === 'ok' ? 'prep sent' : `prep ${prepStatus}`}
+                    </div>
+                  )}
                 </div>
-                {status === 'failed' && (
+                {(status === 'failed' || (online && prepStatus === 'failed')) && (
                   <button onClick={() => retrySync(h.doc)} className="h-8 flex-none rounded-[9px] border border-[rgba(148,163,184,.35)] bg-white px-2.5 text-[11px] font-bold text-ink">
                     Retry
                   </button>
