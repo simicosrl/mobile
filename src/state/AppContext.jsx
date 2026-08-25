@@ -155,6 +155,7 @@ export function AppProvider({ children }) {
       if (apiToUse.apiKey && savedShift?.country) pullDriverProfilesNowRef.current(apiToUse, savedShift.country);
       setCarriers(savedCarriers);
       if (apiToUse.apiKey && savedShift?.country) pullCarriersNowRef.current(apiToUse, savedShift.country);
+      if (apiToUse.apiKey && savedShift?.country) pullHistoryNowRef.current(apiToUse, savedShift.country);
       setBadgeCountries(savedBadgeCountries);
       if (savedShift) {
         setShift(savedShift);
@@ -221,6 +222,7 @@ export function AppProvider({ children }) {
     setApiConfig((c) => ({ ...c, baseUrl: DEFAULT_BASE_URL, apiKey: key, autoPush: true, keySecured: false }));
     pullDriverProfilesNowRef.current({ baseUrl: DEFAULT_BASE_URL, apiKey: key }, countryCode);
     pullCarriersNowRef.current({ baseUrl: DEFAULT_BASE_URL, apiKey: key }, countryCode);
+    pullHistoryNowRef.current({ baseUrl: DEFAULT_BASE_URL, apiKey: key }, countryCode);
     // Cosmetic, but avoids a stale "next document" preview number carried
     // over from whichever country was last active on this device — the
     // real, authoritative number always comes from the server reservation
@@ -519,6 +521,44 @@ export function AppProvider({ children }) {
   }, []);
   const pullCarriersNowRef = useRef(() => {});
   useEffect(() => { pullCarriersNowRef.current = pullCarriersNow; }, [pullCarriersNow]);
+
+  // ---- shared session history — every device logged into this country
+  // sees the same list, not just what it personally created, and the doc
+  // numbers on screen are visibly the real country-wide progressive
+  // sequence. Only ever ADDS sessions this device doesn't already have
+  // locally (by doc) — a doc this device itself created keeps its richer
+  // local copy (real signature/photos) rather than being replaced by the
+  // lean server summary. ----
+  const pullHistoryNow = useCallback(async (config, countryCode) => {
+    if (!config?.apiKey) return;
+    const res = await api.fetchSessions(config);
+    if (!res.ok) return;
+    // Dedupe inside the updater itself (always sees the latest state, not
+    // whatever `history` this closure happened to capture) — at cold start
+    // this function can fire before the ref that keeps it fresh has
+    // caught up with the just-loaded local history, which otherwise
+    // treated already-pulled remote sessions as new again on every reload.
+    setHistory((h) => {
+      const known = new Set(h.filter((x) => x.country === countryCode).map((x) => x.doc));
+      const additions = [];
+      for (const remote of res.sessions) {
+        if (known.has(remote.doc)) continue;
+        const closedDate = new Date(remote.closedAtIso);
+        additions.push({
+          ...remote,
+          country: countryCode,
+          syncStatus: 'ok',
+          date: stamp(closedDate),
+          parcels: remote.parcels.map((p) => ({ ...p, time: p.createdAtIso ? hhmm(new Date(p.createdAtIso)) : '' })),
+        });
+      }
+      if (!additions.length) return h;
+      additions.forEach((doc) => { docPut(doc); });
+      return [...additions, ...h].sort((a, b) => (a.closedAtIso < b.closedAtIso ? 1 : -1));
+    });
+  }, []);
+  const pullHistoryNowRef = useRef(() => {});
+  useEffect(() => { pullHistoryNowRef.current = pullHistoryNow; }, [pullHistoryNow]);
 
   // Renders the exact same A4 handover PDF the app can print/share, as a
   // base64 data URL, to attach to the outgoing session payload — so the ERP

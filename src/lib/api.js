@@ -189,6 +189,14 @@ export async function pushCarrier(config, { name, pattern }) {
   return request(config, '/warehouse/carriers', { method: 'POST', body: { name, pattern: pattern || null }, timeoutMs: 10000 });
 }
 
+// This country's full session history (lean — no PDF/damage-photo blobs),
+// so History/Documents show every device's sessions, not just this one's.
+export async function fetchSessions(config, days = 30) {
+  const res = await request(config, `/warehouse/sessions?days=${days}`, { timeoutMs: 20000 });
+  if (res.ok && Array.isArray(res.data?.sessions)) return { ok: true, sessions: res.data.sessions };
+  return { ok: false, error: describeError(res) };
+}
+
 /**
  * Fetches the ERP's own archived PDF for a document, as a base64 data URL.
  * Deliberately doesn't go through request() — that helper decodes bodies as
