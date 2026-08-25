@@ -121,9 +121,6 @@ jobs:
             echo "== wh_it.sessions (last 10) =="
             psql "$CONN" -x -c "select * from wh_it.sessions order by 1 desc limit 10;"
             echo
-            echo "== wh_it latest INBOUND session =="
-            psql "$CONN" -x -c "select doc, direction, carrier, driver_name, driver_plate, operator, closed_at from wh_it.sessions where direction = 'inbound' order by closed_at desc limit 1;"
-            echo
             echo "== wh_it.parcels, any row with tracking code containing 8007404018060 =="
             psql "$CONN" -x -c "select * from wh_it.parcels where tracking::text like '%8007404018060%';"
             echo
