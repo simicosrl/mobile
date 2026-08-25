@@ -78,6 +78,11 @@ jobs:
               -H "Origin: https://localhost" -H "Authorization: Bearer ${IT_KEY}"
             echo
             echo
+            echo "== GET /warehouse/carriers (expect the seeded IT list) =="
+            curl -sS -i -m 20 "https://piafchajbkfkyftumxke.supabase.co/functions/v1/wms-api/warehouse/carriers" \
+              -H "Origin: https://localhost" -H "Authorization: Bearer ${IT_KEY}"
+            echo
+            echo
             echo "== GET /admin/badge-country/BADGE-ADRIAN (expect 200, FR) =="
             curl -sS -i -m 20 "https://piafchajbkfkyftumxke.supabase.co/functions/v1/wms-api/admin/badge-country/BADGE-ADRIAN" \
               -H "Origin: https://localhost" -H "Authorization: Bearer ${IT_KEY}"
