@@ -1,0 +1,270 @@
+== OPTIONS preflight (what the WebView sends before the real POST) ==
+HTTP/2 204 
+date: Sat, 29 Aug 2026 18:14:51 GMT
+cf-ray: a32d89a88f75d84b-SJC
+cf-cache-status: DYNAMIC
+access-control-allow-origin: *
+server: cloudflare
+vary: Accept-Encoding
+access-control-allow-headers: authorization, x-client-info, apikey, content-type
+access-control-allow-methods: GET, POST, OPTIONS
+endpoint-load-metrics: application_utilization:20,named_metrics.queue_depth:20
+sb-gateway-version: 1
+sb-project-ref: piafchajbkfkyftumxke
+sb-request-id: 01a04ebb-4561-7963-bdaa-07a5b1800168
+x-deno-execution-id: cb64fdd1-a6c1-4de3-8b85-917e9a0456d6
+x-sb-edge-region: us-west-1
+x-served-by: supabase-edge-runtime
+strict-transport-security: max-age=31536000; includeSubDomains; preload
+set-cookie: __cf_bm=69CiG_M9sxuPU9QEhP64i1oldIfGf4NeTUmDylg_TU8-1788027290.9704268-1.0.1.1-sGwKXaq1l4LOp874XARlaLS2lTtuj7A8w5GEGnEWYWBeIdYwQuR3Q_.NtX5Dm26aQCjJMifpw2y7gRbtTIo24yObdIHpCxr4YDjNuWRHsPbwdZgO3pekc5DELu557A9j; HttpOnly; SameSite=None; Secure; Path=/; Domain=supabase.co; Expires=Sat, 29 Aug 2026 18:44:51 GMT
+alt-svc: h3=":443"; ma=86400
+
+
+
+== GET /warehouse/manifest with the Italy default key ==
+HTTP/2 200 
+date: Sat, 29 Aug 2026 18:14:53 GMT
+content-type: application/json
+cf-ray: a32d89ad6de599a0-SJC
+cf-cache-status: DYNAMIC
+access-control-allow-origin: *
+set-cookie: __cf_bm=Ojk1dxh3Zx7tqiYiIhQ2PJnh4cxK4juVkSfKtvEpTms-1788027291.743562-1.0.1.1-2PV_rMdX30xtPxfD6aquQUlC6IQon._zbKgmCMYycMgXA.407iJC4qGM7Gg6rT_.mtk9B9gn39a7iJEpr0RWzJKHStRmgBLozjnPzLdF67dZN4eAj1nCp5zVu45sIriw; HttpOnly; SameSite=None; Secure; Path=/; Domain=supabase.co; Expires=Sat, 29 Aug 2026 18:44:53 GMT
+server: cloudflare
+vary: Accept-Encoding
+x-content-type-options: nosniff
+access-control-allow-headers: authorization, x-client-info, apikey, content-type
+access-control-allow-methods: GET, POST, OPTIONS
+endpoint-load-metrics: application_utilization:19,named_metrics.queue_depth:19
+sb-gateway-version: 1
+sb-project-ref: piafchajbkfkyftumxke
+sb-request-id: 01a04ebb-4865-7d67-b7e5-6b8e1bd44521
+x-deno-execution-id: fbb64330-ed9d-47cc-9146-94e289cfdea3
+x-sb-edge-region: us-west-1
+x-served-by: supabase-edge-runtime
+strict-transport-security: max-age=31536000; includeSubDomains; preload
+alt-svc: h3=":443"; ma=86400
+
+{"tracking_ids":[]}
+
+== POST /warehouse/next-doc-number (inbound) ==
+HTTP/2 200 
+date: Sat, 29 Aug 2026 18:14:54 GMT
+content-type: application/json
+cf-ray: a32d89ba9f2ae8d8-SJC
+cf-cache-status: DYNAMIC
+access-control-allow-origin: *
+set-cookie: __cf_bm=6uhLIkfn8lMPEqRrorcz0.Zh8vomirgFj_ZI6cjGeME-1788027293.854676-1.0.1.1-lRQhaYAeTqOBaAb73ee9W1frqGQ3UkKGD8NfJR6l87lgVRt15kBvFkbCcwYbfkft7__rIXfj..BArKJpi_thpWcGZaoFaX1zE54U6UKRPlGOdjsZJn.AGX47WhL9pteL; HttpOnly; SameSite=None; Secure; Path=/; Domain=supabase.co; Expires=Sat, 29 Aug 2026 18:44:54 GMT
+server: cloudflare
+vary: Accept-Encoding
+access-control-allow-headers: authorization, x-client-info, apikey, content-type
+access-control-allow-methods: GET, POST, OPTIONS
+endpoint-load-metrics: application_utilization:20,named_metrics.queue_depth:20
+sb-gateway-version: 1
+sb-project-ref: piafchajbkfkyftumxke
+sb-request-id: 01a04ebb-50a6-7aaa-b36a-1cb6bbd616d1
+x-deno-execution-id: 1df301e4-4e4b-40f9-be70-5195b48b3b4c
+x-sb-edge-region: us-west-1
+x-served-by: supabase-edge-runtime
+strict-transport-security: max-age=31536000; includeSubDomains; preload
+alt-svc: h3=":443"; ma=86400
+
+{"document":"WH-IT-IN-000030"}
+
+== POST /warehouse/drivers (upsert a CI-PROBE test driver) ==
+HTTP/2 200 
+date: Sat, 29 Aug 2026 18:14:56 GMT
+content-type: application/json
+cf-ray: a32d89c10df8483d-SJC
+cf-cache-status: DYNAMIC
+access-control-allow-origin: *
+set-cookie: __cf_bm=4MnWV4SW6brpS_zJYRUeyax78xMqwMpeVv2fiG0GbmQ-1788027294.883251-1.0.1.1-bto6Q_2pKTb.N4wbNGLfoTs1uQn3hvCU0UKD8H_DHNT3GiodFUSfmZMGcRKPiUPw0hRH2BtT2XYya8QtDdiMHfZzBb.SedYY65w7Jp8kFN9YfucbLPhWd77tzYGPblve; HttpOnly; SameSite=None; Secure; Path=/; Domain=supabase.co; Expires=Sat, 29 Aug 2026 18:44:56 GMT
+server: cloudflare
+vary: Accept-Encoding
+access-control-allow-headers: authorization, x-client-info, apikey, content-type
+access-control-allow-methods: GET, POST, OPTIONS
+endpoint-load-metrics: application_utilization:20,named_metrics.queue_depth:20
+sb-gateway-version: 1
+sb-project-ref: piafchajbkfkyftumxke
+sb-request-id: 01a04ebb-54a9-74ee-8234-a9cde2d184c8
+x-deno-execution-id: a6643305-ad43-4e07-8535-896877a9b149
+x-sb-edge-region: us-west-1
+x-served-by: supabase-edge-runtime
+strict-transport-security: max-age=31536000; includeSubDomains; preload
+alt-svc: h3=":443"; ma=86400
+
+{"ok":true}
+
+== GET /warehouse/drivers ==
+HTTP/2 200 
+date: Sat, 29 Aug 2026 18:14:57 GMT
+content-type: application/json
+cf-ray: a32d89c94d03086b-SJC
+cf-cache-status: DYNAMIC
+access-control-allow-origin: *
+set-cookie: __cf_bm=Tm.WokyYReYTovJPIJF56o8YtUJy8r.eSpo..uVX4oo-1788027296.2141676-1.0.1.1-SG6PZkV0CufsggGq4FitTqCkQ1ucmBj9aQhY1ji1t8Af0mmSztpXu42MWPNB.Xn4lsyRS1YzfAcOwp7V5ya0jjOBXxA5IoTeerPE_m9eJq91wPQQKOqdWbzL18c0GpiO; HttpOnly; SameSite=None; Secure; Path=/; Domain=supabase.co; Expires=Sat, 29 Aug 2026 18:44:57 GMT
+server: cloudflare
+vary: Accept-Encoding
+x-content-type-options: nosniff
+access-control-allow-headers: authorization, x-client-info, apikey, content-type
+access-control-allow-methods: GET, POST, OPTIONS
+endpoint-load-metrics: application_utilization:20,named_metrics.queue_depth:20
+sb-gateway-version: 1
+sb-project-ref: piafchajbkfkyftumxke
+sb-request-id: 01a04ebb-59e5-7e56-a4b7-36153e710076
+x-deno-execution-id: 715517c4-4808-4255-91b3-60f4e3885000
+x-sb-edge-region: us-west-1
+x-served-by: supabase-edge-runtime
+strict-transport-security: max-age=31536000; includeSubDomains; preload
+alt-svc: h3=":443"; ma=86400
+
+{"drivers":[{"name":"CI-PROBE Driver","courierCompany":"CI Test Co","plate":"CI-000-CI","lastUsedAt":"2026-08-29T18:14:55.564+00:00"},{"name":"No name","courierCompany":"","plate":"","lastUsedAt":"2026-08-29T18:01:27.18+00:00"},{"name":"Gabriel","courierCompany":"","plate":"Gx361pl","lastUsedAt":"2026-08-28T12:09:50.191+00:00"},{"name":"Liviu iancu","courierCompany":"Sda","plate":"Hc834pp","lastUsedAt":"2026-08-28T10:04:23.727+00:00"},{"name":"Zarate","courierCompany":"Ups","plate":"","lastUsedAt":"2026-08-27T13:23:05.012+00:00"},{"name":"Viorel moisei","courierCompany":"GB transporti","plate":"Gr042cv","lastUsedAt":"2026-08-27T09:31:17.972+00:00"},{"name":"Gimo","courierCompany":"Fedex","plate":"Hb677cx","lastUsedAt":"2026-08-26T12:00:53.815+00:00"}]}
+
+== GET /admin/badge-country/BADGE-IONUT (expect 200, IT) ==
+HTTP/2 200 
+date: Sat, 29 Aug 2026 18:14:57 GMT
+content-type: application/json
+cf-ray: a32d89cf3f3d7a33-SJC
+cf-cache-status: DYNAMIC
+access-control-allow-origin: *
+set-cookie: __cf_bm=cKjihWVlWvmXZB5VplIkbZW.TVW9ph31UffTNdJ_SA8-1788027297.1583061-1.0.1.1-1wqF4vZKo705WPpscmlbJO0Z3ImY3_vFXALFXjrKzrV2A4Crvm5ZkDGB_L2NZ.1rczUqIfMSCcc6GJ69Aq9Noup_79E3Q1FhNa3ZeueerlXwReS_XwjEtALyuYYZXZJ0; HttpOnly; SameSite=None; Secure; Path=/; Domain=supabase.co; Expires=Sat, 29 Aug 2026 18:44:57 GMT
+server: cloudflare
+vary: Accept-Encoding
+x-content-type-options: nosniff
+access-control-allow-headers: authorization, x-client-info, apikey, content-type
+access-control-allow-methods: GET, POST, OPTIONS
+endpoint-load-metrics: application_utilization:19,named_metrics.queue_depth:19
+sb-gateway-version: 1
+sb-project-ref: piafchajbkfkyftumxke
+sb-request-id: 01a04ebb-5d8e-7639-a8c2-c4c72ed5e5e0
+x-deno-execution-id: f95ca897-e794-41cb-b513-242727f9acd2
+x-sb-edge-region: us-west-1
+x-served-by: supabase-edge-runtime
+strict-transport-security: max-age=31536000; includeSubDomains; preload
+alt-svc: h3=":443"; ma=86400
+
+{"country":"IT","label":"Staicu Ionut"}
+
+== GET /warehouse/carriers (expect the seeded IT list) ==
+HTTP/2 200 
+date: Sat, 29 Aug 2026 18:14:58 GMT
+content-type: application/json
+cf-ray: a32d89d2fb14720c-SJC
+cf-cache-status: DYNAMIC
+access-control-allow-origin: *
+set-cookie: __cf_bm=0N5t0ep8IHwQfxMruPMEIZjbONcP4aHN.45fOjbkEmY-1788027297.7551658-1.0.1.1-u92SWRGroATD7ahqbrUjbksBtTVBJamP12uvzofOH1lejIhyW4Wn7HhSOpX1U2P.lZwYzyfqm8dmSaMPNJ9gBl_Qa5.vTJkzhKFfWLWcyLeB65Sb2WDi8vn_TTvYqQlC; HttpOnly; SameSite=None; Secure; Path=/; Domain=supabase.co; Expires=Sat, 29 Aug 2026 18:44:58 GMT
+server: cloudflare
+vary: Accept-Encoding
+x-content-type-options: nosniff
+access-control-allow-headers: authorization, x-client-info, apikey, content-type
+access-control-allow-methods: GET, POST, OPTIONS
+endpoint-load-metrics: application_utilization:19,named_metrics.queue_depth:19
+sb-gateway-version: 1
+sb-project-ref: piafchajbkfkyftumxke
+sb-request-id: 01a04ebb-5fe4-71e1-b3ef-89a69b4ab0d7
+x-deno-execution-id: 494d5f0b-17bf-49c9-b29c-386918dfee2e
+x-sb-edge-region: us-west-1
+x-served-by: supabase-edge-runtime
+strict-transport-security: max-age=31536000; includeSubDomains; preload
+alt-svc: h3=":443"; ma=86400
+
+{"carriers":[{"name":"AMAZON","pattern":"IT"},{"name":"BRT","pattern":null},{"name":"DHL","pattern":null},{"name":"FEDEX","pattern":null},{"name":"GLS","pattern":null},{"name":"OTHER","pattern":null},{"name":"SDA","pattern":null},{"name":"TNT","pattern":null},{"name":"UPS","pattern":"1Z"}]}
+
+== GET /warehouse/sessions?days=30 (shared cross-device history) ==
+HTTP/2 200 
+date: Sat, 29 Aug 2026 18:15:00 GMT
+content-type: application/json
+cf-ray: a32d89dabce92702-SJC
+cf-cache-status: DYNAMIC
+access-control-allow-origin: *
+set-cookie: __cf_bm=wZ1bL2DkBkgtpBfqy2bVgM.VZe.mUL5iqJjBXZwFmF4-1788027298.9953454-1.0.1.1-noSSdBr3DQZR0RLKH7s6_5_ceNGoBpZs7MHsmsCAgJ7s19_PjCf7nuM22M3_PzB8XCd8vTJbUmGAyqw5OuI7chdBm41l.okqsA8OyjkyC7TUFRBuRq6DqHJlYJ.4wrcg; HttpOnly; SameSite=None; Secure; Path=/; Domain=supabase.co; Expires=Sat, 29 Aug 2026 18:45:00 GMT
+server: cloudflare
+vary: Accept-Encoding
+x-content-type-options: nosniff
+access-control-allow-headers: authorization, x-client-info, apikey, content-type
+access-control-allow-methods: GET, POST, OPTIONS
+endpoint-load-metrics: application_utilization:21,named_metrics.queue_depth:21
+sb-gateway-version: 1
+sb-project-ref: piafchajbkfkyftumxke
+sb-request-id: 01a04ebb-64c1-7ccb-88aa-18290a6143eb
+x-deno-execution-id: 0dfd7871-ffed-46d9-b78d-9c43c4152af7
+x-sb-edge-region: us-west-1
+x-served-by: supabase-edge-runtime
+strict-transport-security: max-age=31536000; includeSubDomains; preload
+alt-svc: h3=":443"; ma=86400
+
+{"sessions":[{"doc":"WH-IT-IN-000029","direction":"inbound","carrier":"GLS","driverName":"No name","plate":null,"operator":"BADGE-IONUT","closedAtIso":"2026-08-29T18:01:27.184+00:00","parcels":[{"code":"BADGE-IONUT","boxes":1,"expected":null,"damage":null,"createdAtIso":"2026-08-29T18:01:29.282575+00:00"},{"code":"XXCFFDD","boxes":1,"expected":null,"damage":null,"createdAtIso":"2026-08-29T18:01:29.282575+00:00"},{"code":"GGGG","boxes":1,"expected":null,"damage":null,"createdAtIso":"2026-08-29T18:01:29.282575+00:00"},{"code":"DXX","boxes":1,"expected":null,"damage":null,"createdAtIso":"2026-08-29T18:01:29.282575+00:00"}]},{"doc":"WH-IT-IN-000028","direction":"inbound","carrier":"AMAZON","driverName":"Gabriel","plate":"Gx361pl","operator":"BADGE-IONUT","closedAtIso":"2026-08-28T12:09:50.197+00:00","parcels":[{"code":"IT3412460409","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-28T12:09:51.336986+00:00"},{"code":"IT3414199226","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-28T12:09:51.336986+00:00"},{"code":"IT3415229998","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-28T12:09:51.336986+00:00"},{"code":"IT3415359478","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-28T12:09:51.336986+00:00"},{"code":"IT3409346234","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-28T12:09:51.336986+00:00"}]},{"doc":"WH-IN-000011","direction":"inbound","carrier":"SDA","driverName":"Liviu iancu","plate":"Hc834pp","operator":"BADGE-IONUT","closedAtIso":"2026-08-28T10:04:23.743+00:00","parcels":[{"code":"3UW1L3Z102226","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-28T10:04:24.933805+00:00"},{"code":"CE092818972DE","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-28T10:04:24.933805+00:00"},{"code":"282005J002933","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-28T10:04:24.933805+00:00"},{"code":"3UW0JQY050074","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-28T10:04:24.933805+00:00"},{"code":"950C40861935F","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-28T10:04:24.933805+00:00"},{"code":"950C40861884F|TX3KWBBPZ|950C40861884F|CONZENSISIMICOSRL||VIAACQUASPARSA37|24060|GRONE|XX|IT|1||||||XX||||||||||24.8901893798","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-28T10:04:24.933805+00:00"},{"code":"3UW0N8J025151","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-28T10:04:24.933805+00:00"},{"code":"3UW1TOP122341","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-28T10:04:24.933805+00:00"},{"code":"282005J002947","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-28T10:04:24.933805+00:00"}]},{"doc":"WH-OUT-000002","direction":"outbound","carrier":"SDA","driverName":"Liviu iancu","plate":"Hc834pp","operator":"BADGE-IONUT","closedAtIso":"2026-08-27T13:45:54.443+00:00","parcels":[{"code":"1UW07WF370317","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T13:45:55.566204+00:00"},{"code":"1UW07WF368584","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T13:45:55.566204+00:00"},{"code":"1UW07WF369926","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T13:45:55.566204+00:00"},{"code":"3UW1LLO370860","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T13:45:55.566204+00:00"},{"code":"3UW1LLO370624","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T13:45:55.566204+00:00"},{"code":"3UW1LLO371178","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T13:45:55.566204+00:00"},{"code":"MUL3UW07WF289652","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T13:45:55.566204+00:00"},{"code":"MUL07WFM1LXW3UW07WF289652","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T13:45:55.566204+00:00"}]},{"doc":"WH-IT-OUT-000001","direction":"outbound","carrier":"UPS","driverName":"Zarate","plate":null,"operator":"BADGE-IONUT","closedAtIso":"2026-08-27T13:23:05.017+00:00","parcels":[{"code":"1ZY51C496837309520","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T13:23:07.089538+00:00"},{"code":"1ZY51C496811318443","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T13:23:07.089538+00:00"},{"code":"1ZY51C496835139271","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T13:23:07.089538+00:00"},{"code":"1ZY51C496843763447","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T13:23:07.089538+00:00"},{"code":"1ZY51C496854362396","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T13:23:07.089538+00:00"},{"code":"1ZY51C496818659714","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T13:23:07.089538+00:00"},{"code":"1ZY51C496816631667","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T13:23:07.089538+00:00"},{"code":"1ZY51C496826050883","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T13:23:07.089538+00:00"},{"code":"1ZY51C496811202835","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T13:23:07.089538+00:00"},{"code":"1ZY51C496830873058","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T13:23:07.089538+00:00"},{"code":"1ZY51C496810495889","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T13:23:07.089538+00:00"},{"code":"1ZY51C496828156104","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T13:23:07.089538+00:00"},{"code":"1ZY51C496896962409","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T13:23:07.089538+00:00"},{"code":"1ZY51C496897578216","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T13:23:07.089538+00:00"},{"code":"1ZY51C496896334187","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T13:23:07.089538+00:00"},{"code":"1ZY51C496806801493","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T13:23:07.089538+00:00"},{"code":"1ZY51C496860669017","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T13:23:07.089538+00:00"},{"code":"1ZY51C496857542865","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T13:23:07.089538+00:00"},{"code":"1ZY51C496808129592","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T13:23:07.089538+00:00"},{"code":"1ZY509G90424396989","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T13:23:07.089538+00:00"}]},{"doc":"WH-IT-IN-000027","direction":"inbound","carrier":"SDA","driverName":"Liviu iancu","plate":"Hc834pp","operator":"BADGE-IONUT","closedAtIso":"2026-08-27T11:53:38.999+00:00","parcels":[{"code":"3UW0JQY050026","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T11:53:40.701898+00:00"},{"code":"3UW0N8J025096","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T11:53:40.701898+00:00"},{"code":"3UW1TOP121574","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T11:53:40.701898+00:00"}]},{"doc":"WH-IT-IN-000026","direction":"inbound","carrier":"GLS","driverName":"No name","plate":null,"operator":"BADGE-IONUT","closedAtIso":"2026-08-27T09:32:30.541+00:00","parcels":[{"code":"M6662262073040L5","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T09:32:30.915589+00:00"},{"code":"M6662262073050L5","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T09:32:30.915589+00:00"},{"code":"M6662262073020L5","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T09:32:30.915589+00:00"},{"code":"M6662262073030L5","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T09:32:30.915589+00:00"},{"code":"M6662262073060L5","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T09:32:30.915589+00:00"},{"code":"M6662262073010L5","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T09:32:30.915589+00:00"}]},{"doc":"WH-IT-IN-000025","direction":"inbound","carrier":"AMAZON","driverName":"Viorel moisei","plate":"Gr042cv","operator":"BADGE-IONUT","closedAtIso":"2026-08-27T09:31:17.978+00:00","parcels":[{"code":"IT3414313339","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T09:31:18.380946+00:00"},{"code":"IT3414653330","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T09:31:18.380946+00:00"},{"code":"IT3414757521","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T09:31:18.380946+00:00"},{"code":"IT3414046288","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T09:31:18.380946+00:00"},{"code":"IT3415197530","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T09:31:18.380946+00:00"},{"code":"IT3412233684","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T09:31:18.380946+00:00"},{"code":"IT3415312355","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T09:31:18.380946+00:00"},{"code":"IT3414474342","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T09:31:18.380946+00:00"},{"code":"IT3414341976","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T09:31:18.380946+00:00"},{"code":"IT3412074283","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T09:31:18.380946+00:00"},{"code":"IT3412460283","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T09:31:18.380946+00:00"},{"code":"IT3413648836","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T09:31:18.380946+00:00"},{"code":"IT3414533917","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T09:31:18.380946+00:00"},{"code":"IT3410059136","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T09:31:18.380946+00:00"}]},{"doc":"WH-IT-IN-000024","direction":"inbound","carrier":"AMAZON","driverName":"Viorel moisei","plate":"Gr042cv","operator":"BADGE-IONUT","closedAtIso":"2026-08-27T09:31:16.87+00:00","parcels":[{"code":"IT3414313339","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T09:31:18.260283+00:00"},{"code":"IT3414653330","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T09:31:18.260283+00:00"},{"code":"IT3414757521","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T09:31:18.260283+00:00"},{"code":"IT3414046288","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T09:31:18.260283+00:00"},{"code":"IT3415197530","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T09:31:18.260283+00:00"},{"code":"IT3412233684","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T09:31:18.260283+00:00"},{"code":"IT3415312355","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T09:31:18.260283+00:00"},{"code":"IT3414474342","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T09:31:18.260283+00:00"},{"code":"IT3414341976","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T09:31:18.260283+00:00"},{"code":"IT3412074283","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T09:31:18.260283+00:00"},{"code":"IT3412460283","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T09:31:18.260283+00:00"},{"code":"IT3413648836","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T09:31:18.260283+00:00"},{"code":"IT3414533917","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T09:31:18.260283+00:00"},{"code":"IT3410059136","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T09:31:18.260283+00:00"}]},{"doc":"WH-IT-IN-000023","direction":"inbound","carrier":"AMAZON","driverName":"Viorel moisei","plate":"Gr042cv","operator":"BADGE-IONUT","closedAtIso":"2026-08-27T09:31:15.652+00:00","parcels":[{"code":"IT3414313339","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T09:31:18.310654+00:00"},{"code":"IT3414653330","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T09:31:18.310654+00:00"},{"code":"IT3414757521","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T09:31:18.310654+00:00"},{"code":"IT3414046288","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T09:31:18.310654+00:00"},{"code":"IT3415197530","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T09:31:18.310654+00:00"},{"code":"IT3412233684","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T09:31:18.310654+00:00"},{"code":"IT3415312355","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T09:31:18.310654+00:00"},{"code":"IT3414474342","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T09:31:18.310654+00:00"},{"code":"IT3414341976","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T09:31:18.310654+00:00"},{"code":"IT3412074283","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T09:31:18.310654+00:00"},{"code":"IT3412460283","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T09:31:18.310654+00:00"},{"code":"IT3413648836","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T09:31:18.310654+00:00"},{"code":"IT3414533917","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T09:31:18.310654+00:00"},{"code":"IT3410059136","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-27T09:31:18.310654+00:00"}]},{"doc":"WH-IT-IN-000022","direction":"inbound","carrier":"FEDEX","driverName":"Gimo","plate":"Hb677cx","operator":"BADGE-IONUT","closedAtIso":"2026-08-26T12:00:53.821+00:00","parcels":[{"code":"1495478031191114609600875459471625","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-26T12:00:55.321274+00:00"},{"code":"1495478033741114609600876175793964","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-26T12:00:55.321274+00:00"}]},{"doc":"WH-IT-IN-000021","direction":"inbound","carrier":"AMAZON","driverName":"Gabriel","plate":"Gx361pl","operator":"BADGE-IONUT","closedAtIso":"2026-08-26T10:58:37.923+00:00","parcels":[{"code":"IT3413667357","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-26T10:58:40.209201+00:00"},{"code":"IT3413498599","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-26T10:58:40.209201+00:00"},{"code":"IT3413496787","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-26T10:58:40.209201+00:00"},{"code":"IT3413575248","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-26T10:58:40.209201+00:00"},{"code":"IT3413380376","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-26T10:58:40.209201+00:00"},{"code":"IT3412585593","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-26T10:58:40.209201+00:00"}]},{"doc":"WH-IN-000003","direction":"inbound","carrier":"OTHER","driverName":"Viorel moisei","plate":"Gr042cv","operator":"BADGE-IONUT","closedAtIso":"2026-08-26T08:50:24.635+00:00","parcels":[{"code":"8007404018060","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-26T08:50:26.335634+00:00"}]},{"doc":"WH-IT-IN-000019","direction":"inbound","carrier":"AMAZON","driverName":"Gabriel","plate":"Gx361pl","operator":"BADGE-IONUT","closedAtIso":"2026-08-25T12:47:42.802+00:00","parcels":[{"code":"IT3412498765","boxes":1,"expected":null,"damage":null,"createdAtIso":"2026-08-25T12:47:44.355703+00:00"},{"code":"IT3410210892","boxes":1,"expected":null,"damage":null,"createdAtIso":"2026-08-25T12:47:44.355703+00:00"},{"code":"IT3412515344","boxes":1,"expected":null,"damage":null,"createdAtIso":"2026-08-25T12:47:44.355703+00:00"}]},{"doc":"WH-IT-IN-000018","direction":"inbound","carrier":"AMAZON","driverName":"Gabriel","plate":"Gx361pl","operator":"BADGE-IONUT","closedAtIso":"2026-08-25T12:47:40.843+00:00","parcels":[{"code":"IT3412498765","boxes":1,"expected":null,"damage":null,"createdAtIso":"2026-08-25T12:47:44.38492+00:00"},{"code":"IT3410210892","boxes":1,"expected":null,"damage":null,"createdAtIso":"2026-08-25T12:47:44.38492+00:00"},{"code":"IT3412515344","boxes":1,"expected":null,"damage":null,"createdAtIso":"2026-08-25T12:47:44.38492+00:00"}]},{"doc":"WH-IT-IN-000006","direction":"inbound","carrier":"OTHER","driverName":"Viorel moisei","plate":"Gr042cv","operator":"BADGE-IONUT","closedAtIso":"2026-08-24T13:03:46.683+00:00","parcels":[{"code":"8007404018060","boxes":1,"expected":null,"damage":null,"createdAtIso":"2026-08-24T13:03:49.083439+00:00"}]},{"doc":"WH-IT-IN-000003","direction":"inbound","carrier":"SDA","driverName":"Viorel moisei","plate":"Gr042cv","operator":"BADGE-IONUT","closedAtIso":"2026-08-24T12:06:40.313+00:00","parcels":[{"code":"8007404018060","boxes":1,"expected":false,"damage":null,"createdAtIso":"2026-08-24T12:06:44.907415+00:00"}]}]}
+
+== GET /admin/badge-country/BADGE-ADRIAN (expect 200, FR) ==
+HTTP/2 200 
+date: Sat, 29 Aug 2026 18:15:02 GMT
+content-type: application/json
+cf-ray: a32d89e3fa0ecf17-SJC
+cf-cache-status: DYNAMIC
+access-control-allow-origin: *
+set-cookie: __cf_bm=xNNXG5kgqGFU06jjE7xD5iHPnGBWXjs2juxAdftip54-1788027300.4732265-1.0.1.1-E50Z9ogZt.7zM26UA9CmWMPFMlCJKW0Sz.sUrrdKjI4l6yjNLblkKuDoG69LUqKiVYiiBvjnRLoYEA0xSqAviM16sZMePL_r4K8fCv34ta5hKXJncJIDnmJfvDioQCQm; HttpOnly; SameSite=None; Secure; Path=/; Domain=supabase.co; Expires=Sat, 29 Aug 2026 18:45:02 GMT
+server: cloudflare
+vary: Accept-Encoding
+x-content-type-options: nosniff
+access-control-allow-headers: authorization, x-client-info, apikey, content-type
+access-control-allow-methods: GET, POST, OPTIONS
+endpoint-load-metrics: application_utilization:19,named_metrics.queue_depth:19
+sb-gateway-version: 1
+sb-project-ref: piafchajbkfkyftumxke
+sb-request-id: 01a04ebb-6a83-779d-b46c-43694a66ddf2
+x-deno-execution-id: 3bb5b5e1-a300-413a-8003-bef6721848e4
+x-sb-edge-region: us-west-1
+x-served-by: supabase-edge-runtime
+strict-transport-security: max-age=31536000; includeSubDomains; preload
+alt-svc: h3=":443"; ma=86400
+
+{"country":"FR","label":"Adrian"}
+
+== GET /admin/badge-country/BADGE-AMELIE (expect 200, FR) ==
+HTTP/2 200 
+date: Sat, 29 Aug 2026 18:15:03 GMT
+content-type: application/json
+cf-ray: a32d89ef289b483d-SJC
+cf-cache-status: DYNAMIC
+access-control-allow-origin: *
+set-cookie: __cf_bm=610ul2s7ohOqaLh3bBWC5qCsz5DNFbvPkKMcXaaQotg-1788027302.262955-1.0.1.1-if3Ha9vANSxPmCy0q63CzoTx0mE8Ab42T0WvtyiTAVPipEnSnIZKPmt5teYgImhH.MSaB889YABKMPUKgzqmM1rNtXAslLclIX2GikkDf2pXGe4d.ABlQ3Xpa9uUjU35; HttpOnly; SameSite=None; Secure; Path=/; Domain=supabase.co; Expires=Sat, 29 Aug 2026 18:45:03 GMT
+server: cloudflare
+vary: Accept-Encoding
+x-content-type-options: nosniff
+access-control-allow-headers: authorization, x-client-info, apikey, content-type
+access-control-allow-methods: GET, POST, OPTIONS
+endpoint-load-metrics: application_utilization:19,named_metrics.queue_depth:19
+sb-gateway-version: 1
+sb-project-ref: piafchajbkfkyftumxke
+sb-request-id: 01a04ebb-717e-704a-b225-efaa29de4bd3
+x-deno-execution-id: 581cf9cb-5fe2-48a1-a5d2-32bd5de653cf
+x-sb-edge-region: us-west-1
+x-served-by: supabase-edge-runtime
+strict-transport-security: max-age=31536000; includeSubDomains; preload
+alt-svc: h3=":443"; ma=86400
+
+{"country":"FR","label":"Amelie"}
+
+== GET /admin/badge-country/BADGE-DOES-NOT-EXIST (expect 404) ==
+HTTP/2 404 
+date: Sat, 29 Aug 2026 18:15:03 GMT
+content-type: application/json
+cf-ray: a32d89f40f01f0af-SJC
+cf-cache-status: DYNAMIC
+access-control-allow-origin: *
+set-cookie: __cf_bm=F3zXCtt5CVlj2xzK4X4kY_UEqh.mQzgAIQJrLX2kp18-1788027303.0500014-1.0.1.1-YoH4k.LknQfx6Y.iB_tdYsLJ.YhwmjGpm191BUn.Ht0r6RdKCV8Y01m0YdZw8QUVW9NHgqhzcOqaqsE5EoKT0q5woCG1GD4N6gFtD37QdepEv8o.DqB0FjkkHgUA2PTS; HttpOnly; SameSite=None; Secure; Path=/; Domain=supabase.co; Expires=Sat, 29 Aug 2026 18:45:03 GMT
+server: cloudflare
+vary: Accept-Encoding
+x-content-type-options: nosniff
+access-control-allow-headers: authorization, x-client-info, apikey, content-type
+access-control-allow-methods: GET, POST, OPTIONS
+endpoint-load-metrics: application_utilization:19,named_metrics.queue_depth:19
+sb-gateway-version: 1
+sb-project-ref: piafchajbkfkyftumxke
+sb-request-id: 01a04ebb-7493-71e5-a118-409ee8002832
+x-deno-execution-id: 96672721-795d-44d0-8c3e-df3293feeb66
+x-sb-edge-region: us-west-1
+x-served-by: supabase-edge-runtime
+strict-transport-security: max-age=31536000; includeSubDomains; preload
+alt-svc: h3=":443"; ma=86400
+
+{"error":"not found"}
