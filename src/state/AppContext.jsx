@@ -67,6 +67,8 @@ export function AppProvider({ children }) {
   const [driverProfiles, setDriverProfiles] = useState([]); // [{ name, courierCompany, plate, lastUsedAt }]
   const [carriers, setCarriers] = useState([]); // [{ name, pattern, country }] — pattern is a required tracking-code prefix, or null
   const [badgeCountries, setBadgeCountries] = useState({}); // { [badgeId]: 'IT' | 'FR' | 'DE' }
+  const [loginEvents, setLoginEvents] = useState([]); // [{ badgeId, operatorName, country, ip, loggedInAtIso }]
+  const [pullingLoginEvents, setPullingLoginEvents] = useState(false);
   const [viewingPhoto, setViewingPhoto] = useState(null);
   const [updateInfo, setUpdateInfo] = useState(null); // { available, versionName, apkUrl } | null
   const [updateDismissed, setUpdateDismissed] = useState(false);
@@ -269,33 +271,51 @@ export function AppProvider({ children }) {
   // deliberately never navigates to 'home' except on a real, live-confirmed
   // (or offline-with-prior-confirmation) success, since the whole point of
   // this change is an authoritative check, not an optimistic guess.
-  const loginWithBadge = useCallback(async (badgeId, operatorName) => {
+  // Badge login is scan-only end to end — the operator's name is never
+  // typed in here, only ever resolved from the badge's own server-side
+  // registration (admin.badge_countries.label), with the local cache below
+  // as an offline fallback for a badge seen before.
+  const loginWithBadge = useCallback(async (badgeId) => {
     const id = badgeId || 'BADGE-0000';
     const hasCached = Object.prototype.hasOwnProperty.call(badgeCountries, id);
     const cachedCountry = badgeCountries[id];
     const res = await api.fetchBadgeCountry(id);
     let country;
+    let operatorName;
     if (res.ok) {
       country = res.country;
       setBadgeCountries((c) => ({ ...c, [id]: country }));
+      const knownNames = (await kvGet('badgeNames', {})) || {};
+      operatorName = res.label || knownNames[id] || 'Operator';
+      if (res.label && knownNames[id] !== res.label) {
+        await kvSet('badgeNames', { ...knownNames, [id]: res.label });
+      }
     } else if (res.notFound) {
       setBadgeCountries((c) => ({ ...c, [id]: null }));
       return { ok: false, reason: 'unassigned' };
     } else if (hasCached && cachedCountry) {
       // Couldn't reach the server, but this badge's country was confirmed
       // before — proceed offline rather than blocking someone mid-shift
-      // over a transient network blip.
+      // over a transient network blip. Name comes from whatever was
+      // cached the last time this badge's label was actually resolved.
       country = cachedCountry;
+      const knownNames = (await kvGet('badgeNames', {})) || {};
+      operatorName = knownNames[id] || 'Operator';
     } else if (hasCached && cachedCountry === null) {
       return { ok: false, reason: 'unassigned' };
     } else {
       return { ok: false, reason: 'offline' };
     }
-    const s = { badgeId: id, operatorName: operatorName || 'Operator', startedAt: Date.now(), country };
+    const s = { badgeId: id, operatorName, startedAt: Date.now(), country };
     setShift(s);
     setScreen('home');
     applyCountryConnection(country);
     pullManifestNowRef.current({ silent: true });
+    // Audit trail only — never blocks or fails an actual login.
+    const key = DEFAULT_SCANNER_KEYS[country];
+    if (key) {
+      api.recordLoginEvent({ baseUrl: DEFAULT_BASE_URL, apiKey: key }, { badgeId: id, operatorName, country }).catch(() => {});
+    }
     return { ok: true };
   }, [badgeCountries, applyCountryConnection]);
   const endShift = useCallback(() => {
@@ -777,6 +797,18 @@ export function AppProvider({ children }) {
   const pullManifestNowRef = useRef(() => {});
   useEffect(() => { pullManifestNowRef.current = pullManifestNow; }, [pullManifestNow]);
 
+  // Settings › Login history — pulled on demand (not auto-refreshed in the
+  // background) since it's an audit view, not something the core scanning
+  // flow depends on. Always our own database, never Prep-Center.
+  const pullLoginEventsNow = useCallback(async () => {
+    if (!internalConfig) return;
+    setPullingLoginEvents(true);
+    const res = await api.fetchLoginEvents(internalConfig);
+    setPullingLoginEvents(false);
+    if (res.ok) setLoginEvents(res.events);
+    else showToast('Could not load login history: ' + res.error);
+  }, [internalConfig, showToast]);
+
   // Pushes every not-yet-sent document (for the currently connected
   // country) to the Prep-Center connection — used both from `syncNow`
   // below and on its own, whenever there might newly be a working
@@ -929,6 +961,7 @@ export function AppProvider({ children }) {
     driverProfiles: visibleDriverProfiles, applyDriverProfile,
     carriers: visibleCarriers, saveCarrier,
     viewingPhoto, openPhoto, closePhoto,
+    loginEvents, pullingLoginEvents, pullLoginEventsNow,
     updateInfo, updateDismissed, checkUpdateNow, dismissUpdate, downloadUpdate,
     toast, showToast,
     inputRef,
@@ -942,6 +975,7 @@ export function AppProvider({ children }) {
     apiConfig, apiShowKey, setApiBaseUrl, setApiKey, generateApiKey, copyApiKey, togglePush, togglePull, toggleShowKey,
     manifest, pulling, pullManifestNow, syncing, syncNow, retrySync, syncPrepPending,
     orgSettings, updateOrgSettings, visibleDriverProfiles, applyDriverProfile, visibleCarriers, saveCarrier, viewingPhoto, openPhoto, closePhoto,
+    loginEvents, pullingLoginEvents, pullLoginEventsNow,
     updateInfo, updateDismissed, checkUpdateNow, dismissUpdate, downloadUpdate, toast, showToast,
   ]);
 

@@ -1,18 +1,23 @@
 import { useEffect, useRef, useState } from 'react';
 import { useApp } from '../state/AppContext';
-import { kvGet, kvSet } from '../lib/db';
-import { ScanLine, ArrowRight, Camera } from '../components/icons';
+import { ScanLine, Camera } from '../components/icons';
 import { useBarcodeScanner, isCameraScanSupported } from '../hooks/useBarcodeScanner';
 
-// Badge login is scan-only, by design — no manual entry. A hardware
+// Badge login is scan-only, by design — no manual entry of any kind, and no
+// on-screen keyboard should ever appear on this screen. A hardware
 // keyboard-wedge scanner (Zebra engine or Bluetooth ring scanner) types
-// into a hidden, always-focused input and submits on Enter automatically.
-// Phones/tablets with no scanner attached use the camera button, which
-// opens the native ML Kit scanner (see hooks/useBarcodeScanner.js).
+// into a hidden, always-focused input and submits on Enter automatically;
+// `inputMode="none"` on that input is what actually keeps the software
+// keyboard from popping up on a touchscreen device that focuses it —
+// hiding the input visually (opacity/size) does nothing to stop that on
+// its own, since a focused, editable text input still asks the OS for its
+// on-screen keyboard regardless of how it's styled. Phones/tablets with no
+// hardware scanner attached use the camera button instead, which opens the
+// native ML Kit scanner (see hooks/useBarcodeScanner.js). The operator's
+// name is never typed in here either — it comes straight from the badge's
+// own server-side registration (admin.badge_countries.label).
 export default function BadgeLogin() {
   const { loginWithBadge } = useApp();
-  const [pendingBadge, setPendingBadge] = useState(null);
-  const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   // { badgeId, reason: 'unassigned' | 'offline' } | null — country is
   // looked up server-side on every login now (no more manual picker), so a
@@ -25,21 +30,14 @@ export default function BadgeLogin() {
 
   useEffect(() => {
     const refocus = () => {
-      if (!pendingBadge && !busy && !loginError && hiddenRef.current && document.activeElement !== hiddenRef.current) {
+      if (!busy && !loginError && hiddenRef.current && document.activeElement !== hiddenRef.current) {
         try { hiddenRef.current.focus({ preventScroll: true }); } catch { /* ignore */ }
       }
     };
     refocus();
     const t = setInterval(refocus, 400);
     return () => clearInterval(t);
-  }, [pendingBadge, busy, loginError]);
-
-  const attemptLogin = async (badgeId, operatorName) => {
-    setBusy(true);
-    const res = await loginWithBadge(badgeId, operatorName);
-    setBusy(false);
-    if (!res.ok) setLoginError({ badgeId, reason: res.reason });
-  };
+  }, [busy, loginError]);
 
   const handleBadge = async (raw) => {
     // Re-entrancy guard — the hidden input stays live (and its 400ms
@@ -49,12 +47,10 @@ export default function BadgeLogin() {
     const badgeId = String(raw || '').trim().toUpperCase();
     if (!badgeId) return;
     setLoginError(null);
-    const knownNames = (await kvGet('badgeNames', {})) || {};
-    if (knownNames[badgeId]) {
-      await attemptLogin(badgeId, knownNames[badgeId]);
-    } else {
-      setPendingBadge(badgeId);
-    }
+    setBusy(true);
+    const res = await loginWithBadge(badgeId);
+    setBusy(false);
+    if (!res.ok) setLoginError({ badgeId, reason: res.reason });
   };
 
   const scanWithCamera = async () => {
@@ -62,19 +58,7 @@ export default function BadgeLogin() {
     if (code) handleBadge(code);
   };
 
-  const confirmName = async () => {
-    if (busy || !pendingBadge || name.trim().length < 2) return;
-    const knownNames = (await kvGet('badgeNames', {})) || {};
-    knownNames[pendingBadge] = name.trim();
-    await kvSet('badgeNames', knownNames);
-    await attemptLogin(pendingBadge, name.trim());
-  };
-
-  const tryAgain = () => {
-    setLoginError(null);
-    setPendingBadge(null);
-    setName('');
-  };
+  const tryAgain = () => setLoginError(null);
 
   return (
     <div
@@ -84,6 +68,10 @@ export default function BadgeLogin() {
       <input
         ref={hiddenRef}
         defaultValue=""
+        // Suppresses the on-screen keyboard on a touchscreen device while
+        // still accepting real keydown events from a hardware
+        // keyboard-wedge scanner — those aren't affected by this hint.
+        inputMode="none"
         onKeyDown={(e) => {
           if (e.key !== 'Enter') return;
           e.preventDefault();
@@ -146,7 +134,7 @@ export default function BadgeLogin() {
             Try again
           </button>
         </div>
-      ) : !pendingBadge ? (
+      ) : (
         <>
           <div>
             <div className="text-[22px] font-extrabold leading-[1.25] tracking-[-.02em]">Scan your badge to start the shift</div>
@@ -169,28 +157,6 @@ export default function BadgeLogin() {
           )}
           {error && <div className="text-center text-[12px] text-white/80">{error}</div>}
         </>
-      ) : (
-        <div className="flex flex-col gap-3">
-          <div>
-            <div className="text-[20px] font-extrabold leading-[1.25] tracking-[-.02em]">Badge {pendingBadge}</div>
-            <div className="mt-2 text-[13px] text-white/75">First time we've seen this badge — what's your name?</div>
-          </div>
-          <input
-            autoFocus
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') confirmName(); }}
-            placeholder="Full name"
-            className="min-h-[50px] w-full rounded-xl border border-white/35 bg-white/10 px-4 text-[15px] text-white placeholder:text-white/50"
-          />
-          <button
-            onClick={confirmName}
-            disabled={name.trim().length < 2 || busy}
-            className="flex min-h-[52px] w-full items-center justify-center gap-2 rounded-xl bg-white text-[15px] font-extrabold text-primary disabled:opacity-50"
-          >
-            {busy ? 'Checking…' : (<>Start shift <ArrowRight size={17} strokeWidth={2.2} /></>)}
-          </button>
-        </div>
       )}
     </div>
   );
