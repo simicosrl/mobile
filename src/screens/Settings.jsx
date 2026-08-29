@@ -2,7 +2,16 @@ import { useEffect, useState } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import { useApp } from '../state/AppContext';
-import { Check, Download, ChevronDown, Plus } from '../components/icons';
+import { Check, Download, ChevronDown, Plus, RefreshCw } from '../components/icons';
+
+// e.g. "25/08/2026 14:47" in the operator's own timezone, from the
+// server's UTC timestamp — mirrors the format already used for documents.
+function formatLoginTime(iso) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
 
 function Field({ label, ...props }) {
   return (
@@ -57,7 +66,10 @@ function CarrierRow({ carrier, onSave }) {
 }
 
 export default function Settings() {
-  const { shift, updateOperatorName, orgSettings, updateOrgSettings, showToast, updateInfo, checkUpdateNow, downloadUpdate, carriers, saveCarrier } = useApp();
+  const {
+    shift, updateOperatorName, orgSettings, updateOrgSettings, showToast, updateInfo, checkUpdateNow, downloadUpdate, carriers, saveCarrier,
+    loginEvents, pullingLoginEvents, pullLoginEventsNow,
+  } = useApp();
   const [name, setName] = useState(shift?.operatorName || '');
   const [org, setOrg] = useState(orgSettings);
   const [saved, setSaved] = useState(false);
@@ -165,6 +177,35 @@ export default function Settings() {
             <Plus size={17} strokeWidth={2.4} />
           </button>
         </div>
+      </Section>
+
+      <Section title="Login history" summary={loginEvents.length ? `${loginEvents.length} recent logins` : 'Who logged in, from where, and when'}>
+        <div className="flex items-center gap-2.5">
+          <div className="min-w-0 flex-1 text-[11px] leading-snug text-secondary">
+            Every badge login for this country, with the IP it came from — recorded server-side, not
+            something the phone reports about itself.
+          </div>
+          <button
+            onClick={pullLoginEventsNow}
+            disabled={pullingLoginEvents}
+            className="flex h-9 flex-none items-center gap-1.5 rounded-lg border border-[rgba(148,163,184,.35)] px-3 text-xs font-bold text-ink disabled:opacity-60"
+          >
+            <RefreshCw size={14} strokeWidth={2.2} /> {pullingLoginEvents ? 'Loading…' : 'Refresh'}
+          </button>
+        </div>
+        {loginEvents.length > 0 && (
+          <div className="max-h-[260px] overflow-y-auto rounded-xl border border-[rgba(148,163,184,.25)]">
+            {loginEvents.map((e, i) => (
+              <div key={`${e.badgeId}-${e.loggedInAtIso}-${i}`} className="flex items-center gap-2.5 border-b border-[rgba(148,163,184,.15)] px-3 py-2 last:border-b-0">
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[12.5px] font-bold text-ink">{e.operatorName || e.badgeId}</div>
+                  <div className="truncate font-mono text-[10.5px] text-secondary">{e.badgeId} · {e.ip || 'unknown IP'}</div>
+                </div>
+                <div className="flex-none font-mono text-[10.5px] text-secondary">{formatLoginTime(e.loggedInAtIso)}</div>
+              </div>
+            ))}
+          </div>
+        )}
       </Section>
 
       {Capacitor.isNativePlatform() && (

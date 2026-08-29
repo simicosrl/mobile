@@ -141,8 +141,24 @@ export async function fetchBadgeCountry(badgeId) {
     `/admin/badge-country/${encodeURIComponent(badgeId)}`,
   );
   if (res.status === 404) return { ok: false, notFound: true };
-  if (res.ok && res.data?.country) return { ok: true, country: res.data.country };
+  // `label` is the operator's registered name for this badge — badge login
+  // is scan-only, so this is the only source for a name, never something
+  // typed in on the device.
+  if (res.ok && res.data?.country) return { ok: true, country: res.data.country, label: res.data.label || null };
   return { ok: false, notFound: false };
+}
+
+// Records a successful badge login for the audit trail (Settings › Login
+// history) — fire-and-forget from the caller, a failure here must never
+// block or fail an actual login.
+export async function recordLoginEvent(config, { badgeId, operatorName, country }) {
+  return request(config, '/admin/login-event', { method: 'POST', body: { badgeId, operatorName, country }, timeoutMs: 10000 });
+}
+
+export async function fetchLoginEvents(config, limit = 100) {
+  const res = await request(config, `/admin/login-events?limit=${limit}`);
+  if (res.ok && Array.isArray(res.data?.events)) return { ok: true, events: res.data.events };
+  return { ok: false, error: describeError(res) };
 }
 
 export async function pushDamage(config, trackingId, payload) {

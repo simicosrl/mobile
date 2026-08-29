@@ -37,6 +37,19 @@ async function sha256Hex(text: string): Promise<string> {
   return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+// Best-effort real client IP for the login audit trail below — Supabase
+// Edge Functions run behind Cloudflare, which sets this header itself (not
+// forwardable/spoofable by the caller), so it's the one to trust first.
+// x-forwarded-for can carry a comma-separated chain if there's another
+// proxy in front; the first entry is the original client.
+function clientIp(req: Request): string | null {
+  const cf = req.headers.get("cf-connecting-ip");
+  if (cf) return cf;
+  const fwd = req.headers.get("x-forwarded-for");
+  if (fwd) return fwd.split(",")[0].trim();
+  return req.headers.get("x-real-ip");
+}
+
 async function resolveCountry(req: Request): Promise<{ country: string } | null> {
   const auth = req.headers.get("Authorization") || "";
   const key = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
@@ -91,13 +104,58 @@ Deno.serve(async (req: Request) => {
       const { data, error } = await supabase
         .schema("admin")
         .from("badge_countries")
-        .select("country")
+        .select("country, label")
         .eq("badge_id", badgeId)
         .eq("active", true)
         .maybeSingle();
       if (error) return json({ error: error.message }, 500);
       if (!data) return json({ error: "not found" }, 404);
-      return json({ country: data.country });
+      // `label` is the operator's name as registered against this badge —
+      // the app uses it directly rather than ever asking the operator to
+      // type their own name in, keeping badge login scan-only end to end.
+      return json({ country: data.country, label: data.label || null });
+    }
+
+    // POST /admin/login-event — records a successful badge login for the
+    // audit trail (Settings › Login history). `ip`/`logged_in_at` are
+    // filled in here from the request itself, never trusted from the
+    // client. Fire-and-forget from the app's side — a failure here must
+    // never block or fail an actual login.
+    if (req.method === "POST" && path === "/admin/login-event") {
+      const body = await req.json().catch(() => ({}));
+      const badgeId = String(body?.badgeId || "").trim();
+      if (!badgeId) return json({ error: "badgeId required" }, 400);
+      const { error } = await supabase.schema("admin").from("login_events").insert({
+        badge_id: badgeId,
+        operator_name: body?.operatorName || null,
+        country: body?.country || null,
+        ip: clientIp(req),
+      });
+      if (error) return json({ error: error.message }, 500);
+      return json({ ok: true });
+    }
+
+    // GET /admin/login-events?limit=100 — recent badge logins for this
+    // country, newest first, for the Settings screen's login history.
+    if (req.method === "GET" && path === "/admin/login-events") {
+      const limit = Math.min(Number(url.searchParams.get("limit")) || 100, 300);
+      const { data, error } = await supabase
+        .schema("admin")
+        .from("login_events")
+        .select("badge_id, operator_name, country, ip, logged_in_at")
+        .eq("country", auth.country)
+        .order("logged_in_at", { ascending: false })
+        .limit(limit);
+      if (error) return json({ error: error.message }, 500);
+      return json({
+        events: (data || []).map((e) => ({
+          badgeId: e.badge_id,
+          operatorName: e.operator_name,
+          country: e.country,
+          ip: e.ip,
+          loggedInAtIso: e.logged_in_at,
+        })),
+      });
     }
 
     // POST /warehouse/next-doc-number — reserves the next progressive
