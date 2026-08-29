@@ -93,6 +93,22 @@ jobs:
               -H "Origin: https://localhost" -H "Authorization: Bearer ${IT_KEY}"
             echo
             echo
+            echo "== GET /admin/badge-country/BADGE-IONUT (expect a label field now too) =="
+            curl -sS -i -m 20 "https://piafchajbkfkyftumxke.supabase.co/functions/v1/wms-api/admin/badge-country/BADGE-IONUT" \
+              -H "Origin: https://localhost" -H "Authorization: Bearer ${IT_KEY}"
+            echo
+            echo
+            echo "== POST /admin/login-event (CI-PROBE) =="
+            curl -sS -i -m 20 -X POST "https://piafchajbkfkyftumxke.supabase.co/functions/v1/wms-api/admin/login-event" \
+              -H "Origin: https://localhost" -H "Authorization: Bearer ${IT_KEY}" -H "Content-Type: application/json" \
+              -d '{"badgeId":"CI-PROBE-BADGE","operatorName":"CI Probe","country":"IT"}'
+            echo
+            echo
+            echo "== GET /admin/login-events?limit=5 (expect the CI-PROBE row on top with a real IP) =="
+            curl -sS -i -m 20 "https://piafchajbkfkyftumxke.supabase.co/functions/v1/wms-api/admin/login-events?limit=5" \
+              -H "Origin: https://localhost" -H "Authorization: Bearer ${IT_KEY}"
+            echo
+            echo
             echo "== GET /admin/badge-country/BADGE-AMELIE (expect 200, FR) =="
             curl -sS -i -m 20 "https://piafchajbkfkyftumxke.supabase.co/functions/v1/wms-api/admin/badge-country/BADGE-AMELIE" \
               -H "Origin: https://localhost" -H "Authorization: Bearer ${IT_KEY}"
@@ -148,6 +164,7 @@ jobs:
             psql "$CONN" -c "delete from wh_it.parcels where session_id in (select id from wh_it.sessions where carrier like 'CI-PROBE%');"
             psql "$CONN" -c "delete from wh_it.sessions where carrier like 'CI-PROBE%';"
             psql "$CONN" -c "delete from wh_it.driver_profiles where name like 'CI-PROBE%';"
+            psql "$CONN" -c "delete from admin.login_events where badge_id = 'CI-PROBE-BADGE';"
             echo
             echo "== resetting IT/inbound doc sequence back to 0 (only test docs existed) =="
             psql "$CONN" -c "select setval(s.sequencename::regclass, 0, false) from pg_sequences s where s.schemaname = 'admin' and s.sequencename ilike '%it%in%';"
