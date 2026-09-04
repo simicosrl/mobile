@@ -9,12 +9,22 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
 
+        <!-- adjustResize (rather than the platform default, which behaves like
+             adjustPan) makes the WebView itself shrink to fit above the
+             keyboard instead of just being covered/panned underneath it —
+             on a small low-res screen (Zebra handhelds) the keyboard alone
+             can take up most of the display, so without this the field
+             being typed into, and any button below it, end up hidden with
+             no way to reach them. The app's own layout (App.jsx) already
+             has a scrollable content area between a fixed header and
+             bottom nav, so it adapts to the shrunk viewport on its own. -->
         <activity
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
             android:name=".MainActivity"
             android:label="@string/title_activity_main"
             android:theme="@style/AppTheme.NoActionBarLaunch"
             android:launchMode="singleTask"
+            android:windowSoftInputMode="adjustResize"
             android:exported="true">
 
             <intent-filter>
