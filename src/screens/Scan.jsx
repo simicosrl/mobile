@@ -188,28 +188,36 @@ export default function Scan() {
       </div>
 
       <div className="rounded-[14px] border border-[rgba(148,163,184,.25)] bg-white p-3">
-        <div className="mb-2 flex items-center justify-between">
-          <div className="text-[10px] font-bold uppercase tracking-[.08em] text-secondary">Tracking ID · scanner ready</div>
-          <div className="flex items-center gap-2.5">
-            <button onClick={openManualKeyboard} className="flex items-center gap-1 text-[10.5px] font-bold text-primary">
-              <KeyboardIcon size={13} strokeWidth={2} /> Keyboard
+        <div className="mb-2 text-[10px] font-bold uppercase tracking-[.08em] text-secondary">Tracking ID · scanner ready</div>
+        <div className="flex gap-2">
+          <input
+            ref={inputRef}
+            value={buffer}
+            onChange={(e) => setBuffer(e.target.value)}
+            onKeyDown={onKey}
+            onBlur={() => setManualKeyboard(false)}
+            placeholder="waiting for scan…"
+            className="min-h-[54px] min-w-0 flex-1 rounded-xl border-2 border-primary bg-white px-4 font-mono text-[15px] tracking-[.02em] text-ink shadow-focusring"
+          />
+          {/* A real, thumb-sized button rather than a small text link — this
+              is the only way to scan at all on a phone with no hardware
+              engine, and even on a Zebra it's a common fallback (a badly
+              printed label, a scuffed barcode), so it needs to be easy to
+              hit one-handed, not a tiny target buried in a corner. */}
+          {isCameraScanSupported() && (
+            <button
+              onClick={scanWithCamera}
+              disabled={scanning}
+              aria-label="Scan with camera"
+              className="flex min-h-[54px] w-[54px] flex-none items-center justify-center rounded-xl bg-primary text-white shadow-focusring disabled:opacity-60"
+            >
+              <Camera size={22} strokeWidth={2} />
             </button>
-            {isCameraScanSupported() && (
-              <button onClick={scanWithCamera} disabled={scanning} className="flex items-center gap-1 text-[10.5px] font-bold text-primary disabled:opacity-60">
-                <Camera size={13} strokeWidth={2} /> {scanning ? 'Opening…' : 'Camera'}
-              </button>
-            )}
-          </div>
+          )}
         </div>
-        <input
-          ref={inputRef}
-          value={buffer}
-          onChange={(e) => setBuffer(e.target.value)}
-          onKeyDown={onKey}
-          onBlur={() => setManualKeyboard(false)}
-          placeholder="waiting for scan…"
-          className="min-h-[50px] w-full rounded-xl border-2 border-primary bg-white px-4 font-mono text-[15px] tracking-[.02em] text-ink shadow-focusring"
-        />
+        <button onClick={openManualKeyboard} className="mt-2 flex items-center gap-1 text-[10.5px] font-bold text-secondary">
+          <KeyboardIcon size={12} strokeWidth={2} /> Type manually instead
+        </button>
         {scanError && <div className="mt-2 text-[11px] text-danger">{scanError}</div>}
       </div>
 
