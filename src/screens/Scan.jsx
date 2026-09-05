@@ -53,14 +53,21 @@ export default function Scan() {
   // buffer has stopped changing for a moment. 400ms is well past a
   // scanner's burst-typed characters, but doesn't get in the way of the
   // explicit-Enter path below, which still fires immediately.
+  //
+  // Skipped entirely while the operator is typing by hand (manualKeyboard):
+  // a human pausing mid-code — to read the next digits off a label, or just
+  // thinking — easily leaves the field untouched for 400ms, which used to
+  // submit whatever partial code was there so far instead of waiting for
+  // the code to actually be finished. Manual entry is only ever submitted
+  // by an explicit Enter, below.
   useEffect(() => {
-    if (!buffer) return undefined;
+    if (!buffer || manualKeyboard) return undefined;
     const t = setTimeout(() => {
       submitScan(buffer);
       setBuffer('');
     }, 400);
     return () => clearTimeout(t);
-  }, [buffer, submitScan]);
+  }, [buffer, submitScan, manualKeyboard]);
 
   const scanWithCamera = async () => {
     const code = await scan();
