@@ -2,17 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <!-- interactive-widget=resizes-content is the modern, WebView-level
-         mechanism (Chrome/WebView 108+) that actually governs whether the
-         CSS viewport (height:100%, 100vh, etc.) shrinks when the on-screen
-         keyboard opens — independent of, and often overriding, whatever
-         android:windowSoftInputMode says at the native Activity level.
-         Without it, WebView's default (resizes-visual) leaves the CSS
-         layout viewport at full height while only a separate "visual
-         viewport" shrinks, which is exactly the kind of mismatch that
-         produces a keyboard-open screen that looks blank/frozen even
-         though the DOM underneath is still correct. -->
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
     <meta name="theme-color" content="#1F6FEB" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -30,35 +20,6 @@
       the in-React equivalent, which covers crashes after that point).
     -->
     <script>
-      // The interactive-widget meta tag above only helps if this specific
-      // device's WebView build actually honors it — some builds silently
-      // ignore hints they don't recognize, which would explain why the
-      // meta tag alone didn't fix the blank-screen-while-typing bug. This
-      // is a stronger, WebView-version-independent version of the same
-      // idea: instead of asking the WebView to resize the CSS layout
-      // viewport declaratively, we measure the real visible area
-      // ourselves (window.visualViewport, which reflects the keyboard
-      // reliably even on WebView builds that don't support the meta hint)
-      // and force <html>'s height to that exact pixel value on every
-      // change. Since index.css defines html/body/#root as height: 100%,
-      // this directly and forcibly reflows the whole page every time the
-      // keyboard opens/closes/changes height, rather than relying on the
-      // browser to notice on its own — which is what should make the
-      // screen behind the keyboard actually repaint instead of staying
-      // blank/stale.
-      (function () {
-        function applyViewportHeight() {
-          var vv = window.visualViewport;
-          var h = vv ? vv.height : window.innerHeight;
-          document.documentElement.style.height = h + 'px';
-        }
-        if (window.visualViewport) {
-          window.visualViewport.addEventListener('resize', applyViewportHeight);
-          window.visualViewport.addEventListener('scroll', applyViewportHeight);
-        }
-        window.addEventListener('resize', applyViewportHeight);
-        applyViewportHeight();
-      })();
       window.__bootDiag = { errors: [] };
       window.addEventListener('error', function (e) {
         window.__bootDiag.errors.push(
