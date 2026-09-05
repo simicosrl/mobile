@@ -2,7 +2,16 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <!-- The layout MUST shrink when the keyboard opens. Measured without it:
+         the tracking field sits at y=377 on a 800px screen while the keyboard
+         covers everything below y=380, the scroll container has exactly 0px of
+         slack (scrollHeight === clientHeight), and window.visualViewport still
+         reports the full 800px — so the field is simply buried under the
+         keyboard with nothing able to scroll it up. interactive-widget handles
+         that on WebView 108+; android:windowSoftInputMode="adjustResize" in
+         AndroidManifest.xml is what actually does it on older WebViews like the
+         Android 10 device this was reported on. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content" />
     <meta name="theme-color" content="#1F6FEB" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

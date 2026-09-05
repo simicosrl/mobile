@@ -9,12 +9,23 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
 
+        <!-- windowSoftInputMode=adjustResize: without it the window never
+             resizes for the on-screen keyboard, so the WebView never learns the
+             keyboard exists. Measured: the tracking field sits at y=377 on an
+             800px screen while the keyboard covers everything below y=380, the
+             scroll container has exactly 0px of slack, and visualViewport still
+             reports the full 800px — the field is buried under the keyboard
+             with nothing able to scroll it up. The interactive-widget viewport
+             hint in index.html does the same job, but only on WebView 108+;
+             this is what covers older WebViews (the report came from an
+             Android 10 device last patched in 2021). -->
         <activity
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
             android:name=".MainActivity"
             android:label="@string/title_activity_main"
             android:theme="@style/AppTheme.NoActionBarLaunch"
             android:launchMode="singleTask"
+            android:windowSoftInputMode="adjustResize"
             android:exported="true">
 
             <intent-filter>

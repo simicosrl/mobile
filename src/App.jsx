@@ -1,5 +1,7 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
+import { Capacitor } from '@capacitor/core';
+import { Keyboard } from '@capacitor/keyboard';
 import { AppProvider, useApp } from './state/AppContext';
 import Header from './components/Header';
 import BottomNav from './components/BottomNav';
@@ -33,9 +35,49 @@ const SCREENS = {
   settings: Settings,
 };
 
+// The app now resizes for the on-screen keyboard (adjustResize in
+// AndroidManifest.xml + the interactive-widget viewport hint in index.html) —
+// which is what finally makes a focused field reachable instead of buried
+// under the keyboard. But with the layout that much shorter, the bottom tab
+// bar would squeeze up and sit directly above the keyboard, stealing 59px
+// from the field you're actually typing in. So: while the keyboard is up, the
+// tab bar goes away. You can't tap it anyway with the keyboard covering it.
+function useKeyboardOpen() {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const handles = [];
+    let cancelled = false;
+    const track = (p) => p.then((h) => { if (cancelled) h.remove(); else handles.push(h); }).catch(() => {});
+    if (Capacitor.isNativePlatform()) {
+      track(Keyboard.addListener('keyboardWillShow', () => setOpen(true)));
+      track(Keyboard.addListener('keyboardWillHide', () => setOpen(false)));
+    }
+    // Fallback, and the only path in the browser preview build: a visible area
+    // that just lost a big chunk of height lost it to the keyboard. Tracking
+    // the tallest height seen keeps this correct across rotation.
+    const vv = window.visualViewport;
+    let tallest = vv ? vv.height : window.innerHeight;
+    const onResize = () => {
+      const h = vv ? vv.height : window.innerHeight;
+      if (h > tallest) tallest = h;
+      setOpen(h < tallest - 120);
+    };
+    vv?.addEventListener('resize', onResize);
+    window.addEventListener('resize', onResize);
+    return () => {
+      cancelled = true;
+      handles.forEach((h) => h.remove());
+      vv?.removeEventListener('resize', onResize);
+      window.removeEventListener('resize', onResize);
+    };
+  }, []);
+  return open;
+}
+
 function Shell() {
   const { ready, screen, goBack, goHome, canGoBack } = useApp();
   const scrollRef = useRef(null);
+  const keyboardOpen = useKeyboardOpen();
 
   useEffect(() => {
     let handle;
@@ -74,7 +116,7 @@ function Shell() {
       <div ref={scrollRef} className="flex-1 overflow-y-auto">
         <Screen />
       </div>
-      <BottomNav />
+      {!keyboardOpen && <BottomNav />}
       <DuplicateSheet />
       <DamageSheet />
       <NoCodeSheet />
