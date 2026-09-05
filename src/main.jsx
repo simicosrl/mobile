@@ -51,32 +51,51 @@ createRoot(document.getElementById('root')).render(
     if (!vv) return;
     var scroller = el.closest('.overflow-y-auto');
     if (!scroller) return;
+    // The field has to end up inside the part of its own scroll container
+    // that is actually on screen — which is the container's box clipped by
+    // the area the keyboard leaves. Clamping against the window alone isn't
+    // enough: the container starts below the header, so a field scrolled to
+    // the very top gets its top edge cut off by the container's own top
+    // edge, leaving just a sliver of it visible.
+    // getBoundingClientRect() is relative to the layout viewport's origin, so
+    // vv.offsetTop (the visual viewport's offset from that same origin) is
+    // what it compares against — not vv.pageTop, which counts page scroll too.
+    var box = scroller.getBoundingClientRect();
+    var top = Math.max(box.top, vv.offsetTop);
+    var bottom = Math.min(box.bottom, vv.offsetTop + vv.height);
+    if (bottom - top < 40) return;
     var rect = el.getBoundingClientRect();
-    // getBoundingClientRect() is relative to the layout viewport's own
-    // origin — vv.offsetTop (the visual viewport's offset from that same
-    // origin) is the right thing to compare it against, not vv.pageTop
-    // (which is relative to the whole scrolled page instead).
-    var visibleBottom = vv.offsetTop + vv.height;
-    var overlap = rect.bottom - visibleBottom;
-    if (overlap > 0) {
-      scroller.scrollTop += overlap + 24;
-    } else {
-      var aboveOverlap = vv.offsetTop - rect.top;
-      if (aboveOverlap > 0) scroller.scrollTop -= aboveOverlap + 24;
+    // Breathing room above/below the field, but never more than the space
+    // left over once the field itself is placed — on a short strip between
+    // the header and the keyboard a fixed margin would push it back out.
+    var margin = Math.max(0, Math.min(16, (bottom - top - rect.height) / 2));
+    if (rect.bottom > bottom - margin) {
+      scroller.scrollTop += rect.bottom - (bottom - margin);
+    } else if (rect.top < top + margin) {
+      scroller.scrollTop -= top + margin - rect.top;
     }
+  }
+  // A single shot at a fixed delay is really a guess about how long this
+  // particular device takes to animate the keyboard in and settle the new
+  // layout — and on a slow old phone that guess lands before the layout is
+  // final, so it corrects against numbers that are about to change. Re-running
+  // it across the whole window a keyboard can take costs nothing (it's a
+  // no-op as soon as the field already fits) and removes the timing guess.
+  function scheduleScroll() {
+    [60, 180, 350, 550, 800].forEach(function (d) {
+      setTimeout(scrollFocusedIntoView, d);
+    });
   }
   document.addEventListener(
     'focusin',
     function (e) {
       if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) {
-        setTimeout(scrollFocusedIntoView, 300);
+        scheduleScroll();
       }
     },
     true
   );
   if (window.visualViewport) {
-    window.visualViewport.addEventListener('resize', function () {
-      setTimeout(scrollFocusedIntoView, 50);
-    });
+    window.visualViewport.addEventListener('resize', scheduleScroll);
   }
 })();
