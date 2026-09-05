@@ -35,32 +35,56 @@ const SCREENS = {
   settings: Settings,
 };
 
-// The app now resizes for the on-screen keyboard (adjustResize in
-// AndroidManifest.xml + the interactive-widget viewport hint in index.html) —
-// which is what finally makes a focused field reachable instead of buried
-// under the keyboard. But with the layout that much shorter, the bottom tab
-// bar would squeeze up and sit directly above the keyboard, stealing 59px
-// from the field you're actually typing in. So: while the keyboard is up, the
-// tab bar goes away. You can't tap it anyway with the keyboard covering it.
-function useKeyboardOpen() {
-  const [open, setOpen] = useState(false);
+// Measured on the device this was reported from (Settings > Diagnostics,
+// keyboard open): window height 648, "window shrank by 0", visual viewport
+// 648, "shrank by 0" — the window does not resize for the keyboard at all,
+// so android:windowSoftInputMode="adjustResize" had no effect. That is
+// expected here: Capacitor 8 runs the activity edge-to-edge, and Android
+// does not resize an edge-to-edge window for the IME — the app is supposed
+// to consume the keyboard inset itself.
+//
+// Which is why every previous attempt failed. They all keyed off the window
+// or visualViewport shrinking, and on this device neither ever does. The
+// same readout shows what does work: Android reports the keyboard's height
+// (303) through the Keyboard plugin, already divided by display density, so
+// it is in the same units as window.innerHeight. So take that number and
+// shorten the app by it ourselves.
+//
+// Returns both the inset to apply and whether the keyboard is up at all —
+// on a device where the window *does* resize, the inset is correctly 0 while
+// the keyboard is still open, and the tab bar must still be hidden.
+function useKeyboard() {
+  const [state, setState] = useState({ open: false, inset: 0 });
   useEffect(() => {
     const handles = [];
     let cancelled = false;
+    let tallest = window.innerHeight;
+    let keyboardH = 0;
+    let open = false;
+    const apply = () => {
+      if (window.innerHeight > tallest) tallest = window.innerHeight;
+      // Subtract only the part of the keyboard the window has not already
+      // given up by resizing, so this stays correct on both kinds of device.
+      const windowGaveUp = Math.max(0, tallest - window.innerHeight);
+      setState({ open, inset: Math.max(0, Math.round(keyboardH - windowGaveUp)) });
+    };
     const track = (p) => p.then((h) => { if (cancelled) h.remove(); else handles.push(h); }).catch(() => {});
     if (Capacitor.isNativePlatform()) {
-      track(Keyboard.addListener('keyboardWillShow', () => setOpen(true)));
-      track(Keyboard.addListener('keyboardWillHide', () => setOpen(false)));
+      const shown = (info) => { keyboardH = info?.keyboardHeight || 0; open = true; apply(); };
+      const hidden = () => { keyboardH = 0; open = false; apply(); };
+      track(Keyboard.addListener('keyboardWillShow', shown));
+      track(Keyboard.addListener('keyboardDidShow', shown));
+      track(Keyboard.addListener('keyboardWillHide', hidden));
+      track(Keyboard.addListener('keyboardDidHide', hidden));
     }
-    // Fallback, and the only path in the browser preview build: a visible area
-    // that just lost a big chunk of height lost it to the keyboard. Tracking
-    // the tallest height seen keeps this correct across rotation.
+    // Fallback, and the only path in the browser preview: a visible area that
+    // just lost a big chunk of height lost it to the keyboard.
     const vv = window.visualViewport;
-    let tallest = vv ? vv.height : window.innerHeight;
     const onResize = () => {
       const h = vv ? vv.height : window.innerHeight;
       if (h > tallest) tallest = h;
-      setOpen(h < tallest - 120);
+      if (!Capacitor.isNativePlatform()) open = h < tallest - 120;
+      apply();
     };
     vv?.addEventListener('resize', onResize);
     window.addEventListener('resize', onResize);
@@ -71,13 +95,13 @@ function useKeyboardOpen() {
       window.removeEventListener('resize', onResize);
     };
   }, []);
-  return open;
+  return state;
 }
 
 function Shell() {
   const { ready, screen, goBack, goHome, canGoBack } = useApp();
   const scrollRef = useRef(null);
-  const keyboardOpen = useKeyboardOpen();
+  const { open: keyboardOpen, inset: keyboardInset } = useKeyboard();
 
   useEffect(() => {
     let handle;
@@ -111,7 +135,13 @@ function Shell() {
   const Screen = SCREENS[screen] || Home;
 
   return (
-    <div className="relative flex h-full flex-col overflow-hidden bg-page">
+    <div
+      className="relative flex h-full flex-col overflow-hidden bg-page"
+      // Android won't shorten the window for the keyboard here, so do it
+      // ourselves — this is what gives the scroll area real slack and puts
+      // the bottom sheets' content directly above the keyboard.
+      style={keyboardInset ? { height: `calc(100% - ${keyboardInset}px)` } : undefined}
+    >
       <Header />
       <div ref={scrollRef} className="flex-1 overflow-y-auto">
         <Screen />
