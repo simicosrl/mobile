@@ -2,13 +2,13 @@ import { useMemo, useRef, useState } from 'react';
 import { useApp } from '../state/AppContext';
 import { docNumber } from '../lib/format';
 import SignaturePad from '../components/SignaturePad';
-import { Check, ArrowRight } from '../components/icons';
+import { ArrowRight } from '../components/icons';
 
 export default function Signature() {
   const app = useApp();
   const {
     direction, carrier, courierCompany, setCourierCompany, plate, setPlate,
-    courierName, setCourierName, parcels, docSeq, agreed, toggleAgree,
+    courierName, setCourierName, parcels, docSeq,
     sigInk, setSignatureDataUrl, setSigInk, clearSignature, signReady, finish,
     driverProfiles, applyDriverProfile,
   } = app;
@@ -97,18 +97,6 @@ export default function Signature() {
         </div>
         <SignaturePad ref={padRef} onChange={onSigChange} hasInk={sigInk} />
       </div>
-
-      <button onClick={toggleAgree} className="flex items-start gap-2.5 rounded-xl border border-[rgba(148,163,184,.3)] bg-white p-3 text-left">
-        <div
-          className="flex h-[22px] w-[22px] flex-none items-center justify-center rounded-md border-2"
-          style={{ borderColor: agreed ? '#1F6FEB' : 'rgba(148,163,184,.6)', background: agreed ? '#1F6FEB' : '#fff' }}
-        >
-          {agreed && <Check size={13} strokeWidth={3} className="text-white" />}
-        </div>
-        <div className="text-[11.5px] leading-normal text-secondary">
-          The driver confirms the number of parcels and their apparent condition at handover, and accepts the recorded damage notes.
-        </div>
-      </button>
 
       <button
         onClick={finish}
