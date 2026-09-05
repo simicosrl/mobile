@@ -40,7 +40,9 @@ export default function SessionDetail() {
             <div className="w-[18px] flex-none font-mono text-[10px] text-light">{i + 1}</div>
             <div className="min-w-0 flex-1">
               <div className="truncate font-mono text-[11.5px] font-bold">{p.code}</div>
-              <div className="truncate text-[10.5px]" style={{ color: p.damage ? '#DC2626' : '#64748B' }}>{p.damage || 'Good, sealed'}</div>
+              <div className="truncate text-[10.5px]" style={{ color: p.noCode || p.damage ? '#DC2626' : '#64748B' }}>
+                {p.noCode ? 'NO VALID CODE' + (p.noCodeNote ? ` — ${p.noCodeNote}` : '') : p.damage || 'Good, sealed'}
+              </div>
             </div>
             {p.photoDataUrl && (
               <button onClick={() => openPhoto(p.photoDataUrl)} className="flex-none">

@@ -6,6 +6,7 @@ import BottomNav from './components/BottomNav';
 import Toast from './components/Toast';
 import DuplicateSheet from './components/DuplicateSheet';
 import DamageSheet from './components/DamageSheet';
+import NoCodeSheet from './components/NoCodeSheet';
 import PhotoViewer from './components/PhotoViewer';
 import BadgeLogin from './screens/BadgeLogin';
 import Home from './screens/Home';
@@ -76,6 +77,7 @@ function Shell() {
       <BottomNav />
       <DuplicateSheet />
       <DamageSheet />
+      <NoCodeSheet />
       <PhotoViewer />
       <Toast />
     </div>

@@ -244,7 +244,7 @@ Deno.serve(async (req: Request) => {
         const { data: parcelsData, error: parcelErr } = await supabase
           .schema(schema)
           .from("parcels")
-          .select("session_id, scan_order, tracking, boxes, expected, damage_type, created_at")
+          .select("session_id, scan_order, tracking, boxes, expected, damage_type, no_code, created_at")
           .in("session_id", ids)
           .order("scan_order", { ascending: true });
         if (parcelErr) return json({ error: parcelErr.message }, 500);
@@ -265,6 +265,7 @@ Deno.serve(async (req: Request) => {
           boxes: p.boxes,
           expected: p.expected,
           damage: p.damage_type,
+          noCode: p.no_code,
           createdAtIso: p.created_at,
         })),
       }));
@@ -341,6 +342,9 @@ Deno.serve(async (req: Request) => {
         expected: p.expected ?? null,
         damage_type: p.damage?.type ?? null,
         damage_photo: p.damage?.photo ?? null,
+        no_code: p.no_code?.flagged ?? false,
+        no_code_note: p.no_code?.note ?? null,
+        no_code_photo: p.no_code?.photo ?? null,
       }));
       if (parcels.length) {
         const { error: parcelErr } = await supabase.schema(schema).from("parcels").insert(parcels);
