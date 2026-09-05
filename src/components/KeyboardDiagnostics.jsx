@@ -11,6 +11,7 @@ import { Keyboard } from '@capacitor/keyboard';
 export default function KeyboardDiagnostics() {
   const inputRef = useRef(null);
   const [snap, setSnap] = useState(null);
+  const [frozen, setFrozen] = useState(null);
   const [events, setEvents] = useState([]);
 
   useEffect(() => {
@@ -56,7 +57,33 @@ export default function KeyboardDiagnostics() {
     const track = (p) => p.then((h) => { if (cancelled) h.remove(); else handles.push(h); }).catch(() => {});
     if (Capacitor.isNativePlatform()) {
       track(Keyboard.addListener('keyboardWillShow', (info) => log('willShow h=' + Math.round(info?.keyboardHeight ?? -1))));
-      track(Keyboard.addListener('keyboardDidShow', (info) => log('didShow h=' + Math.round(info?.keyboardHeight ?? -1))));
+      track(
+        Keyboard.addListener('keyboardDidShow', (info) => {
+          log('didShow h=' + Math.round(info?.keyboardHeight ?? -1));
+          // Freeze the numbers as they are with the keyboard actually up.
+          // Read live they're useless: by the time the panel can be
+          // photographed the keyboard is usually down again and everything
+          // has snapped back to its resting values.
+          setTimeout(() => {
+            const vv2 = window.visualViewport;
+            const el2 = document.activeElement;
+            const sc2 = el2 && el2.closest ? el2.closest('.overflow-y-auto') : null;
+            const r2 = el2 && el2.getBoundingClientRect ? el2.getBoundingClientRect() : null;
+            const b2 = sc2 ? sc2.getBoundingClientRect() : null;
+            setFrozen({
+              kbH: Math.round(info?.keyboardHeight ?? -1),
+              win: Math.round(window.innerHeight),
+              winMax: Math.round(winMax),
+              vvH: vv2 ? Math.round(vv2.height) : null,
+              scrollerTop: b2 ? Math.round(b2.top) : null,
+              scrollerBottom: b2 ? Math.round(b2.bottom) : null,
+              slack: sc2 ? Math.round(sc2.scrollHeight - sc2.clientHeight) : null,
+              fieldTop: r2 ? Math.round(r2.top) : null,
+              fieldBottom: r2 ? Math.round(r2.bottom) : null,
+            });
+          }, 400);
+        })
+      );
       track(Keyboard.addListener('keyboardWillHide', () => log('willHide')));
     } else {
       log('web preview — no native keyboard events');
@@ -117,6 +144,20 @@ export default function KeyboardDiagnostics() {
         placeholder="Tap here to open the keyboard"
         className="min-h-[48px] w-full rounded-xl border border-inputborder bg-page px-4 text-sm text-ink"
       />
+      {frozen && (
+        <div className="rounded-xl border-2 border-primary bg-white px-3 py-1.5">
+          <div className="py-1 text-[10px] font-bold uppercase tracking-[.08em] text-primary">
+            Frozen while the keyboard was open
+          </div>
+          {row('keyboard height', frozen.kbH)}
+          {row('window height', frozen.win + ' (was ' + frozen.winMax + ')')}
+          {row('visual viewport h', frozen.vvH)}
+          {row('scroll area', frozen.scrollerTop + ' .. ' + frozen.scrollerBottom)}
+          {row('scrollable slack', frozen.slack)}
+          {row('field', frozen.fieldTop + ' .. ' + frozen.fieldBottom)}
+          {row('field clear of kbd?', frozen.fieldBottom !== null && frozen.scrollerBottom !== null && frozen.fieldBottom <= frozen.scrollerBottom ? 'YES' : 'NO')}
+        </div>
+      )}
     </div>
   );
 }
