@@ -39,6 +39,7 @@ function legalText(companyName) {
 }
 
 function condition(p) {
+  if (p.noCode) return 'NO VALID CODE' + (p.noCodeNote ? ` — ${p.noCodeNote}` : '');
   return p.damage ? p.damage : 'Good, sealed';
 }
 
@@ -174,8 +175,8 @@ export function buildHandoverPdf(document, org) {
     doc.text(String(p.boxes), cx + cols[2].w / 2, ry + 12, { align: 'center' });
     cx += cols[2].w;
     const cond = condition(p);
-    doc.setFont('helvetica', p.damage ? 'bold' : 'normal');
-    doc.setTextColor(...(p.damage ? DANGER : SECONDARY));
+    doc.setFont('helvetica', p.damage || p.noCode ? 'bold' : 'normal');
+    doc.setTextColor(...(p.damage || p.noCode ? DANGER : SECONDARY));
     doc.text(cond, cx + 9, ry + 12, { maxWidth: cols[3].w - 12 });
     cx += cols[3].w;
     doc.setFont('helvetica', 'normal');

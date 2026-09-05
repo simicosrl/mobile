@@ -85,6 +85,11 @@ export function sessionToPayload(document) {
       // the actual image bytes live in p.photoDataUrl. Sending the filename
       // here silently shipped documents with no real photo attached.
       damage: p.damage ? { type: p.damage, photo: p.photoDataUrl || null } : null,
+      // A parcel logged with no valid tracking code — a generated
+      // placeholder (NOCODE-1, …) stands in for `tracking` above, and this
+      // carries the required photo evidence plus whatever note the
+      // operator left, for the office to reconcile manually.
+      no_code: p.noCode ? { flagged: true, note: p.noCodeNote || null, photo: p.noCodePhotoDataUrl || null } : null,
     })),
     signature: document.signatureDataUrl || null,
     // Base64 PDF of the exact handover document the app renders on-device,

@@ -47,6 +47,11 @@ export function AppProvider({ children }) {
   const [flash, setFlash] = useState(null); // 'ok' | 'bad' | null
 
   const [damageSheet, setDamageSheet] = useState({ open: false, picks: [], note: '', photoDataUrl: null });
+  const [noCodeSheet, setNoCodeSheet] = useState({ open: false, note: '', photoDataUrl: null });
+  // The most recently rejected scan (pattern mismatch), so the UI can offer
+  // "log it anyway with a photo" right where the rejection happened —
+  // cleared on the next scan attempt of any kind, successful or not.
+  const [rejectedScan, setRejectedScan] = useState(null);
 
   const [toast, setToastState] = useState(null);
   const toastTimer = useRef(null);
@@ -388,16 +393,24 @@ export function AppProvider({ children }) {
   const submitScan = useCallback((raw) => {
     const code = String(raw || '').trim().toUpperCase();
     if (!code) return;
+    // Cleared on every attempt — a mismatch banner from a previous scan
+    // shouldn't linger once the operator has moved on to a new one.
+    setRejectedScan(null);
     // A carrier can require its tracking codes to start with a specific
     // prefix (e.g. UPS -> "1Z") to catch a wrong/stray scan before it ever
     // enters the session — checked before the duplicate check so a bad
     // code is rejected outright rather than compared against what's
-    // already been scanned.
+    // already been scanned. The operator isn't stuck, though: the code
+    // stays visible with a "log it anyway" escape hatch (photo required)
+    // for a genuinely legitimate case — wrong carrier selected, damaged
+    // label — without making the override an effortless one-tap bypass.
     const carrierRule = carriers.find((c) => c.name.toLowerCase() === carrier.toLowerCase());
     if (carrierRule?.pattern && !code.startsWith(carrierRule.pattern)) {
       feedback(true);
       setFlash('bad');
-      showToast(`Invalid code for ${carrier} — must start with "${carrierRule.pattern}"`);
+      const reason = `must start with "${carrierRule.pattern}"`;
+      showToast(`Invalid code for ${carrier} — ${reason}`);
+      setRejectedScan({ code, reason });
       return;
     }
     const dup = parcels.find((p) => p.code === code);
@@ -485,6 +498,41 @@ export function AppProvider({ children }) {
       });
     }
   }, [damageSheet, docSeq, direction, parcels, internalConfig, showToast]);
+
+  // ---- "no valid code" sheet — for a parcel that physically arrived but
+  // has no usable tracking code (unreadable/damaged label, or one that
+  // doesn't match the carrier's required prefix). Creates a brand new
+  // parcel with a generated placeholder code, rather than attaching to an
+  // existing one the way saveDamage does — there's nothing to attach to
+  // when the whole point is that no code could be read. A photo is
+  // required, same as damage, so this can't become an effortless way to
+  // skip the carrier-pattern check. `prefill` seeds the note when opened
+  // right after a rejected scan, so the original (bad) code and reason
+  // aren't lost. ----
+  const openNoCodeSheet = useCallback((prefill = '') => {
+    setNoCodeSheet({ open: true, note: prefill, photoDataUrl: null });
+  }, []);
+  const closeNoCodeSheet = useCallback(() => setNoCodeSheet((s) => ({ ...s, open: false })), []);
+  const setNoCodeNote = useCallback((note) => setNoCodeSheet((s) => ({ ...s, note })), []);
+  const setNoCodePhoto = useCallback((dataUrl) => setNoCodeSheet((s) => ({ ...s, photoDataUrl: dataUrl })), []);
+  const saveNoCode = useCallback(() => {
+    if (!noCodeSheet.photoDataUrl) { showToast('Take a photo first'); return; }
+    // A placeholder unique within this session — NOCODE-1, NOCODE-2, … —
+    // so it still has a "code" to key off everywhere the rest of the app
+    // (dedup, the parcel list, the printed document) expects one.
+    const existing = parcels.filter((p) => p.noCode).length;
+    const code = `NOCODE-${existing + 1}`;
+    const photoName = `IMG_${docSeq[direction]}_${parcels.length}_nocode.jpg`;
+    setParcels((p) => p.concat([{
+      code, carrier, boxes: 1, time: hhmm(), damage: null, photo: null, expected: null,
+      noCode: true, noCodeNote: noCodeSheet.note || null, noCodePhoto: photoName, noCodePhotoDataUrl: noCodeSheet.photoDataUrl,
+    }]));
+    setFlash('ok');
+    setTimeout(() => setFlash((f) => (f === 'ok' ? null : f)), 700);
+    setRejectedScan(null);
+    setNoCodeSheet({ open: false, note: '', photoDataUrl: null });
+    showToast(`${code} logged with photo — flag it for the office`);
+  }, [noCodeSheet, parcels, carrier, docSeq, direction, showToast]);
 
   // ---- signature ----
   const toSign = useCallback(() => {
@@ -951,6 +999,7 @@ export function AppProvider({ children }) {
     submitScan, accept, dupCode, dupTime, closeDup, dupAddBox,
     boxPlus, boxMinus, removeLast, removeParcel, flash,
     damageSheet, openDamage, closeDamage, toggleDamageType, setDamageNote, setDamagePhoto, saveDamage, damageTypes: DAMAGE_TYPES,
+    noCodeSheet, openNoCodeSheet, closeNoCodeSheet, setNoCodeNote, setNoCodePhoto, saveNoCode, rejectedScan,
     courierName, setCourierName, plate, setPlate, agreed, toggleAgree,
     signatureDataUrl, setSignatureDataUrl, sigInk, setSigInk, clearSignature, signReady, toSign, finish,
     confirmedDoc, printDocument, emailDocument,
@@ -970,6 +1019,7 @@ export function AppProvider({ children }) {
     direction, carrier, courierCompany, shipment, parcels, sessionStartedAt, startSession, toScan, docSeq,
     submitScan, accept, dupCode, dupTime, closeDup, dupAddBox, boxPlus, boxMinus, removeLast, removeParcel, flash,
     damageSheet, openDamage, closeDamage, toggleDamageType, setDamageNote, setDamagePhoto, saveDamage,
+    noCodeSheet, openNoCodeSheet, closeNoCodeSheet, setNoCodeNote, setNoCodePhoto, saveNoCode, rejectedScan,
     courierName, plate, agreed, toggleAgree, signatureDataUrl, sigInk, clearSignature, signReady, toSign, finish,
     confirmedDoc, printDocument, emailDocument, visibleHistory, historyQuery, historyFilter, selectedDocNo, openSession, backToHistory,
     apiConfig, apiShowKey, setApiBaseUrl, setApiKey, generateApiKey, copyApiKey, togglePush, togglePull, toggleShowKey,

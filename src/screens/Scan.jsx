@@ -11,6 +11,7 @@ export default function Scan() {
   const {
     direction, carrier, parcels, sessionStartedAt, flash,
     submitScan, removeLast, removeParcel, openDamage, toSign, docSeq, openPhoto,
+    openNoCodeSheet, rejectedScan,
   } = app;
   const isOut = direction === 'out';
   const nextDoc = docNumber(direction, docSeq[direction]);
@@ -110,9 +111,18 @@ export default function Scan() {
         {last ? (
           <>
             <div className="mb-2.5 flex items-center gap-2">
-              <Check size={18} strokeWidth={2.4} className={last.damage ? 'text-danger' : 'text-success'} />
-              <div className={'text-[11px] font-extrabold uppercase tracking-[.08em] ' + (last.damage ? 'text-danger' : 'text-success')}>
-                {last.damage ? 'Recorded with damage' : 'Scan accepted'}
+              {last.noCode ? (
+                <TriangleAlert size={18} strokeWidth={2.4} className="text-[#C2410C]" />
+              ) : (
+                <Check size={18} strokeWidth={2.4} className={last.damage ? 'text-danger' : 'text-success'} />
+              )}
+              <div
+                className={
+                  'text-[11px] font-extrabold uppercase tracking-[.08em] ' +
+                  (last.noCode ? 'text-[#C2410C]' : last.damage ? 'text-danger' : 'text-success')
+                }
+              >
+                {last.noCode ? 'No valid code — logged with photo' : last.damage ? 'Recorded with damage' : 'Scan accepted'}
               </div>
               <div className="ml-auto font-mono text-[11px] text-light">{last.time}</div>
             </div>
@@ -143,6 +153,20 @@ export default function Scan() {
                 {last.photoDataUrl && (
                   <button onClick={() => openPhoto(last.photoDataUrl)} className="flex-none">
                     <img src={last.photoDataUrl} alt="Damage attachment" className="h-12 w-12 rounded-md border border-[rgba(220,38,38,.35)] object-cover" />
+                  </button>
+                )}
+              </div>
+            )}
+            {last.noCode && (
+              <div className="mt-3 flex items-start gap-2 rounded-[11px] border border-[rgba(255,122,0,.3)] bg-[rgba(255,122,0,.08)] p-2.5">
+                <TriangleAlert size={16} strokeWidth={2} className="mt-px flex-none text-[#C2410C]" />
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-bold text-[#C2410C]">Flagged for the office to reconcile</div>
+                  {last.noCodeNote && <div className="mt-0.5 text-[10.5px] text-[#C2410C]">{last.noCodeNote}</div>}
+                </div>
+                {last.noCodePhotoDataUrl && (
+                  <button onClick={() => openPhoto(last.noCodePhotoDataUrl)} className="flex-none">
+                    <img src={last.noCodePhotoDataUrl} alt="Parcel photo" className="h-12 w-12 rounded-md border border-[rgba(255,122,0,.35)] object-cover" />
                   </button>
                 )}
               </div>
@@ -181,6 +205,7 @@ export default function Scan() {
               <div className="w-[18px] flex-none font-mono text-[10px] text-light">{parcels.length - i}</div>
               <div className="min-w-0 flex-1 truncate font-mono text-[11.5px] font-semibold">{r.code}</div>
               {r.damage && <div className="flex-none text-[11px] font-bold text-danger">DMG</div>}
+              {r.noCode && <div className="flex-none text-[11px] font-bold text-[#C2410C]">NO CODE</div>}
               <div className="flex-none text-[11px] font-bold text-ink">{r.boxes}×</div>
               <button
                 onClick={() => removeParcel(r.code)}
@@ -222,9 +247,32 @@ export default function Scan() {
             </button>
           )}
         </div>
-        <button onClick={openManualKeyboard} className="mt-2 flex items-center gap-1 text-[10.5px] font-bold text-secondary">
-          <KeyboardIcon size={12} strokeWidth={2} /> Type manually instead
-        </button>
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+          <button onClick={openManualKeyboard} className="flex items-center gap-1 text-[10.5px] font-bold text-secondary">
+            <KeyboardIcon size={12} strokeWidth={2} /> Type manually instead
+          </button>
+          <button onClick={() => openNoCodeSheet()} className="flex items-center gap-1 text-[10.5px] font-bold text-[#C2410C]">
+            <Camera size={12} strokeWidth={2} /> Can't scan it? Log with photo
+          </button>
+        </div>
+        {/* Follow-up action right where the rejection happened, rather than
+            leaving the operator stuck with a code that was scanned but
+            can't go anywhere — the photo requirement in the sheet itself
+            keeps this from being a one-tap way around the carrier rule. */}
+        {rejectedScan && (
+          <div className="mt-2 flex items-center gap-2 rounded-xl border border-[rgba(255,122,0,.35)] bg-[rgba(255,122,0,.08)] p-2.5">
+            <div className="min-w-0 flex-1">
+              <div className="truncate font-mono text-[11px] font-bold text-[#C2410C]">{rejectedScan.code}</div>
+              <div className="text-[10.5px] text-[#C2410C]">Rejected — {rejectedScan.reason}</div>
+            </div>
+            <button
+              onClick={() => openNoCodeSheet(`Scanned: ${rejectedScan.code} — ${rejectedScan.reason}`)}
+              className="flex-none rounded-lg bg-[#FF7A00] px-2.5 py-2 text-[11px] font-bold text-white"
+            >
+              Log anyway
+            </button>
+          </div>
+        )}
         {scanError && <div className="mt-2 text-[11px] text-danger">{scanError}</div>}
       </div>
 
