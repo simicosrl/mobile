@@ -146,6 +146,9 @@ jobs:
             echo "== wh_it.parcels, any row with tracking code containing 8007404018060 =="
             psql "$CONN" -x -c "select * from wh_it.parcels where tracking::text like '%8007404018060%';"
             echo
+            echo "== wh_it.parcels, the CI-PROBE no_code row =="
+            psql "$CONN" -x -c "select tracking, no_code, no_code_note, left(no_code_photo, 30) as no_code_photo_prefix from wh_it.parcels where tracking = 'NOCODE-CIPROBE-1';"
+            echo
             echo "== wh_it.parcels (last 10, any code) =="
             psql "$CONN" -x -c "select * from wh_it.parcels order by 1 desc limit 10;"
             echo
