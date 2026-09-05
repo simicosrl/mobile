@@ -2,7 +2,17 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <!-- interactive-widget=resizes-content is the modern, WebView-level
+         mechanism (Chrome/WebView 108+) that actually governs whether the
+         CSS viewport (height:100%, 100vh, etc.) shrinks when the on-screen
+         keyboard opens — independent of, and often overriding, whatever
+         android:windowSoftInputMode says at the native Activity level.
+         Without it, WebView's default (resizes-visual) leaves the CSS
+         layout viewport at full height while only a separate "visual
+         viewport" shrinks, which is exactly the kind of mismatch that
+         produces a keyboard-open screen that looks blank/frozen even
+         though the DOM underneath is still correct. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content" />
     <meta name="theme-color" content="#1F6FEB" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

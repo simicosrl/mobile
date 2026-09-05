@@ -11,7 +11,7 @@ export default function Scan() {
   const {
     direction, carrier, parcels, sessionStartedAt, flash,
     submitScan, removeLast, removeParcel, openDamage, toSign, docSeq, openPhoto,
-    openNoCodeSheet, rejectedScan,
+    openNoCodeSheet, rejectedScan, damageSheet, noCodeSheet,
   } = app;
   const isOut = direction === 'out';
   const nextDoc = docNumber(direction, docSeq[direction]);
@@ -30,6 +30,13 @@ export default function Scan() {
   const [manualKeyboard, setManualKeyboard] = useState(false);
 
   useEffect(() => {
+    // Damage and "no code" are sheets, not separate screens — they render
+    // as an overlay on top of Scan, which stays mounted underneath with
+    // this same interval still running. Left unguarded, it was yanking
+    // focus back to this hidden field and force-closing the IME every
+    // 400ms while the operator was mid-keystroke in the sheet's own note
+    // field — effectively making it impossible to type anything there.
+    if (damageSheet.open || noCodeSheet.open) return undefined;
     const refocus = () => {
       if (!scanning && inputRef.current && document.activeElement !== inputRef.current) {
         try { inputRef.current.focus({ preventScroll: true }); } catch { /* ignore */ }
@@ -41,7 +48,7 @@ export default function Scan() {
     refocus();
     const t = setInterval(refocus, 400);
     return () => clearInterval(t);
-  }, [scanning, parcels.length, manualKeyboard]);
+  }, [scanning, parcels.length, manualKeyboard, damageSheet.open, noCodeSheet.open]);
 
   const openManualKeyboard = () => {
     setManualKeyboard(true);
