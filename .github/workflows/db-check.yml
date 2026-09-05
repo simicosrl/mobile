@@ -62,6 +62,12 @@ jobs:
               -d '{"direction":"inbound"}'
             echo
             echo
+            echo "== POST /warehouse/sessions (CI-PROBE — one no_code parcel) =="
+            curl -sS -i -m 20 -X POST "https://piafchajbkfkyftumxke.supabase.co/functions/v1/wms-api/warehouse/sessions" \
+              -H "Origin: https://localhost" -H "Authorization: Bearer ${IT_KEY}" -H "Content-Type: application/json" \
+              -d '{"document":"CI-PROBE-DOC","direction":"inbound","carrier":"CI-PROBE","driver":{"name":"CI-PROBE Driver"},"operator":"CI-PROBE","closed_at":"2026-01-01T00:00:00Z","parcels":[{"tracking":"NOCODE-CIPROBE-1","boxes":1,"no_code":{"flagged":true,"note":"CI probe note","photo":"data:image/jpeg;base64,AAAA"}}]}'
+            echo
+            echo
             echo "== POST /warehouse/drivers (upsert a CI-PROBE test driver) =="
             curl -sS -i -m 20 -X POST "https://piafchajbkfkyftumxke.supabase.co/functions/v1/wms-api/warehouse/drivers" \
               -H "Origin: https://localhost" -H "Authorization: Bearer ${IT_KEY}" -H "Content-Type: application/json" \
