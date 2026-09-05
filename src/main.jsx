@@ -62,7 +62,13 @@ createRoot(document.getElementById('root')).render(
     // what it compares against — not vv.pageTop, which counts page scroll too.
     var box = scroller.getBoundingClientRect();
     var top = Math.max(box.top, vv.offsetTop);
-    var bottom = Math.min(box.bottom, vv.offsetTop + vv.height);
+    // On a device whose window never resizes for the keyboard, the visual
+    // viewport is no help — it still reports full height with the keyboard
+    // up. App.jsx publishes the height Android reports so this can subtract
+    // it. Taking the minimum keeps it right either way: where the window
+    // does resize the inset is 0 and the container's own box governs.
+    var kbInset = window.__keyboardInset || 0;
+    var bottom = Math.min(box.bottom, vv.offsetTop + vv.height - kbInset);
     if (bottom - top < 40) return;
     var rect = el.getBoundingClientRect();
     // Breathing room above/below the field, but never more than the space
@@ -98,4 +104,8 @@ createRoot(document.getElementById('root')).render(
   if (window.visualViewport) {
     window.visualViewport.addEventListener('resize', scheduleScroll);
   }
+  // On a device that never fires a viewport resize for the keyboard, focus is
+  // the only trigger left — and at focus time the keyboard hasn't been
+  // reported yet. App.jsx calls this once it knows the keyboard's height.
+  window.__rescrollFocused = scheduleScroll;
 })();

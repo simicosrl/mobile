@@ -66,7 +66,14 @@ function useKeyboard() {
       // Subtract only the part of the keyboard the window has not already
       // given up by resizing, so this stays correct on both kinds of device.
       const windowGaveUp = Math.max(0, tallest - window.innerHeight);
-      setState({ open, inset: Math.max(0, Math.round(keyboardH - windowGaveUp)) });
+      const inset = Math.max(0, Math.round(keyboardH - windowGaveUp));
+      // The focus-scroll correction in main.jsx is a plain global listener
+      // with no access to this hook, and on this device it cannot work out
+      // the keyboard's height for itself — visualViewport never changes.
+      // Hand it the number.
+      window.__keyboardInset = inset;
+      setState({ open, inset });
+      if (window.__rescrollFocused) window.__rescrollFocused();
     };
     const track = (p) => p.then((h) => { if (cancelled) h.remove(); else handles.push(h); }).catch(() => {});
     if (Capacitor.isNativePlatform()) {
@@ -90,6 +97,7 @@ function useKeyboard() {
     window.addEventListener('resize', onResize);
     return () => {
       cancelled = true;
+      window.__keyboardInset = 0;
       handles.forEach((h) => h.remove());
       vv?.removeEventListener('resize', onResize);
       window.removeEventListener('resize', onResize);
@@ -143,7 +151,19 @@ function Shell() {
       style={keyboardInset ? { height: `calc(100% - ${keyboardInset}px)` } : undefined}
     >
       <Header />
-      <div ref={scrollRef} className="flex-1 overflow-y-auto">
+      {/* Padding equal to the keyboard is what actually guarantees a field can
+          be scrolled clear of it. Measured on the reported device with the
+          keyboard open: scrollHeight === clientHeight, i.e. zero scrollable
+          slack — so nothing, native or ours, had anywhere to scroll the field
+          to. This is also the property the older build the operator remembers
+          as working had for free, simply by having a longer page; the Scan
+          screen got shorter since and lost it. With this, the slack is always
+          at least the keyboard's own height, so any field can always clear it. */}
+      <div
+        ref={scrollRef}
+        className="flex-1 overflow-y-auto"
+        style={keyboardInset ? { paddingBottom: keyboardInset } : undefined}
+      >
         <Screen />
       </div>
       {!keyboardOpen && <BottomNav />}
