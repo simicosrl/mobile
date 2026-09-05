@@ -1,5 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
+import { Capacitor } from '@capacitor/core';
+import { Keyboard } from '@capacitor/keyboard';
 import { AppProvider, useApp } from './state/AppContext';
 import Header from './components/Header';
 import BottomNav from './components/BottomNav';
@@ -55,6 +57,26 @@ function Shell() {
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: 0 });
   }, [screen]);
+
+  // Some Android WebView versions leave a stale, blank frame on screen for
+  // the entire time the keyboard is up after the windowSoftInputMode=
+  // "adjustResize" layout change it triggers — the DOM underneath is
+  // already correct (typing works, and the real content reappears the
+  // instant the keyboard closes), it's purely a compositor repaint that
+  // never happens. Nudging a compositing layer on and back off right when
+  // the keyboard finishes animating in/out forces that repaint. Cheap and
+  // harmless if the device never needed it.
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return undefined;
+    const nudge = () => {
+      requestAnimationFrame(() => {
+        document.body.style.transform = 'translateZ(0)';
+        requestAnimationFrame(() => { document.body.style.transform = ''; });
+      });
+    };
+    const subs = [Keyboard.addListener('keyboardDidShow', nudge), Keyboard.addListener('keyboardDidHide', nudge)];
+    return () => { subs.forEach((s) => s.then((h) => h.remove())); };
+  }, []);
 
   if (!ready) {
     return (
