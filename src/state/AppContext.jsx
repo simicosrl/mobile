@@ -38,7 +38,6 @@ export function AppProvider({ children }) {
 
   const [courierName, setCourierName] = useState('');
   const [plate, setPlate] = useState('');
-  const [agreed, setAgreed] = useState(false);
   const [signatureDataUrl, setSignatureDataUrl] = useState(null);
   const [sigInk, setSigInk] = useState(false);
 
@@ -371,7 +370,6 @@ export function AppProvider({ children }) {
     setConfirmedDoc(null);
     setSignatureDataUrl(null);
     setSigInk(false);
-    setAgreed(false);
     setCourierName('');
     setCourierCompany('');
     setPlate('');
@@ -540,9 +538,11 @@ export function AppProvider({ children }) {
     setScreen('sign');
   }, [parcels.length, showToast]);
   const clearSignature = useCallback(() => { setSignatureDataUrl(null); setSigInk(false); }, []);
-  const toggleAgree = useCallback(() => setAgreed((a) => !a), []);
 
-  const signReady = courierName.trim().length > 1 && sigInk && agreed;
+  // No separate driver-acknowledgment checkbox — the operator's own scan of
+  // every parcel already is the confirmation, so requiring a second manual
+  // tick on top of that was redundant.
+  const signReady = courierName.trim().length > 1 && sigInk;
 
   // ---- driver profiles (remembered so the office doesn't retype the same
   // driver/plate every time that person shows up again) — kept in this
@@ -670,7 +670,7 @@ export function AppProvider({ children }) {
   }, [orgSettings]);
 
   const finish = useCallback(async () => {
-    if (!signReady) { showToast('Name, signature and confirmation are required'); return; }
+    if (!signReady) { showToast('Name and signature are required'); return; }
     saveDriverProfile(courierName, courierCompany, plate);
     const now2 = new Date();
     // Reserve the real progressive number from the database up front,
@@ -721,7 +721,6 @@ export function AppProvider({ children }) {
     setParcels([]);
     setSignatureDataUrl(null);
     setSigInk(false);
-    setAgreed(false);
     setCourierName('');
     setCourierCompany('');
     setPlate('');
@@ -1000,7 +999,7 @@ export function AppProvider({ children }) {
     boxPlus, boxMinus, removeLast, removeParcel, flash,
     damageSheet, openDamage, closeDamage, toggleDamageType, setDamageNote, setDamagePhoto, saveDamage, damageTypes: DAMAGE_TYPES,
     noCodeSheet, openNoCodeSheet, closeNoCodeSheet, setNoCodeNote, setNoCodePhoto, saveNoCode, rejectedScan,
-    courierName, setCourierName, plate, setPlate, agreed, toggleAgree,
+    courierName, setCourierName, plate, setPlate,
     signatureDataUrl, setSignatureDataUrl, sigInk, setSigInk, clearSignature, signReady, toSign, finish,
     confirmedDoc, printDocument, emailDocument,
     history: visibleHistory, historyQuery, setHistoryQuery, historyFilter, setHistoryFilter, selectedDocNo, openSession, backToHistory,
@@ -1020,7 +1019,7 @@ export function AppProvider({ children }) {
     submitScan, accept, dupCode, dupTime, closeDup, dupAddBox, boxPlus, boxMinus, removeLast, removeParcel, flash,
     damageSheet, openDamage, closeDamage, toggleDamageType, setDamageNote, setDamagePhoto, saveDamage,
     noCodeSheet, openNoCodeSheet, closeNoCodeSheet, setNoCodeNote, setNoCodePhoto, saveNoCode, rejectedScan,
-    courierName, plate, agreed, toggleAgree, signatureDataUrl, sigInk, clearSignature, signReady, toSign, finish,
+    courierName, plate, signatureDataUrl, sigInk, clearSignature, signReady, toSign, finish,
     confirmedDoc, printDocument, emailDocument, visibleHistory, historyQuery, historyFilter, selectedDocNo, openSession, backToHistory,
     apiConfig, apiShowKey, setApiBaseUrl, setApiKey, generateApiKey, copyApiKey, togglePush, togglePull, toggleShowKey,
     manifest, pulling, pullManifestNow, syncing, syncNow, retrySync, syncPrepPending,
