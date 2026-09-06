@@ -35,24 +35,31 @@ const SCREENS = {
   settings: Settings,
 };
 
-// Measured on the device this was reported from (Settings > Diagnostics,
-// keyboard open): window height 648, "window shrank by 0", visual viewport
-// 648, "shrank by 0" — the window does not resize for the keyboard at all,
-// so android:windowSoftInputMode="adjustResize" had no effect. That is
-// expected here: Capacitor 8 runs the activity edge-to-edge, and Android
-// does not resize an edge-to-edge window for the IME — the app is supposed
-// to consume the keyboard inset itself.
+// What the keyboard actually does on the reported device, from the frozen
+// Diagnostics readout taken while it was open:
 //
-// Which is why every previous attempt failed. They all keyed off the window
-// or visualViewport shrinking, and on this device neither ever does. The
-// same readout shows what does work: Android reports the keyboard's height
-// (303) through the Keyboard plugin, already divided by display density, so
-// it is in the same units as window.innerHeight. So take that number and
-// shorten the app by it ourselves.
+//   keyboard height 303 | window height 90 (was 648) | scroll area 53..90
 //
-// Returns both the inset to apply and whether the keyboard is up at all —
-// on a device where the window *does* resize, the inset is correctly 0 while
-// the keyboard is still open, and the tab bar must still be hidden.
+// So the window does resize for the keyboard — it just resized twice, once
+// for android:windowSoftInputMode="adjustResize" and again for the
+// interactive-widget viewport hint, both of which this file's history added
+// together: 648 - 279 - 279 = 90. That left the whole app as a 37px strip,
+// which is the sliver of a field the operator was seeing. Both are gone now;
+// the native default that v1.0.65 shipped with resizes correctly on its own.
+//
+// (An earlier reading of this same panel said "shrank by 0" and concluded the
+// window never resizes. That reading was taken live, after the keyboard had
+// already closed and everything had snapped back — it was measuring nothing.
+// Hence the frozen block.)
+//
+// What stays is a safety net for a device whose window does NOT resize: take
+// the keyboard height Android reports (already divided by display density in
+// the plugin, so it is in the same units as window.innerHeight) and shorten
+// the app by whatever part of it the window hasn't already given up.
+//
+// Returns the inset to apply and whether the keyboard is up at all — the tab
+// bar has to be hidden either way, or it squeezes in above the keyboard and
+// takes 59px from the field being typed in.
 function useKeyboard() {
   const [state, setState] = useState({ open: false, inset: 0 });
   useEffect(() => {
@@ -66,7 +73,13 @@ function useKeyboard() {
       // Subtract only the part of the keyboard the window has not already
       // given up by resizing, so this stays correct on both kinds of device.
       const windowGaveUp = Math.max(0, tallest - window.innerHeight);
-      const inset = Math.max(0, Math.round(keyboardH - windowGaveUp));
+      // If the window has already given up most of the keyboard's height, it
+      // is handling this itself and must be left alone — subtracting the
+      // remainder is how the double-shrink to 90px happened. The two numbers
+      // never match exactly (the device reported a 303 keyboard against a 279
+      // window shrink), so this compares loosely rather than exactly.
+      const windowHandledIt = keyboardH > 0 && windowGaveUp >= keyboardH * 0.6;
+      const inset = windowHandledIt ? 0 : Math.max(0, Math.round(keyboardH - windowGaveUp));
       // The focus-scroll correction in main.jsx is a plain global listener
       // with no access to this hook, and on this device it cannot work out
       // the keyboard's height for itself — visualViewport never changes.
@@ -145,20 +158,18 @@ function Shell() {
   return (
     <div
       className="relative flex h-full flex-col overflow-hidden bg-page"
-      // Android won't shorten the window for the keyboard here, so do it
-      // ourselves — this is what gives the scroll area real slack and puts
-      // the bottom sheets' content directly above the keyboard.
+      // Only used on a device whose window does not shorten itself for the
+      // keyboard; where it does (including the one this was reported on) the
+      // inset is 0 and this is left alone, which is what stops the app being
+      // shrunk twice down to a 37px strip.
       style={keyboardInset ? { height: `calc(100% - ${keyboardInset}px)` } : undefined}
     >
       <Header />
-      {/* Padding equal to the keyboard is what actually guarantees a field can
-          be scrolled clear of it. Measured on the reported device with the
-          keyboard open: scrollHeight === clientHeight, i.e. zero scrollable
-          slack — so nothing, native or ours, had anywhere to scroll the field
-          to. This is also the property the older build the operator remembers
-          as working had for free, simply by having a longer page; the Scan
-          screen got shorter since and lost it. With this, the slack is always
-          at least the keyboard's own height, so any field can always clear it. */}
+      {/* Bottom padding only matters on that same non-resizing device: there
+          the page keeps its full height with the keyboard over it and has no
+          slack at all (scrollHeight === clientHeight), so nothing has anywhere
+          to scroll the field to. Where the window does resize, the slack comes
+          for free and the inset is 0. */}
       <div
         ref={scrollRef}
         className="flex-1 overflow-y-auto"
