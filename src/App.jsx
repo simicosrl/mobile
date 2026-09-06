@@ -158,11 +158,19 @@ function Shell() {
   return (
     <div
       className="relative flex h-full flex-col overflow-hidden bg-page"
-      // Only used on a device whose window does not shorten itself for the
-      // keyboard; where it does (including the one this was reported on) the
-      // inset is 0 and this is left alone, which is what stops the app being
-      // shrunk twice down to a 37px strip.
-      style={keyboardInset ? { height: `calc(100% - ${keyboardInset}px)` } : undefined}
+      // While the keyboard is up, pin the app to exactly the area above it
+      // rather than trusting a percentage height. height:100% only lands in
+      // the right place if every ancestor's height is already right, and this
+      // is precisely where that kept going wrong — once by not shrinking at
+      // all, once by shrinking twice down to a 37px strip. Fixed positioning
+      // states the box outright: top of the screen to the top of the keyboard.
+      // The inset is 0 on a device whose window already resized, in which case
+      // bottom:0 is the top of the keyboard anyway.
+      style={
+        keyboardOpen
+          ? { position: 'fixed', top: 0, left: 0, right: 0, bottom: keyboardInset, height: 'auto' }
+          : undefined
+      }
     >
       <Header />
       {/* Bottom padding only matters on that same non-resizing device: there

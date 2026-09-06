@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
+import { App as CapacitorApp } from '@capacitor/app';
 import { Keyboard } from '@capacitor/keyboard';
 
 // The keyboard behaves differently on the warehouse phones than it does in any
@@ -13,6 +14,14 @@ export default function KeyboardDiagnostics() {
   const [snap, setSnap] = useState(null);
   const [frozen, setFrozen] = useState(null);
   const [events, setEvents] = useState([]);
+  // Which build is actually installed. "Nothing changed" and "the fix didn't
+  // land" look identical from a photo otherwise, and the APK is served from a
+  // CDN that can hand back a stale copy for a while after a new one is pushed.
+  const [build, setBuild] = useState(null);
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) { setBuild('web preview'); return; }
+    CapacitorApp.getInfo().then((i) => setBuild(i.version + ' (' + i.build + ')')).catch(() => setBuild('unknown'));
+  }, []);
 
   useEffect(() => {
     // Whether the window resizes for the keyboard can't be seen by comparing
@@ -108,6 +117,9 @@ export default function KeyboardDiagnostics() {
 
   return (
     <div className="flex flex-col gap-2.5">
+      <div className="rounded-xl bg-primary px-3 py-2 text-[13px] font-extrabold text-white">
+        Installed build: {build || '…'}
+      </div>
       <div className="text-[11.5px] leading-[1.5] text-secondary">
         Tap the field, then photograph this panel <b>while the keyboard is open</b>.
       </div>
