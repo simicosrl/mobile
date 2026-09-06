@@ -74,12 +74,17 @@ createRoot(document.getElementById('root')).render(
     // Breathing room above/below the field, but never more than the space
     // left over once the field itself is placed — on a short strip between
     // the header and the keyboard a fixed margin would push it back out.
-    var margin = Math.max(0, Math.min(16, (bottom - top - rect.height) / 2));
-    if (rect.bottom > bottom - margin) {
-      scroller.scrollTop += rect.bottom - (bottom - margin);
-    } else if (rect.top < top + margin) {
-      scroller.scrollTop -= top + margin - rect.top;
-    }
+    var margin = Math.max(0, Math.min(12, (bottom - top - rect.height) / 2));
+    // Park the field right above the keyboard rather than merely somewhere
+    // inside the visible strip. That is the ask — see what you are typing
+    // directly above the keys — and it is also the safest place to be: any
+    // small error in the keyboard's reported height eats into the empty space
+    // below the field instead of hiding the field itself. Only pull it up when
+    // it would otherwise be off the top, which happens on a short page where
+    // there isn't enough to scroll.
+    var want = bottom - margin - rect.height;
+    if (want < top + margin) want = top + margin;
+    scroller.scrollTop += rect.top - want;
   }
   // A single shot at a fixed delay is really a guess about how long this
   // particular device takes to animate the keyboard in and settle the new
