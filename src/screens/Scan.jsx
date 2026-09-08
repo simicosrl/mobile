@@ -87,21 +87,21 @@ export default function Scan() {
       e.preventDefault();
       submitScan(buffer);
       setBuffer('');
-      // The code is in — manual entry is over, so scanner mode resumes and
-      // the on-screen keyboard stops taking up half the screen.
-      setManualKeyboard(false);
     }
   };
 
   const boxes = parcels.reduce((a, p) => a + p.boxes, 0);
   const codeSize = last && last.code.length > 18 ? 'text-[17px]' : 'text-[21px]';
+  // The tracking field is only ever shown once the operator explicitly asks
+  // to type (manualKeyboard) — otherwise it's a 1px invisible focus target
+  // for the hardware scanner-wedge, no visible "waiting for scan…" box.
+  // Exception: with no camera fallback on this platform, hiding it would
+  // leave nothing else visible to scan with at all.
+  const showTrackingInput = manualKeyboard || !isCameraScanSupported();
 
   return (
     <div className="flex flex-col gap-3 pb-5">
-      {/* Pinned to the top of the screen so the just-scanned code stays in
-          view no matter how long the parcel list below grows — the operator
-          shouldn't have to scroll up to confirm what was just scanned. */}
-      <div className="sticky top-0 z-10 flex flex-col gap-3 bg-page px-3.5 pb-1 pt-3">
+      <div className="flex flex-col gap-3 bg-page px-3.5 pb-1 pt-3">
       <div className="flex items-center gap-2">
         <div className="rounded-full px-2 py-[3px] text-[10px] font-extrabold uppercase tracking-[.1em] text-white" style={{ background: isOut ? '#FF7A00' : '#1F6FEB' }}>
           {isOut ? 'Outbound' : 'Inbound'}
@@ -183,10 +183,9 @@ export default function Scan() {
             )}
           </>
         ) : (
-          <div className="flex flex-col items-center gap-2.5 py-3.5">
-            <ScanLine size={40} strokeWidth={1.5} className="text-light" />
-            <div className="text-[15px] font-bold text-ink">Pull the trigger to scan</div>
-            <div className="max-w-[220px] text-center text-xs text-secondary">The tracking ID lands in the field below and is submitted automatically.</div>
+          <div className="flex items-center gap-2.5 py-1">
+            <ScanLine size={22} strokeWidth={1.6} className="flex-none text-light" />
+            <div className="text-[13px] font-bold text-ink">Pull the trigger to scan</div>
           </div>
         )}
       </div>
@@ -229,50 +228,49 @@ export default function Scan() {
         )}
       </div>
 
-      <div className="rounded-[14px] border border-[rgba(148,163,184,.25)] bg-white p-3">
-        <div className="mb-2 text-[10px] font-bold uppercase tracking-[.08em] text-secondary">Tracking ID · scanner ready</div>
+      <div className="relative rounded-[14px] border border-[rgba(148,163,184,.25)] bg-white p-3">
+        <div className="mb-2 text-[10px] font-bold uppercase tracking-[.08em] text-secondary">Scanner ready</div>
         <div className="flex gap-2">
+          {/* Stays in the DOM and focused either way, so a hardware
+              scanner-wedge always has somewhere to type into — but there's
+              no reason to show an empty "waiting for scan…" box with a
+              blinking cursor for that, when the actual instant it matters
+              (a real scan lands) is already shown above, and there are
+              three explicit ways in already visible below (camera, manual
+              typing, photo). Only actually shown once the operator taps
+              "Type manually instead", so they can see what they're typing. */}
           <input
             ref={inputRef}
             value={buffer}
             onChange={(e) => setBuffer(e.target.value)}
             onKeyDown={onKey}
-            // A real tap on the box means the operator intends to type here,
-            // and that has to switch off scanner mode — otherwise the 400ms
-            // interval below force-closes the keyboard under them and the
-            // auto-submit fires on the half-typed code, clearing the box and
-            // logging a bogus parcel. Until now only the "Type manually
-            // instead" button set this, so tapping the box itself — the
-            // obvious thing to do — behaved exactly that way. A pointer event
-            // is the right signal: the scanner-wedge refocus below is a
-            // programmatic .focus() and never fires one, so hardware scanning
-            // is unaffected.
-            onPointerDown={() => setManualKeyboard(true)}
-            onBlur={() => {
-              // Don't leave manual mode just because focus flickered — the
-              // refocus interval puts it straight back, and dropping out
-              // mid-word is what made typing feel like it was fighting back.
-              // Only give up once focus has genuinely settled elsewhere.
-              setTimeout(() => {
-                if (document.activeElement !== inputRef.current) setManualKeyboard(false);
-              }, 600);
-            }}
-            placeholder="waiting for scan…"
-            className="min-h-[54px] min-w-0 flex-1 rounded-xl border-2 border-primary bg-white px-4 font-mono text-[15px] tracking-[.02em] text-ink shadow-focusring"
+            onBlur={() => setManualKeyboard(false)}
+            placeholder="Type the code…"
+            inputMode={showTrackingInput ? 'text' : 'none'}
+            aria-hidden={!showTrackingInput}
+            className={
+              showTrackingInput
+                ? 'min-h-[54px] min-w-0 flex-1 rounded-xl border-2 border-primary bg-white px-4 font-mono text-[15px] tracking-[.02em] text-ink shadow-focusring'
+                : 'absolute h-px w-px opacity-0'
+            }
           />
           {/* A real, thumb-sized button rather than a small text link — this
               is the only way to scan at all on a phone with no hardware
               engine, and even on a Zebra it's a common fallback (a badly
               printed label, a scuffed barcode), so it needs to be easy to
-              hit one-handed, not a tiny target buried in a corner. */}
+              hit one-handed, not a tiny target buried in a corner. Fills
+              the row on its own while the tracking field is hidden. */}
           {isCameraScanSupported() && (
             <button
               onClick={scanWithCamera}
               disabled={scanning}
               aria-label="Scan with camera"
-              className="flex min-h-[54px] w-[54px] flex-none items-center justify-center rounded-xl bg-primary text-white shadow-focusring disabled:opacity-60"
+              className={
+                'flex min-h-[54px] items-center justify-center gap-2 rounded-xl bg-primary text-white shadow-focusring disabled:opacity-60 ' +
+                (showTrackingInput ? 'w-[54px] flex-none' : 'flex-1 text-[14px] font-bold')
+              }
             >
-              <Camera size={22} strokeWidth={2} />
+              <Camera size={20} strokeWidth={2} /> {!showTrackingInput && (scanning ? 'Opening…' : 'Scan with camera')}
             </button>
           )}
         </div>
