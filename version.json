@@ -1,6 +1,6 @@
 {
-  "versionCode": 90,
-  "versionName": "1.0.90",
+  "versionCode": 91,
+  "versionName": "1.0.91",
   "apkUrl": "https://raw.githubusercontent.com/simicosrl/mobile/main/WMS-App-debug.apk",
-  "commit": "731cadbecc1e789e2b187d4f451edcab36ebe7d9"
+  "commit": "a41cda22273ba1b0e27ce6eb28631a32b4cbba39"
 }
