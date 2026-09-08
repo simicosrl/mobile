@@ -3,7 +3,6 @@ import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import { useApp } from '../state/AppContext';
 import { Check, Download, ChevronDown, Plus, RefreshCw } from '../components/icons';
-import KeyboardDiagnostics from '../components/KeyboardDiagnostics';
 
 // e.g. "25/08/2026 14:47" in the operator's own timezone, from the
 // server's UTC timestamp — mirrors the format already used for documents.
@@ -235,10 +234,6 @@ export default function Settings() {
           )}
         </Section>
       )}
-
-      <Section title="Diagnostics" summary="Keyboard behaviour on this device">
-        <KeyboardDiagnostics />
-      </Section>
 
       <button
         onClick={save}
