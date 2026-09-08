@@ -87,6 +87,9 @@ export default function Scan() {
       e.preventDefault();
       submitScan(buffer);
       setBuffer('');
+      // The code is in — manual entry is over, so scanner mode resumes and
+      // the on-screen keyboard stops taking up half the screen.
+      setManualKeyboard(false);
     }
   };
 
@@ -234,7 +237,26 @@ export default function Scan() {
             value={buffer}
             onChange={(e) => setBuffer(e.target.value)}
             onKeyDown={onKey}
-            onBlur={() => setManualKeyboard(false)}
+            // A real tap on the box means the operator intends to type here,
+            // and that has to switch off scanner mode — otherwise the 400ms
+            // interval below force-closes the keyboard under them and the
+            // auto-submit fires on the half-typed code, clearing the box and
+            // logging a bogus parcel. Until now only the "Type manually
+            // instead" button set this, so tapping the box itself — the
+            // obvious thing to do — behaved exactly that way. A pointer event
+            // is the right signal: the scanner-wedge refocus below is a
+            // programmatic .focus() and never fires one, so hardware scanning
+            // is unaffected.
+            onPointerDown={() => setManualKeyboard(true)}
+            onBlur={() => {
+              // Don't leave manual mode just because focus flickered — the
+              // refocus interval puts it straight back, and dropping out
+              // mid-word is what made typing feel like it was fighting back.
+              // Only give up once focus has genuinely settled elsewhere.
+              setTimeout(() => {
+                if (document.activeElement !== inputRef.current) setManualKeyboard(false);
+              }, 600);
+            }}
             placeholder="waiting for scan…"
             className="min-h-[54px] min-w-0 flex-1 rounded-xl border-2 border-primary bg-white px-4 font-mono text-[15px] tracking-[.02em] text-ink shadow-focusring"
           />
