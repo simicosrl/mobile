@@ -137,6 +137,9 @@ jobs:
             echo "== connection actually used below =="
             echo "$CONN" | sed -E 's#(://[^:]+:)[^@]+#\1<redacted>#'
             echo
+            echo "== admin.badge_countries (who can sign in, and as which country) =="
+            psql "$CONN" -c "select badge_id, country, label, active from admin.badge_countries order by country, badge_id;"
+            echo
             echo "== admin.scanner_keys =="
             psql "$CONN" -c "select * from admin.scanner_keys order by country;"
             echo
