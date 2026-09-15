@@ -28,7 +28,16 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
+      # packages: '' on purpose. The action's default is "tools platform-tools",
+      # and 'tools' is the obsolete SDK package that no longer exists in the
+      # cmdline-tools the runner image now ships (16.0) — sdkmanager exits 1 on
+      # it and takes the whole build with it ("Failed to find package 'tools'").
+      # Nothing is lost by skipping: this action is only needed to put
+      # ANDROID_HOME and sdkmanager on PATH, and the step below already installs
+      # platform-tools, the platform and the build-tools this project needs.
       - uses: android-actions/setup-android@v3
+        with:
+          packages: ''
 
       - name: Install matching Android SDK platform/build-tools
         run: |
