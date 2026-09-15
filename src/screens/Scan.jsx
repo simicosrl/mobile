@@ -101,7 +101,11 @@ export default function Scan() {
 
   return (
     <div className="flex flex-col gap-3 pb-5">
-      <div className="flex flex-col gap-3 bg-page px-3.5 pb-1 pt-3">
+      {/* Pinned: the just-scanned code has to stay in view no matter how long
+          the parcel list below grows. Scrolling back up to check what you
+          just scanned, while holding a parcel, is not a thing an operator
+          should have to do. */}
+      <div className="sticky top-0 z-10 flex flex-col gap-3 bg-page px-3.5 pb-1 pt-3">
       <div className="flex items-center gap-2">
         <div className="rounded-full px-2 py-[3px] text-[10px] font-extrabold uppercase tracking-[.1em] text-white" style={{ background: isOut ? '#FF7A00' : '#1F6FEB' }}>
           {isOut ? 'Outbound' : 'Inbound'}
