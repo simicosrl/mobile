@@ -1,16 +1,19 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
-import { BarcodeScanner, BarcodeFormat } from '@capacitor-mlkit/barcode-scanning';
+import { BarcodeScanner, BarcodeFormat, LensFacing } from '@capacitor-mlkit/barcode-scanning';
+import { scanSquare, pickAimedBarcode } from '../lib/scanRegion';
 
-// Camera-based fallback scanning for phones/tablets with no hardware scan
-// engine or Bluetooth ring scanner attached. Uses the native ML Kit barcode
-// scanner plugin's ready-made scan() UI (Google's own full-screen scanner —
-// no camera permission prompt needed on Android, no custom overlay to
-// build) rather than the web BarcodeDetector/getUserMedia APIs, which are
-// unreliable specifically inside an Android WebView (they work in a real
-// browser tab but the camera commonly never opens in an embedded WebView
-// without extra native permission-bridging that a default Capacitor
-// activity doesn't provide).
+// Camera-based fallback scanning for phones with no hardware scan engine.
+//
+// This used to call the plugin's ready-made scan() UI — Google's own
+// full-screen scanner. Convenient, but it draws a frame while accepting a code
+// from anywhere in the camera's view, so a shelf of labels behind the parcel
+// could be read instead of the one being aimed at. scan() also returns no
+// position data at all (the plugin's own docs: cornerPoints "is currently only
+// supported by the startScan(...) method"), so there was nothing to filter on.
+//
+// So: run the camera ourselves via startScan, draw our own square, and accept
+// only a code whose centre falls inside it.
 const FORMATS = [
   BarcodeFormat.Code128,
   BarcodeFormat.Code39,
@@ -28,9 +31,35 @@ export function isCameraScanSupported() {
   return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
 }
 
+// startScan puts the camera behind the WebView, so the page has to actually be
+// see-through while it runs — otherwise the operator stares at the app instead
+// of the camera.
+function setTransparent(on) {
+  document.body.classList.toggle('scanner-active', on);
+}
+
+// The back button and screen teardown both need to be able to stop a scan that
+// is already running, from outside this hook.
+let activeCancel = null;
+export function cancelActiveCameraScan() {
+  if (!activeCancel) return false;
+  activeCancel();
+  return true;
+}
+
 export function useBarcodeScanner() {
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState(null);
+  const listenerRef = useRef(null);
+
+  const teardown = useCallback(async () => {
+    activeCancel = null;
+    try { await listenerRef.current?.remove(); } catch { /* ignore */ }
+    listenerRef.current = null;
+    try { await BarcodeScanner.stopScan(); } catch { /* ignore */ }
+    setTransparent(false);
+    setScanning(false);
+  }, []);
 
   const scan = useCallback(async () => {
     if (!isCameraScanSupported()) {
@@ -38,23 +67,49 @@ export function useBarcodeScanner() {
       return null;
     }
     setError(null);
-    setScanning(true);
-    try {
-      const { available } = await BarcodeScanner.isGoogleBarcodeScannerModuleAvailable();
-      if (!available) {
-        await BarcodeScanner.installGoogleBarcodeScannerModule();
-      }
-      const result = await BarcodeScanner.scan({ formats: FORMATS });
-      const hit = result.barcodes && result.barcodes[0];
-      if (!hit) return null;
-      return hit.rawValue || hit.displayValue || null;
-    } catch (err) {
-      setError(err?.message || 'Could not open the camera scanner');
-      return null;
-    } finally {
-      setScanning(false);
-    }
-  }, []);
 
-  return { scan, scanning, error };
+    try {
+      const permission = await BarcodeScanner.requestPermissions();
+      if (permission.camera !== 'granted' && permission.camera !== 'limited') {
+        setError('Camera permission is needed to scan.');
+        return null;
+      }
+    } catch {
+      setError('Could not ask for camera permission.');
+      return null;
+    }
+
+    setScanning(true);
+    setTransparent(true);
+
+    return new Promise((resolve) => {
+      let settled = false;
+      const finish = async (value) => {
+        if (settled) return;
+        settled = true;
+        await teardown();
+        resolve(value);
+      };
+      activeCancel = () => finish(null);
+
+      BarcodeScanner.addListener('barcodesScanned', (event) => {
+        // Re-read the square every time: the operator may have rotated the
+        // phone since the scan started.
+        const square = scanSquare(window.innerWidth, window.innerHeight);
+        const aimed = pickAimedBarcode(event?.barcodes, square, window.devicePixelRatio || 1);
+        if (aimed) finish(aimed);
+      })
+        .then((handle) => {
+          listenerRef.current = handle;
+          if (settled) handle.remove().catch(() => {});
+          return BarcodeScanner.startScan({ formats: FORMATS, lensFacing: LensFacing.Back });
+        })
+        .catch((err) => {
+          setError(err?.message || 'Could not open the camera scanner');
+          finish(null);
+        });
+    });
+  }, [teardown]);
+
+  return { scan, scanning, error, cancel: () => cancelActiveCameraScan() };
 }

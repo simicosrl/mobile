@@ -5,6 +5,7 @@ import { useApp } from '../state/AppContext';
 import { docNumber, elapsedLabel } from '../lib/format';
 import { Check, TriangleAlert, ScanLine, Trash2, PenLine, Camera, X, Keyboard as KeyboardIcon } from '../components/icons';
 import { useBarcodeScanner, isCameraScanSupported } from '../hooks/useBarcodeScanner';
+import CameraScanOverlay from '../components/CameraScanOverlay';
 
 export default function Scan() {
   const app = useApp();
@@ -18,7 +19,7 @@ export default function Scan() {
   const last = parcels.length ? parcels[parcels.length - 1] : null;
   const [buffer, setBuffer] = useState('');
   const inputRef = useRef(null);
-  const { scan, scanning, error: scanError } = useBarcodeScanner();
+  const { scan, scanning, error: scanError, cancel: cancelScan } = useBarcodeScanner();
   // The tracking field stays auto-focused so a hardware scanner-wedge can
   // always type into it (DataWedge injects text via the field's
   // InputConnection regardless of whether the on-screen keyboard is
@@ -101,6 +102,7 @@ export default function Scan() {
 
   return (
     <div className="flex flex-col gap-3 pb-5">
+      {scanning && <CameraScanOverlay onCancel={cancelScan} />}
       {/* Pinned: the just-scanned code has to stay in view no matter how long
           the parcel list below grows. Scrolling back up to check what you
           just scanned, while holding a parcel, is not a thing an operator

@@ -23,3 +23,17 @@ input, textarea, button {
 /* iOS/Android safe-area padding for the bottom tab bar and header */
 .safe-top { padding-top: env(safe-area-inset-top); }
 .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+
+/* While the camera scanner runs it renders *behind* the WebView, so the page
+   has to be genuinely see-through or the operator just sees the app. The
+   overlay itself is portalled to <body>, outside #root, so it stays visible. */
+body.scanner-active,
+body.scanner-active #root {
+  background: transparent !important;
+}
+body.scanner-active #root {
+  visibility: hidden;
+}
+body.scanner-active .scan-overlay {
+  visibility: visible;
+}

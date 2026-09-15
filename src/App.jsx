@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
+import { cancelActiveCameraScan } from './hooks/useBarcodeScanner';
 import { AppProvider, useApp } from './state/AppContext';
 import Header from './components/Header';
 import BottomNav from './components/BottomNav';
@@ -40,6 +41,9 @@ function Shell() {
   useEffect(() => {
     let handle;
     CapacitorApp.addListener('backButton', () => {
+      // While the camera is up, back means "close the camera" — not "leave the
+      // screen and abandon the session underneath it".
+      if (cancelActiveCameraScan()) return;
       if (canGoBack) goBack();
       else if (screen !== 'home' && screen !== 'login') goHome();
       else CapacitorApp.exitApp();
