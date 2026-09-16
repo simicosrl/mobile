@@ -68,6 +68,30 @@ jobs:
               -d '{"document":"CI-PROBE-DOC","direction":"inbound","carrier":"CI-PROBE","driver":{"name":"CI-PROBE Driver"},"operator":"CI-PROBE","closed_at":"2026-01-01T00:00:00Z","parcels":[{"tracking":"NOCODE-CIPROBE-1","boxes":1,"no_code":{"flagged":true,"note":"CI probe note","photo":"data:image/jpeg;base64,AAAA"}}]}'
             echo
             echo
+            echo "== POST /warehouse/next-doc-number kind=ddt (the separate DDT series) =="
+            curl -sS -i -m 20 -X POST "https://piafchajbkfkyftumxke.supabase.co/functions/v1/wms-api/warehouse/next-doc-number" \
+              -H "Origin: https://localhost" -H "Authorization: Bearer ${IT_KEY}" -H "Content-Type: application/json" \
+              -d '{"kind":"ddt"}'
+            echo
+            echo
+            echo "== POST /warehouse/ddt (two shipments on the CI-PROBE session) =="
+            curl -sS -i -m 20 -X POST "https://piafchajbkfkyftumxke.supabase.co/functions/v1/wms-api/warehouse/ddt" \
+              -H "Origin: https://localhost" -H "Authorization: Bearer ${IT_KEY}" -H "Content-Type: application/json" \
+              -d '{"document":"CI-PROBE-DOC","ddts":[{"doc":"CI-PROBE-DDT-1","shipment_id":"CI-PROBE-SH-1","fba_id":"FBACIPROBE","driver":{"name":"CI-PROBE Driver","plate":"CI-000-CI","company":"CI Test Co"},"lines":[{"tracking":"NOCODE-CIPROBE-1","boxes":1}]},{"doc":"CI-PROBE-DDT-2","shipment_id":"CI-PROBE-SH-2","lines":[{"tracking":"NOCODE-CIPROBE-2","boxes":2}]}]}'
+            echo
+            echo
+            echo "== POST /warehouse/ddt again — must UPDATE, never duplicate =="
+            curl -sS -i -m 20 -X POST "https://piafchajbkfkyftumxke.supabase.co/functions/v1/wms-api/warehouse/ddt" \
+              -H "Origin: https://localhost" -H "Authorization: Bearer ${IT_KEY}" -H "Content-Type: application/json" \
+              -d '{"document":"CI-PROBE-DOC","ddts":[{"doc":"CI-PROBE-DDT-1","shipment_id":"CI-PROBE-SH-1","fba_id":"FBACIPROBE","lines":[{"tracking":"NOCODE-CIPROBE-1","boxes":1}]}]}'
+            echo
+            echo
+            echo "== POST /warehouse/ddt with an unknown session — must be refused =="
+            curl -sS -i -m 20 -X POST "https://piafchajbkfkyftumxke.supabase.co/functions/v1/wms-api/warehouse/ddt" \
+              -H "Origin: https://localhost" -H "Authorization: Bearer ${IT_KEY}" -H "Content-Type: application/json" \
+              -d '{"document":"WH-IT-OUT-DOES-NOT-EXIST","ddts":[]}'
+            echo
+            echo
             echo "== POST /warehouse/drivers (upsert a CI-PROBE test driver) =="
             curl -sS -i -m 20 -X POST "https://piafchajbkfkyftumxke.supabase.co/functions/v1/wms-api/warehouse/drivers" \
               -H "Origin: https://localhost" -H "Authorization: Bearer ${IT_KEY}" -H "Content-Type: application/json" \
@@ -155,6 +179,8 @@ jobs:
             echo "== DDT tables (outbound delivery notes) =="
             psql "$CONN" -c "select table_schema, table_name from information_schema.tables where table_name in ('ddt','ddt_lines') order by table_schema, table_name;"
             psql "$CONN" -c "select doc, shipment_id, fba_id, driver_name, created_at from wh_it.ddt order by created_at desc limit 10;"
+            echo "-- one row per (session, shipment) even though DDT-1 was pushed twice --"
+            psql "$CONN" -c "select d.doc, d.shipment_id, count(l.id) as lines from wh_it.ddt d left join wh_it.ddt_lines l on l.ddt_id = d.id group by d.doc, d.shipment_id order by d.doc;"
             psql "$CONN" -c "select country, year, last_number from admin.ddt_counters order by country, year;"
             echo
             echo "== row counts per country schema =="
@@ -175,6 +201,9 @@ jobs:
             psql "$CONN" -c "select sequencename from pg_sequences where schemaname = 'admin';"
             echo
             echo "== deleting CI-PROBE test rows from wh_it =="
+            psql "$CONN" -c "delete from wh_it.ddt_lines where ddt_id in (select id from wh_it.ddt where session_id in (select id from wh_it.sessions where carrier like 'CI-PROBE%'));"
+            psql "$CONN" -c "delete from wh_it.ddt where session_id in (select id from wh_it.sessions where carrier like 'CI-PROBE%');"
+            psql "$CONN" -c "delete from admin.ddt_counters where last_number > 0 and year = extract(year from now())::int and country = 'IT';"
             psql "$CONN" -c "delete from wh_it.parcels where session_id in (select id from wh_it.sessions where carrier like 'CI-PROBE%');"
             psql "$CONN" -c "delete from wh_it.sessions where carrier like 'CI-PROBE%';"
             psql "$CONN" -c "delete from wh_it.driver_profiles where name like 'CI-PROBE%';"
