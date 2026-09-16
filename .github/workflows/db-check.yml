@@ -83,7 +83,7 @@ jobs:
             echo "== POST /warehouse/ddt again — must UPDATE, never duplicate =="
             curl -sS -i -m 20 -X POST "https://piafchajbkfkyftumxke.supabase.co/functions/v1/wms-api/warehouse/ddt" \
               -H "Origin: https://localhost" -H "Authorization: Bearer ${IT_KEY}" -H "Content-Type: application/json" \
-              -d '{"document":"CI-PROBE-DOC","ddts":[{"doc":"CI-PROBE-DDT-1","shipment_id":"CI-PROBE-SH-1","fba_id":"FBACIPROBE","lines":[{"tracking":"NOCODE-CIPROBE-1","boxes":1}]}]}'
+              -d '{"document":"CI-PROBE-DOC","ddts":[{"doc":"CI-PROBE-DDT-1","shipment_id":"CI-PROBE-SH-1","fba_id":"FBACIPROBE","driver":{"name":"CI-PROBE Driver","plate":"CI-000-CI","company":"CI Test Co"},"lines":[{"tracking":"NOCODE-CIPROBE-1","boxes":1}]}]}'
             echo
             echo
             echo "== POST /warehouse/ddt with an unknown session — must be refused =="
@@ -203,7 +203,11 @@ jobs:
             echo "== deleting CI-PROBE test rows from wh_it =="
             psql "$CONN" -c "delete from wh_it.ddt_lines where ddt_id in (select id from wh_it.ddt where session_id in (select id from wh_it.sessions where carrier like 'CI-PROBE%'));"
             psql "$CONN" -c "delete from wh_it.ddt where session_id in (select id from wh_it.sessions where carrier like 'CI-PROBE%');"
-            psql "$CONN" -c "delete from admin.ddt_counters where last_number > 0 and year = extract(year from now())::int and country = 'IT';"
+            # Give back exactly the one number the probe above reserved — never
+            # delete the row. DDT numbering is a legal series: clearing it would
+            # restart at 1 and re-issue numbers already printed on documents that
+            # have left the building.
+            psql "$CONN" -c "update admin.ddt_counters set last_number = last_number - 1 where country = 'IT' and year = extract(year from now())::int and last_number > 0;"
             psql "$CONN" -c "delete from wh_it.parcels where session_id in (select id from wh_it.sessions where carrier like 'CI-PROBE%');"
             psql "$CONN" -c "delete from wh_it.sessions where carrier like 'CI-PROBE%';"
             psql "$CONN" -c "delete from wh_it.driver_profiles where name like 'CI-PROBE%';"

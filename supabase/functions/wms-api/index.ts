@@ -373,6 +373,11 @@ Deno.serve(async (req: Request) => {
     // updates its documents instead of creating a second set — the app retries
     // this call whenever a push failed, and a duplicated legal document is a
     // far worse outcome than a wasted write.
+    //
+    // The upsert REPLACES the row: the app is the source of truth for a DDT and
+    // always sends the complete document. A caller that sent a partial one would
+    // blank out the driver and signature on a document that has already been
+    // signed, so send everything or send nothing.
     if (req.method === "POST" && path === "/warehouse/ddt") {
       const body = await req.json();
       const sessionDoc = String(body.document || "");
