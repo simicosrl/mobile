@@ -907,6 +907,19 @@ export function AppProvider({ children }) {
     if (toastParts.length) showToast(toastParts.join(' · '));
   }, [signReady, direction, docSeq, carrier, courierCompany, shipment, courierName, plate, shift, parcels, signatureDataUrl, internalConfig, apiConfig, showToast, renderPdfDataUrl, saveDriverProfile, buildDdtsForSession]);
 
+  // Print or share one delivery note. The DDT travels with the goods, so the
+  // driver needs it at the bay — it is no use only being in the database.
+  const printDdt = useCallback(async (ddt) => {
+    try {
+      const mod = await import('../lib/pdfDoc');
+      const ddtMod = await import('../lib/ddtPdf');
+      const dataUrl = ddt.pdfDataUrl || ddtMod.ddtDataUrl(ddt, orgSettings);
+      await mod.exportPdfDataUrl(dataUrl, { doc: ddt.number });
+    } catch (err) {
+      showToast(`Could not open ${ddt.number} — ${String(err?.message || err)}`);
+    }
+  }, [orgSettings, showToast]);
+
   // ---- document export ----
   const printDocument = useCallback(async (document) => {
     try {
@@ -1175,7 +1188,7 @@ export function AppProvider({ children }) {
     noCodeSheet, openNoCodeSheet, closeNoCodeSheet, setNoCodeNote, setNoCodePhoto, saveNoCode, rejectedScan,
     courierName, setCourierName, plate, setPlate,
     signatureDataUrl, setSignatureDataUrl, sigInk, setSigInk, clearSignature, signReady, toSign, finish,
-    confirmedDoc, printDocument, emailDocument,
+    confirmedDoc, printDocument, printDdt, emailDocument,
     history: visibleHistory, historyQuery, setHistoryQuery, historyFilter, setHistoryFilter, selectedDocNo, openSession, backToHistory,
     apiConfig, apiShowKey, setApiBaseUrl, setApiKey, generateApiKey, copyApiKey, togglePush, togglePull, toggleShowKey,
     manifest, pulling, pullManifestNow, syncing, syncNow, retrySync, syncPrepPending,
@@ -1194,7 +1207,7 @@ export function AppProvider({ children }) {
     damageSheet, openDamage, closeDamage, toggleDamageType, setDamageNote, setDamagePhoto, saveDamage,
     noCodeSheet, openNoCodeSheet, closeNoCodeSheet, setNoCodeNote, setNoCodePhoto, saveNoCode, rejectedScan,
     courierName, plate, signatureDataUrl, sigInk, clearSignature, signReady, toSign, finish,
-    confirmedDoc, printDocument, emailDocument, visibleHistory, historyQuery, historyFilter, selectedDocNo, openSession, backToHistory,
+    confirmedDoc, printDocument, printDdt, emailDocument, visibleHistory, historyQuery, historyFilter, selectedDocNo, openSession, backToHistory,
     apiConfig, apiShowKey, setApiBaseUrl, setApiKey, generateApiKey, copyApiKey, togglePush, togglePull, toggleShowKey,
     manifest, pulling, pullManifestNow, syncing, syncNow, retrySync, syncPrepPending,
     orgSettings, updateOrgSettings, visibleDriverProfiles, applyDriverProfile, visibleCarriers, saveCarrier, viewingPhoto, openPhoto, closePhoto,
