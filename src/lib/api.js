@@ -181,6 +181,45 @@ export async function reserveDocNumber(config, direction) {
   return { ok: false, error: describeError(res) };
 }
 
+// Same reservation, from the separate DDT series: its own per-country
+// numbering that restarts each year ("DDT 209-OUT/2026"). A session shipping
+// two shipments reserves two numbers, one per delivery note.
+export async function reserveDdtNumber(config) {
+  const res = await request(config, '/warehouse/next-doc-number', { method: 'POST', body: { kind: 'ddt' }, timeoutMs: 10000 });
+  if (res.ok && res.data?.document) return { ok: true, document: res.data.document };
+  return { ok: false, error: describeError(res) };
+}
+
+// Pushes the outbound delivery notes for a session — one per shipment, each
+// listing only the trackings scanned in that session. Idempotent server-side
+// on (session, shipment), so a retry after a failed push updates the documents
+// rather than creating a second set.
+export async function pushDdts(config, sessionDoc, ddts) {
+  const res = await request(config, '/warehouse/ddt', {
+    method: 'POST',
+    timeoutMs: 30000,
+    body: {
+      document: sessionDoc,
+      ddts: ddts.map((d) => ({
+        doc: d.number,
+        shipment_id: d.shipmentId,
+        fba_id: d.fbaId || null,
+        driver: { name: d.driverName || null, plate: d.driverPlate || null, company: d.driverCompany || null },
+        signature: d.signatureDataUrl || null,
+        fields: d.source || null,
+        pdf: d.pdfDataUrl || null,
+        lines: (d.parcels || []).map((p) => ({
+          tracking: p.code,
+          boxes: p.boxes ?? 1,
+          condition: p.damage || null,
+        })),
+      })),
+    },
+  });
+  if (res.ok) return { ok: true, documents: res.data?.documents || [] };
+  return { ok: false, error: describeError(res) };
+}
+
 // Pulls this country's remembered driver profiles — shared across every
 // device/operator logged into it, so a driver's details survive an app
 // reinstall instead of living only in that one phone's local storage.

@@ -218,7 +218,21 @@ export default function Scan() {
           parcels.slice().reverse().map((r, i) => (
             <div key={r.code} className="flex items-center gap-2.5 border-b border-[rgba(148,163,184,.15)] px-3 py-2.5 last:border-b-0">
               <div className="w-[18px] flex-none font-mono text-[10px] text-light">{parcels.length - i}</div>
-              <div className="min-w-0 flex-1 truncate font-mono text-[11.5px] font-semibold">{r.code}</div>
+              <div className="min-w-0 flex-1">
+                <div className="truncate font-mono text-[11.5px] font-semibold">{r.code}</div>
+                {/* Outbound only: which shipping this box belongs to, so the
+                    operator can see at a glance that a parcel will land on a
+                    different delivery note — or, worse, on none at all. */}
+                {direction === 'out' && r.shipmentStatus === 'ok' && (
+                  <div className="truncate text-[10px] text-secondary">{r.fbaId || r.shipmentId}</div>
+                )}
+                {direction === 'out' && r.shipmentStatus === 'unknown' && (
+                  <div className="truncate text-[10px] font-bold text-danger">Not in Prep-Center — no DDT</div>
+                )}
+                {direction === 'out' && r.shipmentStatus === 'pending' && (
+                  <div className="truncate text-[10px] text-[#C2410C]">Shipping pending — resolves at sync</div>
+                )}
+              </div>
               {r.damage && <div className="flex-none text-[11px] font-bold text-danger">DMG</div>}
               {r.noCode && <div className="flex-none text-[11px] font-bold text-[#C2410C]">NO CODE</div>}
               <div className="flex-none text-[11px] font-bold text-ink">{r.boxes}×</div>

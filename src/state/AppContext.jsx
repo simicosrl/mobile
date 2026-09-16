@@ -5,6 +5,8 @@ import { DAMAGE_TYPES, carriersForCountry } from '../lib/carriers';
 import { hhmm, stamp, docNumber } from '../lib/format';
 import { feedback } from '../lib/audio';
 import * as api from '../lib/api';
+import { resolveTrackings } from '../lib/prepCenter';
+import { groupForDdt } from '../lib/ddtGrouping';
 import { checkForUpdate, openDownload } from '../lib/updateCheck';
 
 const AppCtx = createContext(null);
@@ -62,6 +64,10 @@ export function AppProvider({ children }) {
   const [selectedDocNo, setSelectedDocNo] = useState(null);
 
   const [apiConfig, setApiConfig] = useState(INITIAL_API_CONFIG);
+  // Tracking -> the prep center's shipping record, for the open session only.
+  // Cleared with the session: a shipment's contents can change between days,
+  // and a DDT must describe what is in the boxes leaving today.
+  const shipmentCacheRef = useRef(new Map());
   const [apiShowKey, setApiShowKey] = useState(false);
   const [manifest, setManifest] = useState({ codes: [], lastPulledAt: null });
   const [pulling, setPulling] = useState(false);
@@ -367,6 +373,7 @@ export function AppProvider({ children }) {
     }
     setDirection(dir);
     setParcels([]);
+    shipmentCacheRef.current.clear();
     setConfirmedDoc(null);
     setSignatureDataUrl(null);
     setSigInk(false);
@@ -379,6 +386,59 @@ export function AppProvider({ children }) {
   }, [parcels.length, screen, direction, showToast]);
   const toScan = useCallback(() => { setSessionStartedAt(Date.now()); setScreen('scan'); }, []);
 
+  // ---- outbound: which shipment does this box belong to? ----
+  // A DDT is built per shipment, so an outbound scan has to be placed against
+  // the prep center's shipping record. One shipment can hold ~200 trackings and
+  // an operator may scan dozens of them, so the answer is cached per shipment
+  // for the session: 40 boxes of one shipment cost one call, not 40.
+  //
+  // Deliberately fire-and-forget. Scanning is the one thing in this app that
+  // must never wait on a network — the parcel is recorded first and patched
+  // when (or if) the answer arrives; a parcel left `pending` is resolved again
+  // at sync time rather than blocking the operator at the loading bay.
+  const apiConfigRef = useRef(apiConfig);
+  useEffect(() => { apiConfigRef.current = apiConfig; }, [apiConfig]);
+
+  const patchParcel = useCallback((code, patch) => {
+    setParcels((list) => list.map((p) => (p.code === code ? { ...p, ...patch } : p)));
+  }, []);
+
+  const applyShipment = useCallback((code, shipment) => {
+    const boxInfo = shipment?.byTracking?.get(code) || null;
+    patchParcel(code, {
+      shipmentId: shipment.shipmentId,
+      fbaId: shipment.fbaId || null,
+      weightKg: boxInfo?.weightKg ?? null,
+      contents: boxInfo?.contents || [],
+      shipmentStatus: 'ok',
+      shipmentError: null,
+    });
+  }, [patchParcel]);
+
+  const resolveShipmentForCode = useCallback(async (code) => {
+    const cached = shipmentCacheRef.current.get(code);
+    if (cached) { applyShipment(code, cached); return; }
+    const config = apiConfigRef.current;
+    if (!config?.baseUrl) {
+      patchParcel(code, { shipmentStatus: 'pending', shipmentError: 'Prep-Center not configured' });
+      return;
+    }
+    const res = await resolveTrackings(config, [code]);
+    const shipment = res.shipments.get(code);
+    if (shipment) {
+      for (const t of shipment.byTracking.keys()) shipmentCacheRef.current.set(t, shipment);
+      applyShipment(code, shipment);
+      return;
+    }
+    // Two different failures that must not be confused. `unknown` means the
+    // prep center answered and has never heard of this label — it cannot go on
+    // a DDT. `pending` means we could not ask; it is resolved later.
+    patchParcel(code, {
+      shipmentStatus: res.ok ? 'unknown' : 'pending',
+      shipmentError: res.ok ? 'Not found in Prep-Center' : res.error || 'Prep-Center unreachable',
+    });
+  }, [applyShipment, patchParcel]);
+
   // ---- scanning ----
   const accept = useCallback((code) => {
     const expected = apiConfig.autoPull && manifest.codes.length ? manifest.codes.includes(code) : null;
@@ -386,7 +446,8 @@ export function AppProvider({ children }) {
     setParcels((p) => p.concat([{ code, carrier, boxes: 1, time: hhmm(), damage: null, photo: null, expected }]));
     setFlash('ok');
     setTimeout(() => setFlash((f) => (f === 'ok' ? null : f)), 700);
-  }, [apiConfig.autoPull, manifest.codes, carrier]);
+    if (direction === 'out') resolveShipmentForCode(code);
+  }, [apiConfig.autoPull, manifest.codes, carrier, direction, resolveShipmentForCode]);
 
   const submitScan = useCallback((raw) => {
     const code = String(raw || '').trim().toUpperCase();
@@ -660,6 +721,77 @@ export function AppProvider({ children }) {
   // gets the real document instead of having to re-derive its own from the
   // structured fields. Non-fatal: the session still sends without it if
   // rendering fails for some reason.
+  // Build the outbound delivery notes for a signed session: one per shipment,
+  // each listing only the trackings scanned in this session. The same signature
+  // and driver details go on every one — the driver signed for the whole
+  // handover, whichever shipments it happened to span.
+  //
+  // Anything the prep center could not place is deliberately left out and
+  // reported instead. A tracking on a DDT that the shipping record does not
+  // recognise would be a false statement on a legal transport document.
+  const buildDdtsForSession = useCallback(async (document) => {
+    if (document.direction !== 'out') return { ddts: [], excluded: [] };
+    const { groups, unresolved } = groupForDdt(
+      (document.parcels || []).map((p) => ({
+        ...p,
+        // groupForDdt keys on shipmentId; a parcel the prep center rejected
+        // outright must not be grouped even if a stale id is still on it.
+        shipmentId: p.shipmentStatus === 'ok' ? p.shipmentId : null,
+      })),
+    );
+    if (!groups.length) return { ddts: [], excluded: unresolved };
+
+    const mod = await import('../lib/ddtPdf');
+    const ddts = [];
+    for (const group of groups) {
+      const shipment = shipmentCacheRef.current.get(group.parcels[0].code) || {};
+      // Each DDT takes its own number from the DDT series. Reserved
+      // server-side like every other document number; if that call fails the
+      // document is still produced, marked so the office can see the number
+      // was not the database's.
+      let number = null;
+      if (internalConfig) {
+        const res = await api.reserveDdtNumber(internalConfig);
+        if (res.ok) number = res.document;
+      }
+      const ddt = {
+        ...group,
+        number: number || `DDT (local) ${group.shipmentId}`,
+        numberReserved: Boolean(number),
+        // A DDT is dated, not timestamped — `document.date` carries the time
+        // too ("16/09/2026 · 20:56"), which belongs in the collection field,
+        // not in "no. DDT 211-OUT/2026 del ...".
+        date: String(document.date || '').split('·')[0].trim(),
+        pickup: shipment.pickup || [],
+        customer: shipment.customer || [],
+        destination: shipment.destination || [],
+        carrier: shipment.carrier || document.carrier || null,
+        reason: shipment.reason || null,
+        goodsDescription: shipment.goodsDescription || 'Box',
+        collectionAt: document.date,   // date and time: when the driver took them
+        prepAt: shipment.prepAt || null,
+        references: [
+          shipment.fbaId || group.fbaId ? `Inbound Plan ID: ${shipment.fbaId || group.fbaId}` : null,
+          shipment.amazonReference ? `Amazon reference number: ${shipment.amazonReference}` : null,
+        ].filter(Boolean),
+        legalNote: shipment.legalNote || null,
+        confirmationLine: shipment.packingGroup ? `Packing group ${shipment.packingGroup}` : null,
+        driverName: document.driverName || null,
+        driverCompany: document.courierCompany || null,
+        driverPlate: document.plate || null,
+        signedAt: document.docTime || null,
+        signatureDataUrl: document.signatureDataUrl || null,
+        // Kept verbatim for the audit trail — see the `fields` column.
+        source: shipment.raw || null,
+        contentsPerBox: shipment.contentsPerBox !== false,
+      };
+      let pdfDataUrl = null;
+      try { pdfDataUrl = mod.ddtDataUrl(ddt, orgSettings); } catch { pdfDataUrl = null; }
+      ddts.push({ ...ddt, pdfDataUrl });
+    }
+    return { ddts, excluded: unresolved };
+  }, [internalConfig, orgSettings]);
+
   const renderPdfDataUrl = useCallback(async (document) => {
     try {
       const mod = await import('../lib/pdfDoc');
@@ -728,7 +860,10 @@ export function AppProvider({ children }) {
     setSessionStartedAt(null);
 
     const pdfDataUrl = await renderPdfDataUrl(document);
-    let updated = document;
+    // Outbound only: the delivery notes that travel with the goods. Built here,
+    // after the driver has signed, because the signature belongs on every one.
+    const { ddts, excluded } = await buildDdtsForSession(document);
+    let updated = ddts.length || excluded.length ? { ...document, ddts, ddtExcluded: excluded.map((p) => p.code) } : document;
     const toastParts = [];
     // Always saved to our own database — this isn't optional, unlike the
     // Prep-Center push below.
@@ -737,6 +872,24 @@ export function AppProvider({ children }) {
       const syncError = res.ok ? null : api.describeError(res);
       updated = { ...updated, syncStatus: res.ok ? 'ok' : 'failed', syncError };
       toastParts.push(res.ok ? `${doc} saved` : `${doc} failed to save — ${syncError}`);
+      // The DDTs hang off the saved session, so they can only go after it.
+      if (res.ok && ddts.length) {
+        const ddtRes = await api.pushDdts(internalConfig, doc, ddts);
+        updated = { ...updated, ddtSyncStatus: ddtRes.ok ? 'ok' : 'failed', ddtSyncError: ddtRes.ok ? null : ddtRes.error };
+        toastParts.push(
+          ddtRes.ok
+            ? `${ddts.length} DDT${ddts.length > 1 ? 's' : ''} saved`
+            : `DDT save failed — ${ddtRes.error}`,
+        );
+      } else if (ddts.length) {
+        updated = { ...updated, ddtSyncStatus: 'pending', ddtSyncError: null };
+      }
+    }
+    // Loudly, not silently: a box left off a delivery note is a box that
+    // legally never left, and the operator is the only one who can still fix it
+    // while the driver is at the bay.
+    if (excluded.length) {
+      toastParts.push(`${excluded.length} parcel${excluded.length > 1 ? 's' : ''} not on any DDT — no shipment found`);
     }
     // Separate, optional: also push to the Prep-Center connection from the
     // API screen, if one is configured and enabled. If it isn't, this
@@ -752,7 +905,7 @@ export function AppProvider({ children }) {
     setHistory((h) => h.map((d) => (d.doc === doc && d.country === document.country ? { ...d, ...updated } : d)));
     setConfirmedDoc((c) => (c && c.doc === doc && c.country === document.country ? { ...c, ...updated } : c));
     if (toastParts.length) showToast(toastParts.join(' · '));
-  }, [signReady, direction, docSeq, carrier, courierCompany, shipment, courierName, plate, shift, parcels, signatureDataUrl, internalConfig, apiConfig, showToast, renderPdfDataUrl, saveDriverProfile]);
+  }, [signReady, direction, docSeq, carrier, courierCompany, shipment, courierName, plate, shift, parcels, signatureDataUrl, internalConfig, apiConfig, showToast, renderPdfDataUrl, saveDriverProfile, buildDdtsForSession]);
 
   // ---- document export ----
   const printDocument = useCallback(async (document) => {
@@ -911,6 +1064,13 @@ export function AppProvider({ children }) {
     // country is connected right now (the backend trusts the auth key for
     // schema routing, not the payload's own country field).
     const pending = history.filter((d) => d.syncStatus !== 'ok' && d.country === shift?.country);
+    // A session can be saved while its delivery notes are not — the DDT push is
+    // a second call, and the phone can lose the network between the two. These
+    // are retried on their own, or the DDTs of an otherwise-synced session
+    // would never be sent at all.
+    const ddtPending = history.filter(
+      (d) => d.country === shift?.country && d.syncStatus === 'ok' && d.ddtSyncStatus && d.ddtSyncStatus !== 'ok' && (d.ddts || []).length,
+    );
     let okCount = 0;
     let failCount = 0;
     let lastError = null;
@@ -919,7 +1079,20 @@ export function AppProvider({ children }) {
       const res = await api.pushSession(internalConfig, { ...d, pdfDataUrl });
       const syncError = res.ok ? null : api.describeError(res);
       if (res.ok) okCount++; else { failCount++; lastError = syncError; }
-      const updated = { ...d, syncStatus: res.ok ? 'ok' : 'failed', syncError };
+      let updated = { ...d, syncStatus: res.ok ? 'ok' : 'failed', syncError };
+      if (res.ok && (d.ddts || []).length) {
+        const ddtRes = await api.pushDdts(internalConfig, d.doc, d.ddts);
+        updated = { ...updated, ddtSyncStatus: ddtRes.ok ? 'ok' : 'failed', ddtSyncError: ddtRes.ok ? null : ddtRes.error };
+      }
+      await docPut(updated);
+      setHistory((h) => h.map((x) => (x.doc === d.doc && x.country === d.country ? { ...x, ...updated } : x)));
+    }
+    let ddtOk = 0;
+    let ddtFail = 0;
+    for (const d of ddtPending) {
+      const ddtRes = await api.pushDdts(internalConfig, d.doc, d.ddts);
+      if (ddtRes.ok) ddtOk++; else ddtFail++;
+      const updated = { ...d, ddtSyncStatus: ddtRes.ok ? 'ok' : 'failed', ddtSyncError: ddtRes.ok ? null : ddtRes.error };
       await docPut(updated);
       setHistory((h) => h.map((x) => (x.doc === d.doc && x.country === d.country ? { ...x, ...updated } : x)));
     }
@@ -930,6 +1103,7 @@ export function AppProvider({ children }) {
     const parts = [
       !pending.length ? 'DB: nothing pending' : failCount ? `DB: ${okCount} sent, ${failCount} failed — ${lastError}` : `DB: ${okCount} sent`,
     ];
+    if (ddtOk || ddtFail) parts.push(ddtFail ? `DDT: ${ddtOk} sent, ${ddtFail} failed` : `DDT: ${ddtOk} sent`);
     if (apiConfig.baseUrl) {
       parts.push(
         !prepResult.attempted ? 'Prep-Center: up to date'

@@ -152,8 +152,13 @@ jobs:
             echo "== wh_it.parcels (last 10, any code) =="
             psql "$CONN" -x -c "select * from wh_it.parcels order by 1 desc limit 10;"
             echo
+            echo "== DDT tables (outbound delivery notes) =="
+            psql "$CONN" -c "select table_schema, table_name from information_schema.tables where table_name in ('ddt','ddt_lines') order by table_schema, table_name;"
+            psql "$CONN" -c "select doc, shipment_id, fba_id, driver_name, created_at from wh_it.ddt order by created_at desc limit 10;"
+            psql "$CONN" -c "select country, year, last_number from admin.ddt_counters order by country, year;"
+            echo
             echo "== row counts per country schema =="
-            psql "$CONN" -c "select 'it' as country, (select count(*) from wh_it.sessions) as sessions, (select count(*) from wh_it.parcels) as parcels;"
+            psql "$CONN" -c "select 'it' as country, (select count(*) from wh_it.sessions) as sessions, (select count(*) from wh_it.parcels) as parcels, (select count(*) from wh_it.ddt) as ddt;"
             psql "$CONN" -c "select 'fr' as country, (select count(*) from wh_fr.sessions) as sessions, (select count(*) from wh_fr.parcels) as parcels;"
             psql "$CONN" -c "select 'de' as country, (select count(*) from wh_de.sessions) as sessions, (select count(*) from wh_de.parcels) as parcels;"
           } > db-check-result.txt 2>&1

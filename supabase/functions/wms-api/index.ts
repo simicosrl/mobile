@@ -167,8 +167,20 @@ Deno.serve(async (req: Request) => {
     // resets the local counter, or a second operator/device is mid-session
     // at the same time) — the database number was always correct, but the
     // printed one wasn't guaranteed to match it.
+    //
+    // `kind: "ddt"` reserves from the separate DDT series instead — its own
+    // per-country numbering that restarts each year ("DDT 209-OUT/2026"), which
+    // is how delivery notes are numbered and how the prep center's own
+    // documents read. A session shipping two shipments reserves two numbers.
     if (req.method === "POST" && path === "/warehouse/next-doc-number") {
       const body = await req.json().catch(() => ({}));
+      if (body.kind === "ddt") {
+        const { data: ddtDoc, error: ddtErr } = await supabase
+          .schema("admin")
+          .rpc("next_ddt_number", { p_country: auth.country });
+        if (ddtErr) return json({ error: ddtErr.message }, 500);
+        return json({ document: ddtDoc });
+      }
       const { data: doc, error: docErr } = await supabase
         .schema("admin")
         .rpc("next_doc_number", { p_country: auth.country, p_direction: body.direction });
@@ -351,6 +363,74 @@ Deno.serve(async (req: Request) => {
         if (parcelErr) return json({ error: parcelErr.message }, 500);
       }
       return json({ ok: true, document: doc });
+    }
+
+    // POST /warehouse/ddt — the outbound delivery notes for one session.
+    //
+    // A session produces one DDT per shipment, each listing only the trackings
+    // actually scanned in that session. Written as an upsert on
+    // (session_id, shipment_id) so re-syncing a session that already synced
+    // updates its documents instead of creating a second set — the app retries
+    // this call whenever a push failed, and a duplicated legal document is a
+    // far worse outcome than a wasted write.
+    if (req.method === "POST" && path === "/warehouse/ddt") {
+      const body = await req.json();
+      const sessionDoc = String(body.document || "");
+      if (!sessionDoc) return json({ error: "document is required" }, 400);
+
+      const { data: session, error: findErr } = await supabase
+        .schema(schema)
+        .from("sessions")
+        .select("id")
+        .eq("doc", sessionDoc)
+        .maybeSingle();
+      if (findErr) return json({ error: findErr.message }, 500);
+      if (!session) return json({ error: "unknown session document" }, 404);
+
+      const saved: string[] = [];
+      for (const d of body.ddts || []) {
+        if (!d.shipment_id) return json({ error: "shipment_id is required on every DDT" }, 400);
+        const { data: row, error: ddtErr } = await supabase
+          .schema(schema)
+          .from("ddt")
+          .upsert(
+            {
+              doc: d.doc,
+              session_id: session.id,
+              shipment_id: String(d.shipment_id),
+              fba_id: d.fba_id ?? null,
+              driver_name: d.driver?.name ?? null,
+              driver_plate: d.driver?.plate ?? null,
+              driver_company: d.driver?.company ?? null,
+              signature: d.signature ?? null,
+              // Kept verbatim: a DDT is a legal transport document, so what the
+              // prep center actually told us has to stay reconstructable.
+              fields: d.fields ?? null,
+              pdf: d.pdf ?? null,
+            },
+            { onConflict: "session_id,shipment_id" },
+          )
+          .select("id, doc")
+          .single();
+        if (ddtErr) return json({ error: ddtErr.message }, 500);
+
+        // Replace the lines rather than appending, so a re-sync of a corrected
+        // session does not leave the old tracking list behind next to the new.
+        const { error: delErr } = await supabase.schema(schema).from("ddt_lines").delete().eq("ddt_id", row.id);
+        if (delErr) return json({ error: delErr.message }, 500);
+        const lines = (d.lines || []).map((l: any) => ({
+          ddt_id: row.id,
+          tracking: l.tracking,
+          boxes: l.boxes ?? 1,
+          condition: l.condition ?? null,
+        }));
+        if (lines.length) {
+          const { error: lineErr } = await supabase.schema(schema).from("ddt_lines").insert(lines);
+          if (lineErr) return json({ error: lineErr.message }, 500);
+        }
+        saved.push(row.doc);
+      }
+      return json({ ok: true, documents: saved });
     }
 
     // GET /warehouse/manifest?date=today — expected tracking IDs, this
