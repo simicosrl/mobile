@@ -1,0 +1,14 @@
+# Parcels to ask the Prep-Center about, one SHA-256 per line.
+#
+# Never the tracking number itself: this file is in version control, and a
+# tracking number identifies a real customer's goods. The probe hashes every ID
+# in the Prep-Center's manifest and matches, so it can answer "is this one
+# resolvable, and what does it carry?" without the repo ever holding the answer
+# to "which parcel is it?".
+#
+#   printf '%s' "1Z..." | sha256sum
+#
+# Both the upper- and lower-case spelling of the same ID are matched, so either
+# hash works.
+
+db8eac1041f5c3871ec17febdad74668dac7166f7016a4690c7be0716f80f1f8

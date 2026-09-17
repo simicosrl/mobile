@@ -228,6 +228,71 @@ try:
 except Exception:                                            # noqa: BLE001
     print('  unparseable')
 
+
+# ---------------------------------------------------------------------------
+# Asking about one particular parcel, without writing its number down.
+#
+# A tracking number identifies a real customer's goods and this report is
+# committed to the repo, so the ID is never passed in or printed. What is passed
+# is its SHA-256: the probe hashes each manifest entry, finds the one that
+# matches, and reports the verdict. A hash answers "is this one resolvable?"
+# without the file ever carrying the answer to "which parcel is it?".
+ASK_FILE = '.github/prep-probe-ask.txt'
+wanted = []
+try:
+    for line in open(ASK_FILE, encoding='utf-8'):
+        line = line.split('#')[0].strip().lower()
+        if len(line) == 64:
+            wanted.append(line)
+except FileNotFoundError:
+    pass
+
+if wanted:
+    import hashlib
+    print()
+    print('=== the specific parcels asked about ===')
+    by_hash = {}
+    for t in ids:
+        by_hash[hashlib.sha256(t.encode()).hexdigest()] = t
+        by_hash[hashlib.sha256(t.upper().encode()).hexdigest()] = t
+        by_hash[hashlib.sha256(t.lower().encode()).hexdigest()] = t
+    for h in wanted:
+        tid = by_hash.get(h)
+        label = h[:12] + '…'
+        if not tid:
+            print('  %s  NOT in the manifest at all' % label)
+            continue
+        print('  %s  in the manifest' % label)
+        st, _, tx = call('POST', path, {'trackings': [tid]})
+        try:
+            b = json.loads(tx)
+            ship = (b.get('shipments') if isinstance(b, dict) else b) or []
+        except Exception:                                    # noqa: BLE001
+            ship = []
+        if not ship:
+            print('             resolve -> %s, no shipment' % st)
+            continue
+        s0 = ship[0]
+        bx = (s0.get('boxes') or [{}])[0]
+        print('             resolve -> %s, shipmentId present: %s, fbaId present: %s'
+              % (st, bool(s0.get('shipmentId')), bool(s0.get('fbaId'))))
+        print('             weightKg: %s, contents lines: %d'
+              % (bx.get('weightKg'), len(bx.get('contents') or [])))
+        qty = sum(int(c.get('qty') or 0) for c in (bx.get('contents') or []))
+        print('             total units in the box: %d' % qty)
+        # Scanners are not always consistent about case; if their lookup is
+        # case-sensitive, a lower-case scan would silently resolve to nothing.
+        for variant, name in ((tid.lower(), 'lower-case'), (tid.upper(), 'upper-case')):
+            if variant == tid:
+                continue
+            st2, _, tx2 = call('POST', path, {'trackings': [variant]})
+            try:
+                b2 = json.loads(tx2)
+                n2 = len((b2.get('shipments') if isinstance(b2, dict) else b2) or [])
+            except Exception:                                # noqa: BLE001
+                n2 = -1
+            print('             same ID as %s -> %d shipment(s)' % (name, n2))
+
 print()
 print('=== does it say why nothing matched? ===')
 st, hdrs, tx = call('POST', path, {'trackings': sample})
