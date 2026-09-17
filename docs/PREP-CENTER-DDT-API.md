@@ -8,6 +8,28 @@ Settings → API** (base URL + key). No new credential.
 
 ---
 
+## What your endpoint answers today
+
+Probed with a valid key, read-only, across the obvious route names. It answers
+exactly one:
+
+```
+GET  /warehouse/manifest        200   { "tracking_ids": [ ...47 strings... ] }
+GET  /warehouse/manifest?date=  200   same shape
+everything else                 404
+```
+
+So the connection, the key and CORS all work — a tracking ID can be confirmed
+as known or unknown, and nothing more. A flat list of IDs cannot say which
+shipping a box belongs to or what is inside it, which is what a DDT has to
+state. That is the whole of the gap.
+
+Until it exists the operator types the shipping reference by hand on the scan
+screen and the app issues the DDTs from that. It works, but the document then
+carries no itemised contents and no weights — only the box count.
+
+---
+
 ## The call
 
 ```
