@@ -81,3 +81,40 @@ ids=(json.load(open("/tmp/pm")).get("tracking_ids") or [])
 t=sys.argv[1]
 print("  %d ids, %s present: %s" % (len(ids), t, "YES" if t in ids else "no"))' "$TRACKING" 2>/dev/null || echo "  (unreadable)"
 fi
+
+# ---------------------------------------------------------------------------
+# Their edge function exposes one route and it carries no shipment data. But a
+# Supabase project also serves its tables directly over PostgREST, and if this
+# key is accepted there, the data a DDT needs can be read without anyone
+# writing a new endpoint. Read-only, and it stops at listing what exists.
+REST="${BASE%%/functions/*}/rest/v1"
+echo
+echo "=== is the database readable directly (PostgREST)? ==="
+echo "  base: $REST"
+for hdr in "apikey: ${KEY}" "Authorization: Bearer ${KEY}"; do
+  code=$(curl -sS -m 20 -o /tmp/pr -w '%{http_code}' "$REST/" -H "$hdr" -H "apikey: ${KEY}" 2>/dev/null || echo 000)
+  echo "  $code  GET /rest/v1/   (${hdr%%:*})"
+  if [ "$code" = "200" ]; then
+    python3 -c '
+import json
+d=json.load(open("/tmp/pr"))
+paths=[p.strip("/") for p in (d.get("paths") or {}) if p!="/"]
+print("     tables exposed:", len(paths))
+for p in paths[:40]: print("       -", p)' 2>/dev/null || head -c 200 /tmp/pr
+    break
+  fi
+done
+
+echo
+echo "=== likely shipment tables ==="
+for t in shipments shipping shippings parcels boxes packages trackings tracking_codes \
+         manifest_codes orders products items fba_shipments inbound_plans; do
+  code=$(curl -sS -m 15 -o /tmp/pt -w '%{http_code}' "$REST/$t?limit=1" -H "apikey: ${KEY}" -H "Authorization: Bearer ${KEY}" 2>/dev/null || echo 000)
+  if [ "$code" = "200" ]; then
+    echo "  200  $t"
+    python3 -c '
+import json
+d=json.load(open("/tmp/pt"))
+print("       columns:", list(d[0].keys()) if d else "(table empty)")' 2>/dev/null || true
+  fi
+done
