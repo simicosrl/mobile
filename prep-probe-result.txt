@@ -11,3 +11,10 @@ Base: https://muswtkzjfrldhgokkmqw.supabase.co/functions/v1/warehouse-scan-api
 === full shape of the manifest response ===
   keys: ['tracking_ids']
   tracking_ids: list of 47, element type str
+
+=== is the database readable directly (PostgREST)? ===
+  base: https://muswtkzjfrldhgokkmqw.supabase.co/rest/v1
+  401  GET /rest/v1/   (apikey)
+  401  GET /rest/v1/   (Authorization)
+
+=== likely shipment tables ===
