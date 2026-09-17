@@ -1,0 +1,13 @@
+Probing with a key.
+Base: https://muswtkzjfrldhgokkmqw.supabase.co/functions/v1/warehouse-scan-api
+
+=== routes that are NOT 404 ===
+  200  GET /warehouse/manifest
+        {tracking_ids: [47 x str]}
+  200  GET /warehouse/manifest?date=today
+        {tracking_ids: [47 x str]}
+  (2 routes answered something other than 404)
+
+=== full shape of the manifest response ===
+  keys: ['tracking_ids']
+  tracking_ids: list of 47, element type str
