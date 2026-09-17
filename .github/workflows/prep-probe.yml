@@ -93,21 +93,33 @@ jobs:
             -H 'Content-Type: application/json' -H 'Origin: https://localhost' \
             -d "{\"trackings\":[\"$TRACKING\"]}"
 
-          # If that route does not exist, one of these names probably does. The
-          # point is to find the route they already have rather than ask them to
-          # build a new one.
-          for p in /shipments /shipment /resolve /trackings/resolve /parcels/resolve /boxes/resolve /warehouse/shipments; do
-            show "POST $p" -X POST "$BASE$p" "${AUTH[@]}" \
-              -H 'Content-Type: application/json' -H 'Origin: https://localhost' \
-              -d "{\"trackings\":[\"$TRACKING\"]}"
-          done
-
           show "POST /definitely-not-a-real-route-xyz (control: what an unknown route looks like)" \
             -X POST "$BASE/definitely-not-a-real-route-xyz" "${AUTH[@]}" \
             -H 'Content-Type: application/json' -H 'Origin: https://localhost' -d '{}'
 
-          show "GET /shipments?tracking=…" "$BASE/shipments?tracking=$TRACKING" "${AUTH[@]}" -H 'Origin: https://localhost'
-          show "GET /tracking/{id}" "$BASE/tracking/$TRACKING" "${AUTH[@]}" -H 'Origin: https://localhost'
+          # Their 404 body and CORS headers have the same shape as our own
+          # wms-api, which suggests this function was built to the same contract
+          # — the one in docs/WMS-App-API-Integration-Guide.pdf, which the app's
+          # Prep-Center push already talks. If so, its real surface is these.
+          #
+          # GET only, deliberately. A POST to /warehouse/sessions would create a
+          # document in someone's live system; discovering a route is never worth
+          # writing data to find out.
+          echo
+          echo "###############################################################"
+          echo "# Does this function speak the app's own protocol?"
+          echo "###############################################################"
+          echo
+
+          for p in "/warehouse/manifest?date=today" /warehouse/drivers /warehouse/carriers "/warehouse/sessions?days=1"; do
+            show "GET $p" "$BASE$p" "${AUTH[@]}" -H 'Origin: https://localhost'
+          done
+          show "GET /admin/badge-country/BADGE-IONUT" "$BASE/admin/badge-country/BADGE-IONUT" "${AUTH[@]}" -H 'Origin: https://localhost'
+
+          # Anything that might simply list what exists.
+          for p in /health /status /routes /openapi.json /api /v1; do
+            show "GET $p" "$BASE$p" "${AUTH[@]}" -H 'Origin: https://localhost'
+          done
 
           echo "───────────────────────────────────────────────"
           echo "Read the statuses: 404 = no such route, 401 = route wants a key,"
