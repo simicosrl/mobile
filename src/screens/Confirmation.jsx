@@ -50,6 +50,19 @@ export default function Confirmation() {
                   The Prep-Center answered, and does not recognise {unknown.length > 1 ? 'these tracking IDs' : 'this tracking ID'}:
                 </div>
                 <div className="mt-1 font-mono text-[11px] text-ink">{unknown.map((d) => d.code).join(', ')}</div>
+                {/* One unrecognised label is a label to go and check. Every
+                    label in the session unrecognised is not twenty bad labels —
+                    it is the Prep-Center holding no shipping for any of them,
+                    and the operator can finish the handover right now by typing
+                    the reference. Sending them to inspect the labels instead
+                    would waste the time the driver is standing there. */}
+                {unknown.length === detail.length && unknown.length > 2 && (
+                  <div className="mt-1.5 text-[10.5px] leading-[1.45] text-light">
+                    Not one parcel in this session was recognised, so this is far more likely
+                    to be the Prep-Center than the labels. Type the shipping reference on the
+                    scan screen and the delivery notes are issued from that.
+                  </div>
+                )}
               </>
             )}
             {unchecked.length > 0 && (

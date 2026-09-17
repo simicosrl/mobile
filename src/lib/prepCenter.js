@@ -13,9 +13,11 @@
 
 import { describeError } from './api';
 
-// The route is a placeholder until their docs land — kept here, alone, so it is
-// one edit rather than a search across the app.
-export const RESOLVE_PATH = '/shipments/resolve';
+// Their real route, confirmed against the live endpoint: /shipments/resolve
+// answers 404, /warehouse/shipments/resolve answers 200. One path segment, and
+// the difference is every box resolving or every box reported as unknown.
+// Kept here, alone, so a future move is one edit rather than a search.
+export const RESOLVE_PATH = '/warehouse/shipments/resolve';
 
 function withTimeout(ms) {
   const controller = new AbortController();
