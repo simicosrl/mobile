@@ -44,107 +44,11 @@ jobs:
           BASE: ${{ github.event.inputs.base_url || 'https://muswtkzjfrldhgokkmqw.supabase.co/functions/v1/warehouse-scan-api' }}
           # Prefer a repository secret so the key never appears in a log or in
           # run metadata; the dispatch input stays as a fallback.
-          KEY: ${{ secrets.PREP_API_KEY || github.event.inputs.api_key }}
+          PREP_API_KEY: ${{ secrets.PREP_API_KEY || github.event.inputs.api_key }}
           TRACKING: ${{ github.event.inputs.tracking }}
         run: |
           set -u
-          exec > >(tee prep-probe-result.txt) 2>&1
-          BASE="${BASE%/}"
-
-          # Show status, content-type and the first part of the body — enough to
-          # tell "route does not exist" from "route exists but wants auth" from
-          # "route answered and this is its shape", without dumping a payload
-          # that might carry customer data into a public log.
-          show() {
-            local label="$1"; shift
-            echo "───────────────────────────────────────────────"
-            echo "== $label"
-            echo "   $*" | sed "s/Bearer [^ ]*/Bearer <redacted>/g"
-            local out
-            out=$(curl -sS -m 25 -D /tmp/h -o /tmp/b -w '%{http_code}' "$@" 2>&1) || out="(request failed)"
-            echo "   -> HTTP $out"
-            grep -i '^content-type:' /tmp/h | head -1 | sed 's/^/   /' || true
-            grep -i '^access-control-' /tmp/h | sed 's/^/   /' || true
-            echo "   body (first 400 chars):"
-            # The manifest body is a list of real customer tracking numbers and
-            # this file is committed — report its shape, not its contents.
-            if grep -q '"tracking_ids"' /tmp/b 2>/dev/null; then
-              python3 -c 'import json;ids=json.load(open("/tmp/b")).get("tracking_ids") or [];print("   | {\"tracking_ids\": [ %d entries, redacted ]}" % len(ids))' 2>/dev/null \
-                || echo '   | {"tracking_ids": [ redacted ]}'
-            else
-              head -c 400 /tmp/b | sed 's/^/   | /'
-            fi
-            echo
-            echo
-          }
-
-          AUTH=()
-          if [ -n "${KEY:-}" ]; then
-            AUTH=(-H "Authorization: Bearer ${KEY}")
-            echo "Probing WITH the supplied key."
-          else
-            echo "Probing WITHOUT a key — 401 here just means the route wants auth."
-          fi
-          echo "Base: $BASE"
-          echo
-
-          show "GET (function root)" "$BASE" "${AUTH[@]}"
-
-          show "OPTIONS /shipments/resolve (the CORS preflight the phone sends first)" \
-            -X OPTIONS "$BASE/shipments/resolve" \
-            -H 'Origin: https://localhost' \
-            -H 'Access-Control-Request-Method: POST' \
-            -H 'Access-Control-Request-Headers: authorization, content-type'
-
-          show "POST /shipments/resolve (what the app calls today)" \
-            -X POST "$BASE/shipments/resolve" "${AUTH[@]}" \
-            -H 'Content-Type: application/json' -H 'Origin: https://localhost' \
-            -d "{\"trackings\":[\"$TRACKING\"]}"
-
-          show "POST /definitely-not-a-real-route-xyz (control: what an unknown route looks like)" \
-            -X POST "$BASE/definitely-not-a-real-route-xyz" "${AUTH[@]}" \
-            -H 'Content-Type: application/json' -H 'Origin: https://localhost' -d '{}'
-
-          # Their 404 body and CORS headers have the same shape as our own
-          # wms-api, which suggests this function was built to the same contract
-          # — the one in docs/WMS-App-API-Integration-Guide.pdf, which the app's
-          # Prep-Center push already talks. If so, its real surface is these.
-          #
-          # GET only, deliberately. A POST to /warehouse/sessions would create a
-          # document in someone's live system; discovering a route is never worth
-          # writing data to find out.
-          echo
-          echo "###############################################################"
-          echo "# Does this function speak the app's own protocol?"
-          echo "###############################################################"
-          echo
-
-          for p in "/warehouse/manifest?date=today" /warehouse/drivers /warehouse/carriers "/warehouse/sessions?days=1"; do
-            show "GET $p" "$BASE$p" "${AUTH[@]}" -H 'Origin: https://localhost'
-          done
-          show "GET /admin/badge-country/BADGE-IONUT" "$BASE/admin/badge-country/BADGE-IONUT" "${AUTH[@]}" -H 'Origin: https://localhost'
-
-          # Anything that might simply list what exists.
-          for p in /health /status /routes /openapi.json /api /v1; do
-            show "GET $p" "$BASE$p" "${AUTH[@]}" -H 'Origin: https://localhost'
-          done
-
-          echo
-          echo "###############################################################"
-          echo "# Does the manifest know the tracking from the warehouse report?"
-          echo "###############################################################"
-          echo
-          # The manifest is a list of real customer tracking IDs, so this counts
-          # and answers rather than printing it into a file that gets committed.
-          # The question is narrow: does the Prep-Center know this label at all.
-          for d in today $(date -u +%F) $(date -u -d yesterday +%F) $(date -u -d '2 days ago' +%F); do
-            curl -sS -m 25 -o /tmp/m "$BASE/warehouse/manifest?date=$d" "${AUTH[@]}" -H 'Origin: https://localhost' || true
-            python3 -c 'import json,sys;d=sys.argv[1];t=sys.argv[2];ids=(json.load(open("/tmp/m")).get("tracking_ids") or []);near=[x for x in ids if x[:6]==t[:6]];print("   %-12s %5d tracking ids   |   %s present: %s%s" % (d, len(ids), t, "YES" if t in ids else "no", "   (%d share its first 6 chars)" % len(near) if near and t not in ids else ""))' "$d" "$TRACKING" || echo "   $d: could not read the manifest"
-          done
-
-          echo "───────────────────────────────────────────────"
-          echo "Read the statuses: 404 = no such route, 401 = route wants a key,"
-          echo "200 with a shipments list = the route we need already exists."
+          bash .github/scripts/prep-probe.sh "$BASE" "$TRACKING" 2>&1 | tee prep-probe-result.txt
 
       # The run log cannot be downloaded from the environment this repo is
       # developed in, so the result comes back through the repo instead —
