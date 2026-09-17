@@ -89,6 +89,13 @@ Key : present
   asked about all 188 manifest ids -> 200, 133 shipment(s)
   top-level keys in the answer: ['shipments']
 
+=== the specific parcels asked about ===
+  db8eac1041f5…  in the manifest
+             resolve -> 200, shipmentId present: True, fbaId present: True
+             weightKg: 18, contents lines: 1
+             total units in the box: 2
+             same ID as lower-case -> 1 shipment(s)
+
 === does it say why nothing matched? ===
   status 200, body length 5106
   content-type: application/json
