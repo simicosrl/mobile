@@ -165,16 +165,16 @@ jobs:
             psql "$CONN" -c "select badge_id, country, label, active from admin.badge_countries order by country, badge_id;"
             echo
             echo "== admin.scanner_keys =="
-            psql "$CONN" -c "select * from admin.scanner_keys order by country;"
+            psql "$CONN" -c "select country, warehouse, label, active, created_at, last_used_at from admin.scanner_keys order by country;"
             echo
             echo "== wh_it.sessions (last 10) =="
-            psql "$CONN" -x -c "select * from wh_it.sessions order by 1 desc limit 10;"
+            psql "$CONN" -x -c "select id, doc, direction, carrier, closed_at, created_at, (signature is not null) as signed, (pdf is not null) as has_pdf from wh_it.sessions order by created_at desc limit 10;"
             echo
             echo "== wh_it.parcels, any row with tracking code containing 8007404018060 =="
-            psql "$CONN" -x -c "select * from wh_it.parcels where tracking::text like '%8007404018060%';"
+            psql "$CONN" -x -c "select id, session_id, scan_order, boxes, expected, damage_type, no_code, created_at from wh_it.parcels where tracking::text like '%8007404018060%';"
             echo
             echo "== wh_it.parcels (last 10, any code) =="
-            psql "$CONN" -x -c "select * from wh_it.parcels order by 1 desc limit 10;"
+            psql "$CONN" -x -c "select id, session_id, scan_order, boxes, expected, damage_type, no_code, created_at from wh_it.parcels order by created_at desc limit 10;"
             echo
             echo "== DDT tables (outbound delivery notes) =="
             psql "$CONN" -c "select table_schema, table_name from information_schema.tables where table_name in ('ddt','ddt_lines') order by table_schema, table_name;"
@@ -220,6 +220,12 @@ jobs:
             psql "$CONN" -c "select count(*) as sessions from wh_it.sessions;"
             psql "$CONN" -c "select count(*) as parcels from wh_it.parcels;"
           } >> db-check-result.txt 2>&1
+
+          # Second line of defence: these files are committed, and one careless
+          # `select *` in a future edit would put driver signatures and customer
+          # tracking numbers back into version control — where taking them out
+          # again means rewriting history.
+          python3 .github/scripts/scrub-report.py db-check-result.txt edge-function-probe.txt
           cat db-check-result.txt
 
       - name: Commit result back to repo

@@ -17,3 +17,7 @@ android/app/src/main/assets/public/
 android/app/src/main/assets/capacitor.config.json
 
 .DS_Store
+
+# Python bytecode from the report scrubber
+__pycache__/
+*.pyc
