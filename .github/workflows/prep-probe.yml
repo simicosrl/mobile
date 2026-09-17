@@ -65,7 +65,14 @@ jobs:
             grep -i '^content-type:' /tmp/h | head -1 | sed 's/^/   /' || true
             grep -i '^access-control-' /tmp/h | sed 's/^/   /' || true
             echo "   body (first 400 chars):"
-            head -c 400 /tmp/b | sed 's/^/   | /'
+            # The manifest body is a list of real customer tracking numbers and
+            # this file is committed — report its shape, not its contents.
+            if grep -q '"tracking_ids"' /tmp/b 2>/dev/null; then
+              python3 -c 'import json;ids=json.load(open("/tmp/b")).get("tracking_ids") or [];print("   | {\"tracking_ids\": [ %d entries, redacted ]}" % len(ids))' 2>/dev/null \
+                || echo '   | {"tracking_ids": [ redacted ]}'
+            else
+              head -c 400 /tmp/b | sed 's/^/   | /'
+            fi
             echo
             echo
           }
