@@ -25,7 +25,7 @@ on:
         required: true
         default: <a tracking number>
   push:
-    branches: [main]
+    branches: [main]      # only with [prepprobe] in the commit message, below
 
 # The result is committed back, so the run needs write access to the repo.
 permissions:
@@ -41,7 +41,9 @@ jobs:
       - name: Ask the endpoint what it answers
         env:
           BASE: ${{ github.event.inputs.base_url || 'https://muswtkzjfrldhgokkmqw.supabase.co/functions/v1/warehouse-scan-api' }}
-          KEY: ${{ github.event.inputs.api_key }}
+          # Prefer a repository secret so the key never appears in a log or in
+          # run metadata; the dispatch input stays as a fallback.
+          KEY: ${{ secrets.PREP_API_KEY || github.event.inputs.api_key }}
           TRACKING: ${{ github.event.inputs.tracking || '<a tracking number>' }}
         run: |
           set -u
@@ -61,6 +63,7 @@ jobs:
             out=$(curl -sS -m 25 -D /tmp/h -o /tmp/b -w '%{http_code}' "$@" 2>&1) || out="(request failed)"
             echo "   -> HTTP $out"
             grep -i '^content-type:' /tmp/h | head -1 | sed 's/^/   /' || true
+            grep -i '^access-control-' /tmp/h | sed 's/^/   /' || true
             echo "   body (first 400 chars):"
             head -c 400 /tmp/b | sed 's/^/   | /'
             echo
@@ -98,6 +101,10 @@ jobs:
               -H 'Content-Type: application/json' -H 'Origin: https://localhost' \
               -d "{\"trackings\":[\"$TRACKING\"]}"
           done
+
+          show "POST /definitely-not-a-real-route-xyz (control: what an unknown route looks like)" \
+            -X POST "$BASE/definitely-not-a-real-route-xyz" "${AUTH[@]}" \
+            -H 'Content-Type: application/json' -H 'Origin: https://localhost' -d '{}'
 
           show "GET /shipments?tracking=…" "$BASE/shipments?tracking=$TRACKING" "${AUTH[@]}" -H 'Origin: https://localhost'
           show "GET /tracking/{id}" "$BASE/tracking/$TRACKING" "${AUTH[@]}" -H 'Origin: https://localhost'
