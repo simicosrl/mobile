@@ -27,6 +27,10 @@ on:
   push:
     branches: [main]
 
+# The result is committed back, so the run needs write access to the repo.
+permissions:
+  contents: write
+
 jobs:
   probe:
     # On a push, only when the commit asks for it.
