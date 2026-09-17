@@ -96,6 +96,20 @@ Key : present
              total units in the box: 2
              same ID as lower-case -> 1 shipment(s)
 
+=== are the address blocks actually filled? ===
+  shipments examined: 133
+  pickup:      present on 133, filled on 133
+  customer:    present on 133, filled on 133
+  destination: present on 133, filled on   3
+  destination is an empty shell on 130 of 133 shipments
+  its keys are: ['city', 'country', 'name', 'postalCode', 'province', 'street']
+  carrier:           on   4 of 133
+  amazonReference:   on   0 of 133
+  reason:            on 133 of 133
+  goodsDescription:  on 133 of 133
+  legalNote:         on 133 of 133
+  packingGroup:      on 133 of 133
+
 === does it say why nothing matched? ===
   status 200, body length 5106
   content-type: application/json
