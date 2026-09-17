@@ -22,9 +22,14 @@ on:
         required: false
       tracking:
         # Deliberately no default: a tracking number identifies a real parcel,
-        # and this file is in version control. Type one in when running.
-        description: A tracking ID that really exists in the Prep-Center
-        required: true
+        # and this file is in version control. Optional now — the resolve probe
+        # takes real IDs from their own manifest instead of being handed one.
+        description: (optional) a tracking ID to check against the manifest
+        required: false
+      mode:
+        description: resolve (the DDT endpoint) or sweep (which routes exist at all)
+        required: false
+        default: resolve
   push:
     branches: [main]      # only with [prepprobe] in the commit message, below
 
@@ -46,9 +51,22 @@ jobs:
           # run metadata; the dispatch input stays as a fallback.
           PREP_API_KEY: ${{ secrets.PREP_API_KEY || github.event.inputs.api_key }}
           TRACKING: ${{ github.event.inputs.tracking }}
+          MODE: ${{ github.event.inputs.mode || 'resolve' }}
         run: |
           set -u
-          bash .github/scripts/prep-probe.sh "$BASE" "$TRACKING" 2>&1 | tee prep-probe-result.txt
+          if [ "$MODE" = "sweep" ]; then
+            bash .github/scripts/prep-probe.sh "$BASE" "$TRACKING" 2>&1 | tee prep-probe-result.txt
+          else
+            python3 .github/scripts/prep-resolve-probe.py "$BASE" 2>&1 | tee prep-probe-result.txt
+          fi
+
+      # The probe prints field names and types, never values. This is the second
+      # line of defence: the report is committed to a public repo, and a future
+      # edit that starts printing a record would otherwise put customer tracking
+      # numbers and addresses into the git history.
+      - name: Scrub the report before it is committed
+        if: always()
+        run: python3 .github/scripts/scrub-report.py prep-probe-result.txt
 
       # The run log cannot be downloaded from the environment this repo is
       # developed in, so the result comes back through the repo instead —
