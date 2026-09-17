@@ -35,6 +35,9 @@ export function AppProvider({ children }) {
   const [carrier, setCarrier] = useState('DHL');
   const [courierCompany, setCourierCompany] = useState('');
   const [shipment, setShipment] = useState('');
+  // Where the goods are going. The prep center would name it; without that the
+  // operator does, because a delivery note has to say who receives the goods.
+  const [destination, setDestination] = useState('');
   const [parcels, setParcels] = useState([]);
   const [sessionStartedAt, setSessionStartedAt] = useState(null);
 
@@ -381,6 +384,7 @@ export function AppProvider({ children }) {
     setCourierCompany('');
     setPlate('');
     setShipment('');
+    setDestination('');
     setSessionStartedAt(Date.now());
     setScreen('setup');
   }, [parcels.length, screen, direction, showToast]);
@@ -448,7 +452,12 @@ export function AppProvider({ children }) {
     if (cached) { applyShipment(code, cached); return; }
     const config = apiConfigRef.current;
     if (!config?.baseUrl) {
-      patchParcel(code, { shipmentStatus: 'pending', shipmentError: 'Prep-Center not configured' });
+      // Not configured is not a reason to undo a reference the operator gave.
+      setParcels((list) => list.map((p) => (
+        p.code !== code || p.shipmentStatus === 'manual' ? p : {
+          ...p, shipmentStatus: 'pending', shipmentError: 'Prep-Center not configured',
+        }
+      )));
       return;
     }
     const res = await resolveTrackings(config, [code]);
@@ -461,21 +470,37 @@ export function AppProvider({ children }) {
     // Two different failures that must not be confused. `unknown` means the
     // prep center answered and has never heard of this label — it cannot go on
     // a DDT. `pending` means we could not ask; it is resolved later.
-    patchParcel(code, {
-      shipmentStatus: res.ok ? 'unknown' : 'pending',
-      shipmentError: res.ok ? 'Not found in Prep-Center' : res.error || 'Prep-Center unreachable',
-    });
+    setParcels((list) => list.map((p) => (
+      p.code !== code || p.shipmentStatus === 'manual' ? p : {
+        ...p,
+        shipmentStatus: res.ok ? 'unknown' : 'pending',
+        shipmentError: res.ok ? 'Not found in Prep-Center' : res.error || 'Prep-Center unreachable',
+      }
+    )));
   }, [applyShipment, patchParcel]);
 
   // ---- scanning ----
   const accept = useCallback((code) => {
     const expected = apiConfig.autoPull && manifest.codes.length ? manifest.codes.includes(code) : null;
     feedback(false);
-    setParcels((p) => p.concat([{ code, carrier, boxes: 1, time: hhmm(), damage: null, photo: null, expected }]));
+    // Which shipping this box belongs to is the one fact a delivery note cannot
+    // do without, and the prep center's API does not expose it — its only route
+    // returns a bare list of tracking numbers. So the operator supplies it:
+    // whatever reference is set on the scan screen is stamped on each box as it
+    // is scanned, and changing it mid-session starts a new delivery note. If the
+    // prep center is ever able to answer, its reply overwrites this with the
+    // richer record; until then this is what makes the document possible at all.
+    const ref = (shipment || '').trim().toUpperCase();
+    setParcels((p) => p.concat([{
+      code, carrier, boxes: 1, time: hhmm(), damage: null, photo: null, expected,
+      ...(direction === 'out' && ref
+        ? { shipmentId: ref, fbaId: ref, shipmentStatus: 'manual', shipmentError: null }
+        : {}),
+    }]));
     setFlash('ok');
     setTimeout(() => setFlash((f) => (f === 'ok' ? null : f)), 700);
     if (direction === 'out') resolveShipmentForCode(code);
-  }, [apiConfig.autoPull, manifest.codes, carrier, direction, resolveShipmentForCode]);
+  }, [apiConfig.autoPull, manifest.codes, carrier, direction, shipment, resolveShipmentForCode]);
 
   const submitScan = useCallback((raw) => {
     const code = String(raw || '').trim().toUpperCase();
@@ -777,7 +802,7 @@ export function AppProvider({ children }) {
       if (cached) shipmentByCode.set(p.code, cached);
     }
     const outstanding = parcels
-      .filter((p) => p.shipmentStatus !== 'ok' && !shipmentByCode.has(p.code))
+      .filter((p) => p.shipmentStatus !== 'ok' && p.shipmentStatus !== 'manual' && !shipmentByCode.has(p.code))
       .map((p) => p.code);
     // The catch-up's own outcome is the freshest word on the boxes it covered —
     // more recent than whatever they were marked with while scanning.
@@ -799,9 +824,11 @@ export function AppProvider({ children }) {
         const recheck = catchUp && wasAskedAgain.has(p.code);
         return {
           ...p,
-          shipmentId: p.shipmentStatus === 'ok' ? p.shipmentId : null,
-          shipmentStatus: recheck ? (catchUp.ok ? 'unknown' : 'pending') : p.shipmentStatus,
-          shipmentError: recheck ? (catchUp.ok ? 'Not found in Prep-Center' : catchUp.error) : p.shipmentError,
+          shipmentId: p.shipmentStatus === 'ok' || p.shipmentStatus === 'manual' ? p.shipmentId : null,
+          shipmentStatus: recheck && p.shipmentStatus !== 'manual'
+            ? (catchUp.ok ? 'unknown' : 'pending') : p.shipmentStatus,
+          shipmentError: recheck && p.shipmentStatus !== 'manual'
+            ? (catchUp.ok ? 'Not found in Prep-Center' : catchUp.error) : p.shipmentError,
         };
       }
       const box = shipment.byTracking?.get(p.code);
@@ -838,9 +865,22 @@ export function AppProvider({ children }) {
         // too ("16/09/2026 · 20:56"), which belongs in the collection field,
         // not in "no. DDT 211-OUT/2026 del ...".
         date: String(document.date || '').split('·')[0].trim(),
-        pickup: shipment.pickup || [],
+        // Our own address is the one party to this document we always know,
+        // so it is never left blank waiting on the prep center. A delivery note
+        // without a sender is not a delivery note.
+        // Split on commas: the address boxes are a third of the page wide and a
+        // single long line simply ran across into the next box.
+        pickup: (shipment.pickup || []).length ? shipment.pickup : [
+          orgSettings.companyName,
+          ...String(orgSettings.companyAddress || '').split(',').map((x) => x.trim()).filter(Boolean),
+          orgSettings.companyVat,
+          orgSettings.companyEmail,
+          [orgSettings.warehouseLocation, orgSettings.warehouseDock].filter(Boolean).join(' · ') || null,
+        ].filter(Boolean),
         customer: shipment.customer || [],
-        destination: shipment.destination || [],
+        destination: (shipment.destination || []).length
+          ? shipment.destination
+          : (document.destination ? String(document.destination).split(',').map((x) => x.trim()).filter(Boolean) : []),
         carrier: shipment.carrier || document.carrier || null,
         reason: shipment.reason || null,
         goodsDescription: shipment.goodsDescription || 'Box',
@@ -849,6 +889,12 @@ export function AppProvider({ children }) {
         references: [
           shipment.fbaId || group.fbaId ? `Inbound Plan ID: ${shipment.fbaId || group.fbaId}` : null,
           shipment.amazonReference ? `Amazon reference number: ${shipment.amazonReference}` : null,
+          // Without itemised contents the trackings are what identifies the
+          // goods, so they belong on the document rather than only in our
+          // database. With contents, the products table already says it.
+          ...(group.parcels.some((p) => (p.contents || []).length)
+            ? []
+            : group.parcels.map((p, i) => `Package ${i + 1}: ${p.code}`)),
         ].filter(Boolean),
         legalNote: shipment.legalNote || null,
         confirmationLine: shipment.packingGroup ? `Packing group ${shipment.packingGroup}` : null,
@@ -899,6 +945,7 @@ export function AppProvider({ children }) {
       carrier,
       courierCompany,
       shipment,
+      destination,
       driverName: courierName,
       plate,
       operator: `${shift?.operatorName || 'Operator'} · ${shift?.badgeId || ''}`,
@@ -933,6 +980,7 @@ export function AppProvider({ children }) {
     setCourierCompany('');
     setPlate('');
     setShipment('');
+    setDestination('');
     setSessionStartedAt(null);
 
     const pdfDataUrl = await renderPdfDataUrl(document);
@@ -992,7 +1040,7 @@ export function AppProvider({ children }) {
     setHistory((h) => h.map((d) => (d.doc === doc && d.country === document.country ? { ...d, ...updated } : d)));
     setConfirmedDoc((c) => (c && c.doc === doc && c.country === document.country ? { ...c, ...updated } : c));
     if (toastParts.length) showToast(toastParts.join(' · '));
-  }, [signReady, direction, docSeq, carrier, courierCompany, shipment, courierName, plate, shift, parcels, signatureDataUrl, internalConfig, apiConfig, showToast, renderPdfDataUrl, saveDriverProfile, buildDdtsForSession]);
+  }, [signReady, direction, docSeq, carrier, courierCompany, shipment, destination, courierName, plate, shift, parcels, signatureDataUrl, internalConfig, apiConfig, showToast, renderPdfDataUrl, saveDriverProfile, buildDdtsForSession]);
 
   // Print or share one delivery note. The DDT travels with the goods, so the
   // driver needs it at the bay — it is no use only being in the database.
@@ -1305,6 +1353,7 @@ export function AppProvider({ children }) {
     shift, loginWithBadge, endShift, updateOperatorName,
     screen, setScreen, canGoBack, goBack, goHome, goToHistoryTab, goToDocsTab, goToApiTab, goToSettings,
     direction, carrier, setCarrier, courierCompany, setCourierCompany, shipment, setShipment,
+    destination, setDestination,
     parcels, sessionStartedAt, startSession, toScan, docSeq,
     submitScan, accept, dupCode, dupTime, closeDup, dupAddBox,
     boxPlus, boxMinus, removeLast, removeParcel, flash,

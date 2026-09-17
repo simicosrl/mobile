@@ -13,6 +13,7 @@ export default function Scan() {
     direction, carrier, parcels, sessionStartedAt, flash,
     submitScan, removeLast, removeParcel, openDamage, toSign, docSeq, openPhoto,
     openNoCodeSheet, rejectedScan, damageSheet, noCodeSheet,
+    shipment, setShipment, destination, setDestination,
   } = app;
   const isOut = direction === 'out';
   const nextDoc = docNumber(direction, docSeq[direction]);
@@ -39,9 +40,20 @@ export default function Scan() {
     // field — effectively making it impossible to type anything there.
     if (damageSheet.open || noCodeSheet.open) return undefined;
     const refocus = () => {
-      if (!scanning && inputRef.current && document.activeElement !== inputRef.current) {
+      // Never take focus away from another field the operator is actually
+      // typing in. The sheets are handled above, but the shipping reference on
+      // this very screen was not: every 400ms this stole focus mid-word, and
+      // the rest of what was being typed went into the scanner buffer and was
+      // logged as a parcel. Checking for any editable element covers whatever
+      // gets added next, rather than listing them one by one.
+      const active = document.activeElement;
+      const typingElsewhere =
+        active && active !== inputRef.current &&
+        (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable);
+      if (!scanning && !typingElsewhere && inputRef.current && active !== inputRef.current) {
         try { inputRef.current.focus({ preventScroll: true }); } catch { /* ignore */ }
       }
+      if (typingElsewhere) return;
       if (!manualKeyboard && Capacitor.isNativePlatform()) {
         Keyboard.hide().catch(() => {});
       }
@@ -207,6 +219,55 @@ export default function Scan() {
         </button>
       </div>
 
+      {/* Which shipping the next boxes belong to. One delivery note is issued
+          per reference, so changing it here starts a new one — scan a shipping's
+          boxes, change the reference, scan the next shipping's. It is filled in
+          automatically for any box the Prep-Center can place; this is what makes
+          the document possible for the ones it cannot. */}
+      {isOut && (
+        <div className="overflow-hidden rounded-[14px] border border-[rgba(148,163,184,.25)] bg-white">
+          <div className="flex items-center gap-2 border-b border-[rgba(148,163,184,.25)] bg-page px-3 py-2.5">
+            <div className="text-[10px] font-bold uppercase tracking-[.08em] text-secondary">Shipping / FBA reference</div>
+            {shipment ? (
+              <div className="ml-auto text-[11px] font-bold text-success">DDT will be issued</div>
+            ) : (
+              <div className="ml-auto text-[11px] font-bold text-[#C2410C]">no DDT without this</div>
+            )}
+          </div>
+          <div className="flex items-center gap-2 px-3 py-2.5">
+            <input
+              value={shipment}
+              onChange={(e) => setShipment(e.target.value.toUpperCase())}
+              placeholder="Scan or type, e.g. FBA15MGNXYBV"
+              className="min-h-[46px] w-full flex-1 rounded-xl border border-inputborder bg-page px-3 font-mono text-[13px] font-semibold text-ink"
+            />
+            {shipment && (
+              <button
+                onClick={() => setShipment('')}
+                aria-label="Clear the shipping reference"
+                className="flex h-9 w-9 flex-none items-center justify-center rounded-full text-light"
+              >
+                <X size={16} strokeWidth={2.2} />
+              </button>
+            )}
+          </div>
+          {/* A delivery note has to say who receives the goods. The prep center
+              would name the fulfilment centre; without it, the operator does. */}
+          <div className="px-3 pb-2.5">
+            <input
+              value={destination}
+              onChange={(e) => setDestination(e.target.value)}
+              placeholder="Destination, e.g. Amazon FCO8, Fiano Romano, IT"
+              className="min-h-[42px] w-full rounded-xl border border-inputborder bg-page px-3 text-[12.5px] text-ink"
+            />
+          </div>
+          <div className="px-3 pb-2.5 text-[10.5px] leading-[1.45] text-secondary">
+            Boxes scanned from now on go on this shipping's delivery note. Change the
+            reference for the next shipping.
+          </div>
+        </div>
+      )}
+
       <div className="overflow-hidden rounded-[14px] border border-[rgba(148,163,184,.25)] bg-white">
         <div className="flex items-center gap-2 border-b border-[rgba(148,163,184,.25)] bg-page px-3 py-2.5">
           <div className="text-[10px] font-bold uppercase tracking-[.08em] text-secondary">Session</div>
@@ -223,13 +284,13 @@ export default function Scan() {
                 {/* Outbound only: which shipping this box belongs to, so the
                     operator can see at a glance that a parcel will land on a
                     different delivery note — or, worse, on none at all. */}
-                {direction === 'out' && r.shipmentStatus === 'ok' && (
+                {direction === 'out' && (r.shipmentStatus === 'ok' || r.shipmentStatus === 'manual') && (
                   <div className="truncate text-[10px] text-secondary">{r.fbaId || r.shipmentId}</div>
                 )}
-                {direction === 'out' && r.shipmentStatus === 'unknown' && (
+                {direction === 'out' && !r.shipmentId && r.shipmentStatus === 'unknown' && (
                   <div className="truncate text-[10px] font-bold text-danger">Not in Prep-Center — no DDT</div>
                 )}
-                {direction === 'out' && r.shipmentStatus === 'pending' && (
+                {direction === 'out' && !r.shipmentId && r.shipmentStatus === 'pending' && (
                   // The reason, not just the state: "couldn't check" reads like a
                   // silent failure, and the operator has no way to tell a dead
                   // spot from an endpoint that isn't answering at all.

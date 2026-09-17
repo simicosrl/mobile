@@ -135,6 +135,26 @@ export function buildDdtPdf(ddt, org = {}) {
   y = productsHeader(y);
 
   const lines = productLines(ddt);
+  if (!lines.length) {
+    // No itemised contents: the prep center's API does not expose what is in a
+    // box, so the document describes the consignment rather than inventing a
+    // product list. The transportation table below still carries the box count,
+    // the weight and the goods description, which is what a delivery note has
+    // to state; itemised lines appear here automatically once that data exists.
+    const rowH = 30;
+    box(doc, MARGIN_X, y, PAGE_W - MARGIN_X * 2, rowH);
+    value(doc, '1', MARGIN_X + 9, y + 19);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(...INK);
+    const n = boxCount(ddt);
+    doc.text(`${ddt.goodsDescription || 'Box'} — ${n} package${n === 1 ? '' : 's'}, as listed under DOCUMENT REFERENCE`,
+      MARGIN_X + noW + 9, y + 19);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.text(String(n), PAGE_W - MARGIN_X - 9, y + 19, { align: 'right' });
+    y += rowH;
+  }
   lines.forEach((item, i) => {
     const desc = doc.splitTextToSize(String(item.description || ''), descW - 18);
     const ref = [item.sku ? `SKU: ${item.sku}` : null, item.asin ? `ASIN: ${item.asin}` : null]
