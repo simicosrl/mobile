@@ -164,6 +164,8 @@ export default function Scan() {
               )}
               {last.expected !== null && last.expected !== undefined && (
                 <div
+                  data-testid="manifest-verdict"
+                  data-expected={String(last.expected)}
                   className="rounded-full px-2 py-[3px] text-[10px] font-extrabold uppercase tracking-[.06em]"
                   style={{ background: last.expected ? 'rgba(22,163,74,.12)' : 'rgba(255,122,0,.14)', color: last.expected ? '#15803D' : '#C2410C' }}
                 >

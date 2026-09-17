@@ -149,7 +149,7 @@ export default function ApiScreen() {
         <button onClick={togglePull} className="flex w-full items-center gap-2.5 p-[13px] text-left">
           <div className="min-w-0 flex-1">
             <div className="text-[13.5px] font-bold">Receive expected manifest</div>
-            <div className="text-[11px] leading-snug text-secondary">GET tracking IDs due today from Prep-Center and validate at scan</div>
+            <div className="text-[11px] leading-snug text-secondary">GET the outbound tracking IDs from Prep-Center and check them at scan. Outbound only — the list is of cartons leaving, so it says nothing about a parcel arriving.</div>
           </div>
           <Toggle on={apiConfig.autoPull} />
         </button>

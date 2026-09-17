@@ -481,7 +481,16 @@ export function AppProvider({ children }) {
 
   // ---- scanning ----
   const accept = useCallback((code) => {
-    const expected = apiConfig.autoPull && manifest.codes.length ? manifest.codes.includes(code) : null;
+    // The Prep-Center's manifest lists outbound cartons only — parcels leaving,
+    // with a shipping behind them. It used to list inbound receipts, and the
+    // moment it changed, checking an arriving parcel against it would have
+    // marked every single inbound scan "Not on manifest". An expectation list
+    // for goods it is not about is worse than no list: it cries wolf on every
+    // box, and an operator who learns to ignore the badge will ignore it on the
+    // day it is right. So it applies to outbound, and inbound shows no badge.
+    const expected = direction === 'out' && apiConfig.autoPull && manifest.codes.length
+      ? manifest.codes.includes(code)
+      : null;
     feedback(false);
     // Which shipping this box belongs to is the one fact a delivery note cannot
     // do without, and the prep center's API does not expose it — its only route
