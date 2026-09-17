@@ -293,6 +293,44 @@ if wanted:
                 n2 = -1
             print('             same ID as %s -> %d shipment(s)' % (name, n2))
 
+
+# ---------------------------------------------------------------------------
+# A delivery note has to state where the goods are going. Their answer carries a
+# destination object with the right key names, but on every shipment seen so far
+# every value inside it is an empty string — so the address box prints blank on
+# a legal transport document. Measure it across everything they can resolve,
+# rather than reporting from the handful we happened to look at.
+print()
+print('=== are the address blocks actually filled? ===')
+st, _, tx = call('POST', path, {'trackings': ids})
+try:
+    body = json.loads(tx)
+    ships = (body.get('shipments') if isinstance(body, dict) else body) or []
+except Exception:                                            # noqa: BLE001
+    ships = []
+
+
+def filled(obj):
+    """An address counts as filled if any field in it has a non-empty value."""
+    if not isinstance(obj, dict):
+        return bool(obj)
+    return any(str(v or '').strip() for v in obj.values())
+
+
+print('  shipments examined: %d' % len(ships))
+for block in ('pickup', 'customer', 'destination'):
+    have = sum(1 for s in ships if filled(s.get(block)))
+    present = sum(1 for s in ships if s.get(block) is not None)
+    print('  %-12s present on %3d, filled on %3d' % (block + ':', present, have))
+empties = [s for s in ships if s.get('destination') is not None and not filled(s.get('destination'))]
+if empties:
+    print('  destination is an empty shell on %d of %d shipments' % (len(empties), len(ships)))
+    print('  its keys are: %s' % sorted((empties[0].get('destination') or {}).keys()))
+# Which other fields a delivery note wants are missing outright.
+for f in ('carrier', 'amazonReference', 'reason', 'goodsDescription', 'legalNote', 'packingGroup'):
+    have = sum(1 for s in ships if str(s.get(f) or '').strip())
+    print('  %-18s on %3d of %3d' % (f + ':', have, len(ships)))
+
 print()
 print('=== does it say why nothing matched? ===')
 st, hdrs, tx = call('POST', path, {'trackings': sample})
