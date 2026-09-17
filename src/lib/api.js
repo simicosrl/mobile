@@ -262,12 +262,12 @@ export async function fetchSessions(config, days = 30) {
  * Deliberately doesn't go through request() — that helper decodes bodies as
  * text/JSON, which would corrupt binary PDF bytes.
  */
-export async function fetchArchivedPdf(config, docNo) {
+export async function fetchArchivedPdf(config, docNo, kind = 'sessions') {
   const base = (config.baseUrl || '').replace(/\/+$/, '');
   if (!base) return { ok: false, error: 'No base URL configured' };
   const { signal, cancel } = withTimeout(15000);
   try {
-    const res = await fetch(`${base}/warehouse/sessions/${encodeURIComponent(docNo)}/pdf`, {
+    const res = await fetch(`${base}/warehouse/${kind}/${encodeURIComponent(docNo)}/pdf`, {
       headers: config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {},
       signal,
     });

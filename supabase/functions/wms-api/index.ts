@@ -264,6 +264,43 @@ Deno.serve(async (req: Request) => {
           (parcelsBySession[p.session_id] ||= []).push(p);
         }
       }
+      // The delivery notes issued for each session, so History shows them on
+      // any device rather than only on the phone that printed them — a DDT
+      // travels with the goods and is the document anyone asking later wants.
+      // Summary only: the stored PDF and the signature are large, and both are
+      // fetched on demand through /warehouse/ddt/{doc}/pdf.
+      const ddtsBySession: Record<string, any[]> = {};
+      if (ids.length) {
+        const { data: ddtData, error: ddtErr } = await supabase
+          .schema(schema)
+          .from("ddt")
+          .select("id, doc, session_id, shipment_id, fba_id, created_at")
+          .in("session_id", ids)
+          .order("created_at", { ascending: true });
+        if (ddtErr) return json({ error: ddtErr.message }, 500);
+        const ddtIds = (ddtData || []).map((d) => d.id);
+        const boxesByDdt: Record<string, number> = {};
+        if (ddtIds.length) {
+          const { data: lineData, error: lineErr } = await supabase
+            .schema(schema)
+            .from("ddt_lines")
+            .select("ddt_id, boxes")
+            .in("ddt_id", ddtIds);
+          if (lineErr) return json({ error: lineErr.message }, 500);
+          for (const l of lineData || []) {
+            boxesByDdt[l.ddt_id] = (boxesByDdt[l.ddt_id] || 0) + (l.boxes || 1);
+          }
+        }
+        for (const d of ddtData || []) {
+          (ddtsBySession[d.session_id] ||= []).push({
+            number: d.doc,
+            shipmentId: d.shipment_id,
+            fbaId: d.fba_id,
+            boxes: boxesByDdt[d.id] || 0,
+            createdAtIso: d.created_at,
+          });
+        }
+      }
       const sessions = (sessionsData || []).map((s) => ({
         doc: s.doc,
         direction: s.direction,
@@ -280,6 +317,7 @@ Deno.serve(async (req: Request) => {
           noCode: p.no_code,
           createdAtIso: p.created_at,
         })),
+        ddtSummaries: ddtsBySession[s.id] || [],
       }));
       return json({ sessions });
     }
@@ -471,6 +509,20 @@ Deno.serve(async (req: Request) => {
     if (req.method === "GET" && pdfMatch) {
       const doc = decodeURIComponent(pdfMatch[1]);
       const { data, error } = await supabase.schema(schema).from("sessions").select("pdf").eq("doc", doc).maybeSingle();
+      if (error || !data?.pdf) return json({ error: "not found" }, 404);
+      const base64 = data.pdf.split(",")[1] || data.pdf;
+      const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+      return new Response(bytes, { headers: { "Content-Type": "application/pdf", ...CORS_HEADERS } });
+    }
+
+    // GET /warehouse/ddt/{doc}/pdf — the archived delivery note, same shape as
+    // the session PDF above, so a note issued on one phone can be reprinted
+    // from any other. The document number carries a slash ("DDT 12-OUT/2026"),
+    // so it arrives percent-encoded.
+    const ddtPdfMatch = path.match(/^\/warehouse\/ddt\/(.+)\/pdf$/);
+    if (req.method === "GET" && ddtPdfMatch) {
+      const doc = decodeURIComponent(ddtPdfMatch[1]);
+      const { data, error } = await supabase.schema(schema).from("ddt").select("pdf").eq("doc", doc).maybeSingle();
       if (error || !data?.pdf) return json({ error: "not found" }, 404);
       const base64 = data.pdf.split(",")[1] || data.pdf;
       const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));

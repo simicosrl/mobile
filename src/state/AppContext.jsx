@@ -1083,13 +1083,27 @@ export function AppProvider({ children }) {
   const printDdt = useCallback(async (ddt) => {
     try {
       const mod = await import('../lib/pdfDoc');
-      const ddtMod = await import('../lib/ddtPdf');
-      const dataUrl = ddt.pdfDataUrl || ddtMod.ddtDataUrl(ddt, orgSettings);
+      let dataUrl = ddt.pdfDataUrl;
+      // A note this device issued can be rebuilt from its own data. One that
+      // only exists as a database summary — a handover closed on another
+      // phone — cannot, so the archived PDF is fetched instead. Reprinting
+      // the stored file is also the more correct of the two: it is the sheet
+      // the driver actually signed for, not a fresh rendering of it.
+      if (!dataUrl && Array.isArray(ddt.parcels)) {
+        const ddtMod = await import('../lib/ddtPdf');
+        dataUrl = ddtMod.ddtDataUrl(ddt, orgSettings);
+      }
+      if (!dataUrl && internalConfig) {
+        const res = await api.fetchArchivedPdf(internalConfig, ddt.number, 'ddt');
+        if (res.ok) dataUrl = res.dataUrl;
+        else throw new Error(res.error || 'not stored');
+      }
+      if (!dataUrl) throw new Error('no connection to fetch it from');
       await mod.exportPdfDataUrl(dataUrl, { doc: ddt.number });
     } catch (err) {
       showToast(`Could not open ${ddt.number} — ${String(err?.message || err)}`);
     }
-  }, [orgSettings, showToast]);
+  }, [orgSettings, showToast, internalConfig]);
 
   // ---- document export ----
   const printDocument = useCallback(async (document) => {

@@ -2,11 +2,12 @@ import { useApp } from '../state/AppContext';
 import { Download, Printer } from '../components/icons';
 
 export default function SessionDetail() {
-  const { history, selectedDocNo, historyQuery, printDocument, openPhoto } = useApp();
+  const { history, selectedDocNo, historyQuery, printDocument, printDdt, openPhoto } = useApp();
   const sel = history.find((h) => h.doc === selectedDocNo);
   if (!sel) return null;
   const q = historyQuery.trim().toUpperCase();
   const boxes = sel.parcels.reduce((a, p) => a + p.boxes, 0);
+  const ddts = (sel.ddts || []).length ? sel.ddts : (sel.ddtSummaries || []);
   const signed = sel.signed !== undefined ? sel.signed : !!sel.signatureDataUrl;
 
   return (
@@ -55,6 +56,35 @@ export default function SessionDetail() {
         ))}
       </div>
 
+      {/* The delivery notes issued for this handover. A DDT travels with the
+          goods and is the document anyone asking afterwards wants to see, so
+          it has to outlive the confirmation screen it was printed from.
+          `ddts` are the full notes this device issued; `ddtSummaries` are what
+          the database reports for a session closed on another phone — enough to
+          say which notes exist, and reprintable by fetching the stored PDF. */}
+      {ddts.length > 0 && (
+        <div className="overflow-hidden rounded-2xl border border-[rgba(148,163,184,.25)] bg-white">
+          <div className="border-b border-[rgba(148,163,184,.25)] bg-page px-3 py-2.5 text-[10px] font-bold uppercase tracking-[.08em] text-secondary">
+            Delivery notes ({ddts.length})
+          </div>
+          {ddts.map((d) => (
+            <button
+              key={d.number}
+              onClick={() => printDdt(d)}
+              className="flex w-full items-center gap-2.5 border-b border-[rgba(148,163,184,.15)] px-3 py-3 text-left last:border-b-0"
+            >
+              <Printer size={16} strokeWidth={2} className="flex-none text-primary" />
+              <div className="min-w-0 flex-1">
+                <div className="truncate font-mono text-[12px] font-bold text-ink">{d.number}</div>
+                <div className="truncate text-[11px] text-secondary">
+                  {d.fbaId || d.shipmentId} · {ddtBoxes(d)} box{ddtBoxes(d) === 1 ? '' : 'es'}
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="flex flex-col gap-2.5">
         <button onClick={() => printDocument(sel)} className="flex min-h-[54px] w-full items-center justify-center gap-2.5 rounded-xl bg-primary text-[15px] font-extrabold text-white">
           <Download size={18} strokeWidth={2} /> Download PDF
@@ -65,6 +95,13 @@ export default function SessionDetail() {
       </div>
     </div>
   );
+}
+
+// A note issued here carries its parcels; one summarised by the database
+// carries a box count instead. Both have to render the same line.
+function ddtBoxes(d) {
+  if (Array.isArray(d.parcels)) return d.parcels.reduce((a, p) => a + (p.boxes || 1), 0);
+  return d.boxes || 0;
 }
 
 function Row({ label, value, last }) {
