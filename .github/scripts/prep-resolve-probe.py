@@ -184,3 +184,63 @@ try:
           % (status, len(shipments) if isinstance(shipments, list) else -1))
 except Exception:                                            # noqa: BLE001
     print('  %s, unparseable' % status)
+
+
+# ---------------------------------------------------------------------------
+# If real tracking IDs resolve to nothing, the endpoint is answering but not
+# finding — and there are only two explanations worth separating: we are naming
+# the request field differently than it expects, or it genuinely holds no
+# association for these parcels. Guessing wrong here costs a release, so ask.
+def count(resp_text):
+    try:
+        b = json.loads(resp_text)
+        s = b.get('shipments', b) if isinstance(b, dict) else b
+        return len(s) if isinstance(s, list) else -1
+    except Exception:                                        # noqa: BLE001
+        return -1
+
+
+print()
+print('=== is the request field named what we think? ===')
+SHAPES = [
+    ('{"trackings": [...]}', {'trackings': sample}),
+    ('{"tracking_ids": [...]}', {'tracking_ids': sample}),
+    ('{"trackingIds": [...]}', {'trackingIds': sample}),
+    ('{"codes": [...]}', {'codes': sample}),
+    ('{"tracking": "one"}', {'tracking': sample[0]}),
+    ('bare array [...]', sample),
+]
+for label, body in SHAPES:
+    st, _, tx = call('POST', path, body)
+    print('  %s  %-26s -> %s shipment(s)' % (st, label, count(tx)))
+
+print()
+print('=== does anything in their whole manifest resolve? ===')
+st, _, tx = call('POST', path, {'trackings': ids})
+print('  asked about all %d manifest ids -> %s, %s shipment(s)' % (len(ids), st, count(tx)))
+try:
+    b = json.loads(tx)
+    if isinstance(b, dict):
+        print('  top-level keys in the answer: %s' % list(b.keys()))
+        for k, v in b.items():
+            if k != 'shipments':
+                print('    %s: %s' % (k, schema(v)))
+except Exception:                                            # noqa: BLE001
+    print('  unparseable')
+
+print()
+print('=== does it say why nothing matched? ===')
+st, hdrs, tx = call('POST', path, {'trackings': sample})
+print('  status %s, body length %d' % (st, len(tx)))
+print('  content-type: %s'
+      % next((v for k, v in hdrs.items() if k.lower() == 'content-type'), '?'))
+# The body is a schema-only concern unless it is an error string, which carries
+# no customer data and is the most useful thing here.
+try:
+    b = json.loads(tx)
+    if isinstance(b, dict) and not b.get('shipments'):
+        for k in ('error', 'message', 'detail', 'reason', 'warning', 'excluded', 'unknown'):
+            if k in b:
+                print('  %s: %s' % (k, json.dumps(b[k])[:300]))
+except Exception:                                            # noqa: BLE001
+    print('  body was not JSON')
