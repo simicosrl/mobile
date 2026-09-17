@@ -1,0 +1,101 @@
+# Ask the Prep-Center's own endpoint what it actually answers.
+#
+# The container this repo is developed in cannot reach supabase.co, so there is
+# no way to see the real responses from there. A GitHub runner can, and knowing
+# the true status codes and bodies is the difference between guessing at the
+# integration and writing it against what is really there.
+#
+# Read-only: it asks, it prints, it changes nothing. Run it from the Actions tab
+# ("Run workflow"), optionally pasting the API key from the app's Settings › API
+# so the probe sees what the phone sees.
+name: Probe the Prep-Center API (debug tool)
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: Prep-Center base URL
+        required: true
+        default: https://muswtkzjfrldhgokkmqw.supabase.co/functions/v1/warehouse-scan-api
+      api_key:
+        description: API key from Settings › API (optional — leave empty to probe unauthenticated)
+        required: false
+      tracking:
+        description: A tracking ID that really exists in the Prep-Center
+        required: true
+        default: <a tracking number>
+  push:
+    branches: [main]
+
+jobs:
+  probe:
+    # On a push, only when the commit asks for it.
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[prepprobe]')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ask the endpoint what it answers
+        env:
+          BASE: ${{ github.event.inputs.base_url || 'https://muswtkzjfrldhgokkmqw.supabase.co/functions/v1/warehouse-scan-api' }}
+          KEY: ${{ github.event.inputs.api_key }}
+          TRACKING: ${{ github.event.inputs.tracking || '<a tracking number>' }}
+        run: |
+          set -u
+          BASE="${BASE%/}"
+
+          # Show status, content-type and the first part of the body — enough to
+          # tell "route does not exist" from "route exists but wants auth" from
+          # "route answered and this is its shape", without dumping a payload
+          # that might carry customer data into a public log.
+          show() {
+            local label="$1"; shift
+            echo "───────────────────────────────────────────────"
+            echo "== $label"
+            echo "   $*" | sed "s/Bearer [^ ]*/Bearer <redacted>/g"
+            local out
+            out=$(curl -sS -m 25 -D /tmp/h -o /tmp/b -w '%{http_code}' "$@" 2>&1) || out="(request failed)"
+            echo "   -> HTTP $out"
+            grep -i '^content-type:' /tmp/h | head -1 | sed 's/^/   /' || true
+            echo "   body (first 400 chars):"
+            head -c 400 /tmp/b | sed 's/^/   | /'
+            echo
+            echo
+          }
+
+          AUTH=()
+          if [ -n "${KEY:-}" ]; then
+            AUTH=(-H "Authorization: Bearer ${KEY}")
+            echo "Probing WITH the supplied key."
+          else
+            echo "Probing WITHOUT a key — 401 here just means the route wants auth."
+          fi
+          echo "Base: $BASE"
+          echo
+
+          show "GET (function root)" "$BASE" "${AUTH[@]}"
+
+          show "OPTIONS /shipments/resolve (the CORS preflight the phone sends first)" \
+            -X OPTIONS "$BASE/shipments/resolve" \
+            -H 'Origin: https://localhost' \
+            -H 'Access-Control-Request-Method: POST' \
+            -H 'Access-Control-Request-Headers: authorization, content-type'
+
+          show "POST /shipments/resolve (what the app calls today)" \
+            -X POST "$BASE/shipments/resolve" "${AUTH[@]}" \
+            -H 'Content-Type: application/json' -H 'Origin: https://localhost' \
+            -d "{\"trackings\":[\"$TRACKING\"]}"
+
+          # If that route does not exist, one of these names probably does. The
+          # point is to find the route they already have rather than ask them to
+          # build a new one.
+          for p in /shipments /shipment /resolve /trackings/resolve /parcels/resolve /boxes/resolve /warehouse/shipments; do
+            show "POST $p" -X POST "$BASE$p" "${AUTH[@]}" \
+              -H 'Content-Type: application/json' -H 'Origin: https://localhost' \
+              -d "{\"trackings\":[\"$TRACKING\"]}"
+          done
+
+          show "GET /shipments?tracking=…" "$BASE/shipments?tracking=$TRACKING" "${AUTH[@]}" -H 'Origin: https://localhost'
+          show "GET /tracking/{id}" "$BASE/tracking/$TRACKING" "${AUTH[@]}" -H 'Origin: https://localhost'
+
+          echo "───────────────────────────────────────────────"
+          echo "Read the statuses: 404 = no such route, 401 = route wants a key,"
+          echo "200 with a shipments list = the route we need already exists."
