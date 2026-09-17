@@ -194,6 +194,29 @@ export async function reserveDdtNumber(config) {
 // listing only the trackings scanned in that session. Idempotent server-side
 // on (session, shipment), so a retry after a failed push updates the documents
 // rather than creating a second set.
+/**
+ * Which of these trackings already travel on a delivery note.
+ * A parcel ships once, so a second note for the same box would be a duplicate
+ * transport document for goods that have already left. Asked as each box is
+ * scanned, so the operator hears about it while the driver is still at the bay.
+ * Returns a Map<tracking, {doc, createdAtIso}>; a failure is never fatal —
+ * scanning has to keep working with no network.
+ */
+export async function lookupNotedTrackings(config, trackings) {
+  const list = [...new Set((trackings || []).filter(Boolean).map(String))];
+  if (!list.length) return { ok: true, noted: new Map() };
+  const res = await request(config, '/warehouse/ddt/lookup', {
+    method: 'POST',
+    body: { trackings: list },
+  });
+  if (!res.ok || !Array.isArray(res.data?.known)) return { ok: false, noted: new Map(), error: describeError(res) };
+  const noted = new Map();
+  for (const k of res.data.known) {
+    if (k?.tracking) noted.set(String(k.tracking), { doc: k.doc || null, createdAtIso: k.createdAtIso || null });
+  }
+  return { ok: true, noted };
+}
+
 export async function pushDdts(config, sessionDoc, ddts) {
   const res = await request(config, '/warehouse/ddt', {
     method: 'POST',
@@ -216,7 +239,7 @@ export async function pushDdts(config, sessionDoc, ddts) {
       })),
     },
   });
-  if (res.ok) return { ok: true, documents: res.data?.documents || [] };
+  if (res.ok) return { ok: true, documents: res.data?.documents || [], refused: res.data?.refused || [] };
   return { ok: false, error: describeError(res) };
 }
 

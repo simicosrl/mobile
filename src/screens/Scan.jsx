@@ -104,6 +104,20 @@ export default function Scan() {
   };
 
   const boxes = parcels.reduce((a, p) => a + p.boxes, 0);
+  // A box the Prep-Center could not place has no shipping, so it can go on no
+  // delivery note unless the operator supplies one.
+  const unplacedCount = parcels.filter(
+    (p) => p.shipmentStatus && p.shipmentStatus !== 'ok' && p.shipmentStatus !== 'manual',
+  ).length;
+  const needsShippingRef = unplacedCount > 0 || Boolean(shipment);
+  // A box with no delivery address to print. That is either one the
+  // Prep-Center placed but whose shipping came back with an empty address, or
+  // any box it could not place at all — an unplaced box has no record behind
+  // it, so it has no destination either, and asking only about the first kind
+  // left the note blank exactly when the Prep-Center was unreachable.
+  const needsDestination = parcels.some(
+    (p) => p.shipmentStatus && (p.shipmentStatus !== 'ok' || !p.shipmentHasDestination),
+  ) || Boolean(destination);
   const codeSize = last && last.code.length > 18 ? 'text-[17px]' : 'text-[21px]';
   // The tracking field is only ever shown once the operator explicitly asks
   // to type (manualKeyboard) — otherwise it's a 1px invisible focus target
@@ -173,6 +187,24 @@ export default function Scan() {
                 </div>
               )}
             </div>
+            {/* This box has already left on a delivery note. Said here, at the
+                bay, because this is the only moment the operator can still put
+                it back on the shelf — after the signature it is a duplicate
+                transport document for goods that are already gone. */}
+            {last.notedOn && (
+              <div
+                data-testid="already-noted"
+                className="mt-3 flex items-start gap-2 rounded-[11px] border border-[rgba(220,38,38,.35)] bg-danger-tint2 p-2.5"
+              >
+                <TriangleAlert size={16} strokeWidth={2} className="mt-px flex-none text-danger" />
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-bold text-danger-dark">Already shipped on {last.notedOn}</div>
+                  <div className="mt-0.5 text-[10.5px] leading-snug text-danger">
+                    This parcel will not go on another delivery note. Put it back unless you are sure it is a different box.
+                  </div>
+                </div>
+              </div>
+            )}
             {last.damage && (
               <div className="mt-3 flex items-start gap-2 rounded-[11px] border border-[rgba(220,38,38,.25)] bg-danger-tint2 p-2.5">
                 <TriangleAlert size={16} strokeWidth={2} className="mt-px flex-none text-danger" />
@@ -221,20 +253,23 @@ export default function Scan() {
         </button>
       </div>
 
-      {/* Which shipping the next boxes belong to. One delivery note is issued
-          per reference, so changing it here starts a new one — scan a shipping's
-          boxes, change the reference, scan the next shipping's. It is filled in
-          automatically for any box the Prep-Center can place; this is what makes
-          the document possible for the ones it cannot. */}
-      {isOut && (
-        <div className="overflow-hidden rounded-[14px] border border-[rgba(148,163,184,.25)] bg-white">
-          <div className="flex items-center gap-2 border-b border-[rgba(148,163,184,.25)] bg-page px-3 py-2.5">
-            <div className="text-[10px] font-bold uppercase tracking-[.08em] text-secondary">Shipping / FBA reference</div>
-            {shipment ? (
-              <div className="ml-auto text-[11px] font-bold text-success">DDT will be issued</div>
-            ) : (
-              <div className="ml-auto text-[11px] font-bold text-[#C2410C]">no DDT without this</div>
-            )}
+      {/* Neither of these belongs on the screen in the normal flow: the
+          Prep-Center places a box and names its destination the moment it is
+          scanned, and asking the operator to type what the system already knows
+          is how mistakes get in. So each appears only when its own answer is
+          actually missing, naming why, and disappears again once it is not.
+
+          Removing them outright was the other option, and it is the wrong one
+          while the Prep-Center can still fail to answer: a delivery note with
+          no shipping cannot be issued at all, and one with no destination
+          cannot say where the goods are going. Either would stop a lorry. */}
+      {isOut && needsShippingRef && (
+        <div data-testid="shipping-fallback" className="overflow-hidden rounded-[14px] border border-[rgba(255,122,0,.4)] bg-white">
+          <div className="flex items-center gap-2 border-b border-[rgba(148,163,184,.25)] bg-[rgba(255,122,0,.08)] px-3 py-2.5">
+            <div className="text-[10px] font-bold uppercase tracking-[.08em] text-[#C2410C]">Shipping / FBA reference</div>
+            <div className="ml-auto text-[11px] font-bold text-[#C2410C]">
+              {shipment ? 'DDT will be issued' : 'needed for the unplaced boxes'}
+            </div>
           </div>
           <div className="flex items-center gap-2 px-3 py-2.5">
             <input
@@ -253,19 +288,32 @@ export default function Scan() {
               </button>
             )}
           </div>
-          {/* A delivery note has to say who receives the goods. The prep center
-              would name the fulfilment centre; without it, the operator does. */}
-          <div className="px-3 pb-2.5">
+          <div className="px-3 pb-2.5 text-[10.5px] leading-[1.45] text-secondary">
+            The Prep-Center could not place {unplacedCount === 1 ? 'a box' : `${unplacedCount} boxes`} in this
+            session. Boxes scanned from now on go on this reference's delivery note; change it for the next shipping.
+          </div>
+        </div>
+      )}
+
+      {isOut && needsDestination && (
+        <div data-testid="destination-fallback" className="overflow-hidden rounded-[14px] border border-[rgba(255,122,0,.4)] bg-white">
+          <div className="flex items-center gap-2 border-b border-[rgba(148,163,184,.25)] bg-[rgba(255,122,0,.08)] px-3 py-2.5">
+            <div className="text-[10px] font-bold uppercase tracking-[.08em] text-[#C2410C]">Merchandise destination</div>
+            <div className="ml-auto text-[11px] font-bold text-[#C2410C]">
+              {destination.trim() ? 'will be printed' : 'blank on the note'}
+            </div>
+          </div>
+          <div className="px-3 py-2.5">
             <input
               value={destination}
               onChange={(e) => setDestination(e.target.value)}
               placeholder="Destination, e.g. Amazon FCO8, Fiano Romano, IT"
-              className="min-h-[42px] w-full rounded-xl border border-inputborder bg-page px-3 text-[12.5px] text-ink"
+              className="min-h-[46px] w-full rounded-xl border border-inputborder bg-page px-3 text-[12.5px] text-ink"
             />
           </div>
           <div className="px-3 pb-2.5 text-[10.5px] leading-[1.45] text-secondary">
-            Boxes scanned from now on go on this shipping's delivery note. Change the
-            reference for the next shipping.
+            The Prep-Center sent no delivery address for this shipping. A delivery note has to say where
+            the goods are going, so type it here — commas start a new line on the document.
           </div>
         </div>
       )}

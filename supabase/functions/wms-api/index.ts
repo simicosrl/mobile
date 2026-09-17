@@ -403,6 +403,31 @@ Deno.serve(async (req: Request) => {
       return json({ ok: true, document: doc });
     }
 
+    // POST /warehouse/ddt/lookup — which of these trackings already travel on a
+    // delivery note. A parcel ships once; a second note for the same box is a
+    // duplicate transport document for goods that have already left. The phone
+    // asks as each box is scanned, so the operator hears about it while the
+    // driver is still at the bay and can put the box back, rather than after
+    // the paperwork is signed.
+    if (req.method === "POST" && path === "/warehouse/ddt/lookup") {
+      const body = await req.json();
+      const trackings = (body.trackings || []).map((t: any) => String(t)).filter(Boolean);
+      if (!trackings.length) return json({ known: [] });
+      const { data, error } = await supabase
+        .schema(schema)
+        .from("ddt_lines")
+        .select("tracking, ddt!inner(doc, created_at, session_id)")
+        .in("tracking", trackings);
+      if (error) return json({ error: error.message }, 500);
+      const known = (data || []).map((l: any) => ({
+        tracking: l.tracking,
+        doc: l.ddt?.doc ?? null,
+        createdAtIso: l.ddt?.created_at ?? null,
+        sessionId: l.ddt?.session_id ?? null,
+      }));
+      return json({ known });
+    }
+
     // POST /warehouse/ddt — the outbound delivery notes for one session.
     //
     // A session produces one DDT per shipment, each listing only the trackings
@@ -431,6 +456,27 @@ Deno.serve(async (req: Request) => {
       if (!session) return json({ error: "unknown session document" }, 404);
 
       const saved: string[] = [];
+      // Every tracking this push wants to put on a note, and who already has
+      // it. A line belonging to another session's note is refused outright and
+      // reported back: the app must not be able to issue a second document for
+      // a box that has already left, whatever it believes locally.
+      const wanted = (body.ddts || []).flatMap((d: any) => (d.lines || []).map((l: any) => String(l.tracking)));
+      const takenBy = new Map<string, string>();
+      if (wanted.length) {
+        const { data: existing, error: exErr } = await supabase
+          .schema(schema)
+          .from("ddt_lines")
+          .select("tracking, ddt!inner(doc, session_id)")
+          .in("tracking", wanted);
+        if (exErr) return json({ error: exErr.message }, 500);
+        for (const l of existing || []) {
+          // Its own session may legitimately re-sync or move a tracking between
+          // that session's notes; another session's claim is what blocks.
+          if ((l as any).ddt?.session_id !== session.id) takenBy.set(l.tracking, (l as any).ddt?.doc || "another note");
+        }
+      }
+      const refused: { tracking: string; doc: string }[] = [];
+
       for (const d of body.ddts || []) {
         if (!d.shipment_id) return json({ error: "shipment_id is required on every DDT" }, 400);
         const { data: row, error: ddtErr } = await supabase
@@ -461,19 +507,25 @@ Deno.serve(async (req: Request) => {
         // session does not leave the old tracking list behind next to the new.
         const { error: delErr } = await supabase.schema(schema).from("ddt_lines").delete().eq("ddt_id", row.id);
         if (delErr) return json({ error: delErr.message }, 500);
-        const lines = (d.lines || []).map((l: any) => ({
-          ddt_id: row.id,
-          tracking: l.tracking,
-          boxes: l.boxes ?? 1,
-          condition: l.condition ?? null,
-        }));
+        const lines = (d.lines || [])
+          .filter((l: any) => {
+            const owner = takenBy.get(String(l.tracking));
+            if (owner) { refused.push({ tracking: String(l.tracking), doc: owner }); return false; }
+            return true;
+          })
+          .map((l: any) => ({
+            ddt_id: row.id,
+            tracking: l.tracking,
+            boxes: l.boxes ?? 1,
+            condition: l.condition ?? null,
+          }));
         if (lines.length) {
           const { error: lineErr } = await supabase.schema(schema).from("ddt_lines").insert(lines);
           if (lineErr) return json({ error: lineErr.message }, 500);
         }
         saved.push(row.doc);
       }
-      return json({ ok: true, documents: saved });
+      return json({ ok: true, documents: saved, refused });
     }
 
     // GET /warehouse/manifest?date=today — expected tracking IDs, this

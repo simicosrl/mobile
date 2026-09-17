@@ -36,14 +36,32 @@ export default function Confirmation() {
       {(confirmedDoc.ddtExcluded || []).length > 0 && (() => {
         const detail = confirmedDoc.excludedDetail
           || confirmedDoc.ddtExcluded.map((code) => ({ code, status: 'unchecked', error: null }));
+        const noted = detail.filter((d) => d.status === 'noted');
         const unknown = detail.filter((d) => d.status === 'unknown');
-        const unchecked = detail.filter((d) => d.status !== 'unknown');
+        const unchecked = detail.filter((d) => d.status !== 'unknown' && d.status !== 'noted');
         const reason = unchecked.find((d) => d.error)?.error;
         return (
           <div className="rounded-2xl border border-[rgba(220,38,38,.35)] bg-[rgba(220,38,38,.06)] px-[13px] py-3">
             <div className="text-[12px] font-bold text-danger">
               {detail.length} parcel{detail.length > 1 ? 's' : ''} on no delivery note
             </div>
+            {/* Already on someone else's note. Not an error to chase — the
+                document exists and the goods left; what matters is that the
+                box in front of the operator is probably not the one they
+                think it is. */}
+            {noted.length > 0 && (
+              <>
+                <div className="mt-1.5 text-[11px] leading-[1.5] text-secondary">
+                  {noted.length > 1 ? 'These parcels have' : 'This parcel has'} already shipped on an earlier
+                  delivery note, so {noted.length > 1 ? 'they were' : 'it was'} not put on a second one:
+                </div>
+                {noted.map((d) => (
+                  <div key={d.code} className="mt-1 font-mono text-[11px] text-ink">
+                    {d.code} — {d.notedOn}
+                  </div>
+                ))}
+              </>
+            )}
             {unknown.length > 0 && (
               <>
                 <div className="mt-1.5 text-[11px] leading-[1.5] text-secondary">

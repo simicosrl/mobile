@@ -375,6 +375,13 @@ export function AppProvider({ children }) {
       return;
     }
     setDirection(dir);
+    // The manifest was only ever pulled at badge login. A shift runs eight
+    // hours and the Prep-Center prepares shipments all day, so by the
+    // afternoon the list was the morning's and boxes prepared since were
+    // reported "Not on manifest" — a warning that is simply wrong, and one
+    // the operator learns to ignore. Refresh it as an outbound session opens:
+    // that is the moment it is about to be used, and it costs one request.
+    if (dir === 'out') pullManifestNowRef.current({ silent: true });
     setParcels([]);
     shipmentCacheRef.current.clear();
     setConfirmedDoc(null);
@@ -402,6 +409,10 @@ export function AppProvider({ children }) {
   // at sync time rather than blocking the operator at the loading bay.
   const apiConfigRef = useRef(apiConfig);
   useEffect(() => { apiConfigRef.current = apiConfig; }, [apiConfig]);
+  // Our own backend, reachable from the scan path without every caller
+  // re-closing over it and going stale.
+  const internalConfigRef = useRef(null);
+  useEffect(() => { internalConfigRef.current = internalConfig; }, [internalConfig]);
 
   // Update one stored document, in state and in storage, applying only the
   // fields being changed.
@@ -444,8 +455,49 @@ export function AppProvider({ children }) {
       contents: boxInfo?.contents || [],
       shipmentStatus: 'ok',
       shipmentError: null,
+      // Their answer carries a destination object whose every value is an
+      // empty string on almost every shipment. Recorded per box so the scan
+      // screen can ask for the address only when it is genuinely missing,
+      // instead of standing there asking for it on every session forever.
+      shipmentHasDestination: (shipment.destination || []).filter(Boolean).length > 0,
     });
   }, [patchParcel]);
+
+  // Has this box already left on a delivery note? Asked of our own database as
+  // each outbound box is scanned, because a parcel ships once: a second note
+  // for it would be a duplicate transport document for goods already gone. The
+  // answer arrives while the driver is still at the bay, which is the only
+  // moment the operator can actually do something about it.
+  const checkAlreadyNoted = useCallback(async (code) => {
+    const config = internalConfigRef.current;
+    if (!config) return;
+    const res = await api.lookupNotedTrackings(config, [code]);
+    const hit = res.noted.get(code);
+    if (!hit) return;
+    patchParcel(code, { notedOn: hit.doc || 'an earlier delivery note', notedAtIso: hit.createdAtIso || null });
+  }, [patchParcel]);
+
+  // The shipping reference the operator types, applied to the boxes that have
+  // none yet.
+  //
+  // The reference used to be typed before scanning, so stamping it at scan time
+  // was enough. It is now offered only once a box comes back unplaced — which
+  // means the box that revealed it was already scanned, and without this it
+  // would keep no shipping at all and quietly fall off the delivery note. The
+  // first box of every session, missing from its own note, is not a thing an
+  // operator would notice until someone asked where the goods went.
+  //
+  // Only boxes with no shipping are touched: one already assigned belongs to
+  // the reference that was current when it was scanned, and changing the
+  // reference is how the operator starts the next shipping's note.
+  const setShipmentRef = useCallback((value) => {
+    setShipment(value);
+    const ref = (value || '').trim().toUpperCase();
+    if (!ref) return;
+    setParcels((list) => list.map((p) => (
+      p.shipmentId ? p : { ...p, shipmentId: ref, fbaId: ref, shipmentStatus: 'manual', shipmentError: null }
+    )));
+  }, []);
 
   const resolveShipmentForCode = useCallback(async (code) => {
     const cached = shipmentCacheRef.current.get(code);
@@ -508,8 +560,8 @@ export function AppProvider({ children }) {
     }]));
     setFlash('ok');
     setTimeout(() => setFlash((f) => (f === 'ok' ? null : f)), 700);
-    if (direction === 'out') resolveShipmentForCode(code);
-  }, [apiConfig.autoPull, manifest.codes, carrier, direction, shipment, resolveShipmentForCode]);
+    if (direction === 'out') { resolveShipmentForCode(code); checkAlreadyNoted(code); }
+  }, [apiConfig.autoPull, manifest.codes, carrier, direction, shipment, resolveShipmentForCode, checkAlreadyNoted]);
 
   const submitScan = useCallback((raw) => {
     const code = String(raw || '').trim().toUpperCase();
@@ -869,8 +921,26 @@ export function AppProvider({ children }) {
       };
     });
 
-    const { groups, unresolved } = groupForDdt(resolved);
-    if (!groups.length) return { ddts: [], excluded: unresolved };
+    // A box that already travels on a delivery note cannot go on a second one.
+    // The check runs again here, not only at scan time, because the scan-time
+    // answer may never have arrived — no signal at the bay, or the box scanned
+    // in the same second the question was asked. This is the last moment before
+    // a legal document is issued, so it is the one that has to be right.
+    let noted = new Map();
+    if (internalConfigRef.current && resolved.length) {
+      const res = await api.lookupNotedTrackings(internalConfigRef.current, resolved.map((p) => p.code));
+      if (res.ok) noted = res.noted;
+    }
+    const withNoted = resolved.map((p) => {
+      const hit = noted.get(p.code);
+      if (!hit && !p.notedOn) return p;
+      return { ...p, notedOn: p.notedOn || hit.doc || 'an earlier delivery note' };
+    });
+    const alreadyNoted = withNoted.filter((p) => p.notedOn);
+    const issuable = withNoted.filter((p) => !p.notedOn);
+
+    const { groups, unresolved } = groupForDdt(issuable);
+    if (!groups.length) return { ddts: [], excluded: [...unresolved, ...alreadyNoted] };
 
     const mod = await import('../lib/ddtPdf');
     const ddts = [];
@@ -939,7 +1009,7 @@ export function AppProvider({ children }) {
       try { pdfDataUrl = mod.ddtDataUrl(ddt, orgSettings); } catch { pdfDataUrl = null; }
       ddts.push({ ...ddt, pdfDataUrl });
     }
-    return { ddts, excluded: unresolved };
+    return { ddts, excluded: [...unresolved, ...alreadyNoted] };
   }, [internalConfig, orgSettings]);
 
   const renderPdfDataUrl = useCallback(async (document) => {
@@ -1020,8 +1090,9 @@ export function AppProvider({ children }) {
     // them looking for a problem that is not theirs.
     const excludedDetail = excluded.map((p) => ({
       code: p.code,
-      status: p.shipmentStatus === 'unknown' ? 'unknown' : 'unchecked',
+      status: p.notedOn ? 'noted' : (p.shipmentStatus === 'unknown' ? 'unknown' : 'unchecked'),
       error: p.shipmentError || null,
+      notedOn: p.notedOn || null,
     }));
     let updated = ddts.length || excluded.length
       ? { ...document, ddts, ddtExcluded: excluded.map((p) => p.code), excludedDetail }
@@ -1201,6 +1272,15 @@ export function AppProvider({ children }) {
   // without a stale closure over apiConfig/showToast.
   const pullManifestNowRef = useRef(() => {});
   useEffect(() => { pullManifestNowRef.current = pullManifestNow; }, [pullManifestNow]);
+  // And on its own every 15 minutes while the app is open, so a phone that
+  // stays on the scan screen all afternoon is not working from a list that
+  // stopped being true hours ago. Silent: a failed refresh is not news, the
+  // previous list is still there, and nothing about scanning depends on it.
+  useEffect(() => {
+    if (!ready || !apiConfig.autoPull || !apiConfig.baseUrl) return undefined;
+    const t = setInterval(() => pullManifestNowRef.current({ silent: true }), 15 * 60 * 1000);
+    return () => clearInterval(t);
+  }, [ready, apiConfig.autoPull, apiConfig.baseUrl]);
 
   // Settings › Login history — pulled on demand (not auto-refreshed in the
   // background) since it's an audit view, not something the core scanning
@@ -1409,7 +1489,7 @@ export function AppProvider({ children }) {
     ready, now,
     shift, loginWithBadge, endShift, updateOperatorName,
     screen, setScreen, canGoBack, goBack, goHome, goToHistoryTab, goToDocsTab, goToApiTab, goToSettings,
-    direction, carrier, setCarrier, courierCompany, setCourierCompany, shipment, setShipment,
+    direction, carrier, setCarrier, courierCompany, setCourierCompany, shipment, setShipment: setShipmentRef,
     destination, setDestination,
     parcels, sessionStartedAt, startSession, toScan, docSeq,
     submitScan, accept, dupCode, dupTime, closeDup, dupAddBox,
