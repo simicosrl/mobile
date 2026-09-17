@@ -658,6 +658,18 @@ export function AppProvider({ children }) {
   // tick on top of that was redundant.
   const signReady = courierName.trim().length > 1 && sigInk;
 
+  // Closing a session is not instantaneous: it reserves a document number over
+  // the network, renders the PDF, builds the delivery notes and pushes them.
+  // For those few hundred milliseconds the parcel list is still full and the
+  // button still looks tappable, so a second tap — an impatient operator, a
+  // double-tap on a laggy handheld — used to start the whole flow a second
+  // time and record the same goods under a second document number. (It really
+  // happened: three outbound documents, same nineteen trackings, one second
+  // apart.) The ref is what actually blocks it; the state only drives the
+  // button, and state updates arrive too late to stop the second tap.
+  const finishingRef = useRef(false);
+  const [finishing, setFinishing] = useState(false);
+
   // ---- driver profiles (remembered so the office doesn't retype the same
   // driver/plate every time that person shows up again) — kept in this
   // country's own database, not just on this one phone, so the same driver
@@ -923,8 +935,7 @@ export function AppProvider({ children }) {
     }
   }, [orgSettings]);
 
-  const finish = useCallback(async () => {
-    if (!signReady) { showToast('Name and signature are required'); return; }
+  const closeSession = useCallback(async () => {
     saveDriverProfile(courierName, courierCompany, plate);
     const now2 = new Date();
     // Reserve the real progressive number from the database up front,
@@ -1040,7 +1051,23 @@ export function AppProvider({ children }) {
     setHistory((h) => h.map((d) => (d.doc === doc && d.country === document.country ? { ...d, ...updated } : d)));
     setConfirmedDoc((c) => (c && c.doc === doc && c.country === document.country ? { ...c, ...updated } : c));
     if (toastParts.length) showToast(toastParts.join(' · '));
-  }, [signReady, direction, docSeq, carrier, courierCompany, shipment, destination, courierName, plate, shift, parcels, signatureDataUrl, internalConfig, apiConfig, showToast, renderPdfDataUrl, saveDriverProfile, buildDdtsForSession]);
+  }, [direction, docSeq, carrier, courierCompany, shipment, destination, courierName, plate, shift, parcels, signatureDataUrl, internalConfig, apiConfig, showToast, renderPdfDataUrl, saveDriverProfile, buildDdtsForSession]);
+
+  // The guarded entry point. Every caller uses this one, never `closeSession`.
+  const finish = useCallback(async () => {
+    if (!signReady) { showToast('Name and signature are required'); return; }
+    // Checked and set in the same synchronous step, before the first `await`,
+    // so there is no window for a second tap to slip through.
+    if (finishingRef.current) return;
+    finishingRef.current = true;
+    setFinishing(true);
+    try {
+      await closeSession();
+    } finally {
+      finishingRef.current = false;
+      setFinishing(false);
+    }
+  }, [signReady, showToast, closeSession]);
 
   // Print or share one delivery note. The DDT travels with the goods, so the
   // driver needs it at the bay — it is no use only being in the database.
@@ -1360,7 +1387,7 @@ export function AppProvider({ children }) {
     damageSheet, openDamage, closeDamage, toggleDamageType, setDamageNote, setDamagePhoto, saveDamage, damageTypes: DAMAGE_TYPES,
     noCodeSheet, openNoCodeSheet, closeNoCodeSheet, setNoCodeNote, setNoCodePhoto, saveNoCode, rejectedScan,
     courierName, setCourierName, plate, setPlate,
-    signatureDataUrl, setSignatureDataUrl, sigInk, setSigInk, clearSignature, signReady, toSign, finish,
+    signatureDataUrl, setSignatureDataUrl, sigInk, setSigInk, clearSignature, signReady, toSign, finish, finishing,
     confirmedDoc, printDocument, printDdt, emailDocument,
     history: visibleHistory, historyQuery, setHistoryQuery, historyFilter, setHistoryFilter, selectedDocNo, openSession, backToHistory,
     apiConfig, apiShowKey, setApiBaseUrl, setApiKey, generateApiKey, copyApiKey, togglePush, togglePull, toggleShowKey,
@@ -1379,7 +1406,7 @@ export function AppProvider({ children }) {
     submitScan, accept, dupCode, dupTime, closeDup, dupAddBox, boxPlus, boxMinus, removeLast, removeParcel, flash,
     damageSheet, openDamage, closeDamage, toggleDamageType, setDamageNote, setDamagePhoto, saveDamage,
     noCodeSheet, openNoCodeSheet, closeNoCodeSheet, setNoCodeNote, setNoCodePhoto, saveNoCode, rejectedScan,
-    courierName, plate, signatureDataUrl, sigInk, clearSignature, signReady, toSign, finish,
+    courierName, plate, signatureDataUrl, sigInk, clearSignature, signReady, toSign, finish, finishing,
     confirmedDoc, printDocument, printDdt, emailDocument, visibleHistory, historyQuery, historyFilter, selectedDocNo, openSession, backToHistory,
     apiConfig, apiShowKey, setApiBaseUrl, setApiKey, generateApiKey, copyApiKey, togglePush, togglePull, toggleShowKey,
     manifest, pulling, pullManifestNow, syncing, syncNow, retrySync, syncPrepPending,

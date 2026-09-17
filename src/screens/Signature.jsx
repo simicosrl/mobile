@@ -9,7 +9,7 @@ export default function Signature() {
   const {
     direction, carrier, courierCompany, setCourierCompany, plate, setPlate,
     courierName, setCourierName, parcels, docSeq,
-    sigInk, setSignatureDataUrl, setSigInk, clearSignature, signReady, finish,
+    sigInk, setSignatureDataUrl, setSigInk, clearSignature, signReady, finish, finishing,
     driverProfiles, applyDriverProfile,
   } = app;
   const isOut = direction === 'out';
@@ -98,11 +98,17 @@ export default function Signature() {
         <SignaturePad ref={padRef} onChange={onSigChange} hasInk={sigInk} />
       </div>
 
+      {/* Disabled for real while the handover is being closed, not just styled
+          as such: closing reserves a document number, renders the PDF and
+          pushes the delivery notes, and a second tap during that would record
+          the same goods under a second number. */}
       <button
         onClick={finish}
-        className={'flex min-h-[56px] w-full items-center justify-center gap-2.5 rounded-xl text-[15px] font-extrabold text-white ' + (signReady ? 'cursor-pointer bg-primary' : 'cursor-not-allowed bg-disabled')}
+        disabled={finishing}
+        data-testid="confirm-handover"
+        className={'flex min-h-[56px] w-full items-center justify-center gap-2.5 rounded-xl text-[15px] font-extrabold text-white ' + (signReady && !finishing ? 'cursor-pointer bg-primary' : 'cursor-not-allowed bg-disabled')}
       >
-        Confirm handover <ArrowRight size={17} strokeWidth={2.2} />
+        {finishing ? 'Closing…' : <>Confirm handover <ArrowRight size={17} strokeWidth={2.2} /></>}
       </button>
     </div>
   );
