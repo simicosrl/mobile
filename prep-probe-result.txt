@@ -32,3 +32,19 @@ Key : present
 
 === unknown tracking ===
   200, 0 shipment(s) returned (0 expected)
+
+=== is the request field named what we think? ===
+  200  {"trackings": [...]}       -> 0 shipment(s)
+  400  {"tracking_ids":[ redacted ]}    -> -1 shipment(s)
+  400  {"trackingIds": [...]}     -> -1 shipment(s)
+  400  {"codes": [...]}           -> -1 shipment(s)
+  400  {"tracking":"<redacted>"}        -> -1 shipment(s)
+  400  bare array [...]           -> -1 shipment(s)
+
+=== does anything in their whole manifest resolve? ===
+  asked about all 47 manifest ids -> 200, 0 shipment(s)
+  top-level keys in the answer: ['shipments']
+
+=== does it say why nothing matched? ===
+  status 200, body length 16
+  content-type: application/json
