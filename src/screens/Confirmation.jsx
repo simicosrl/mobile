@@ -27,17 +27,45 @@ export default function Confirmation() {
         <Row label="Damaged" value={dmgCount === 0 ? 'none' : `${dmgCount} parcel${dmgCount > 1 ? 's' : ''}`} valueColor={dmgCount ? '#DC2626' : '#16A34A'} last />
       </div>
 
-      {(confirmedDoc.ddtExcluded || []).length > 0 && (
-        <div className="rounded-2xl border border-[rgba(220,38,38,.35)] bg-[rgba(220,38,38,.06)] px-[13px] py-3">
-          <div className="text-[12px] font-bold text-danger">
-            {confirmedDoc.ddtExcluded.length} parcel{confirmedDoc.ddtExcluded.length > 1 ? 's' : ''} on no delivery note
+      {/* Two different reasons a parcel is on no DDT, and they call for opposite
+          actions. "Not recognised" means check the label or the shipping record.
+          "Could not check" means nothing is wrong with the parcel — the lookup
+          failed, and Sync now will issue the document later. Saying the first
+          when the second happened sends the operator hunting a problem that
+          isn't theirs, so each is named, with the reason the app was given. */}
+      {(confirmedDoc.ddtExcluded || []).length > 0 && (() => {
+        const detail = confirmedDoc.excludedDetail
+          || confirmedDoc.ddtExcluded.map((code) => ({ code, status: 'unchecked', error: null }));
+        const unknown = detail.filter((d) => d.status === 'unknown');
+        const unchecked = detail.filter((d) => d.status !== 'unknown');
+        const reason = unchecked.find((d) => d.error)?.error;
+        return (
+          <div className="rounded-2xl border border-[rgba(220,38,38,.35)] bg-[rgba(220,38,38,.06)] px-[13px] py-3">
+            <div className="text-[12px] font-bold text-danger">
+              {detail.length} parcel{detail.length > 1 ? 's' : ''} on no delivery note
+            </div>
+            {unknown.length > 0 && (
+              <>
+                <div className="mt-1.5 text-[11px] leading-[1.5] text-secondary">
+                  The Prep-Center answered, and does not recognise {unknown.length > 1 ? 'these tracking IDs' : 'this tracking ID'}:
+                </div>
+                <div className="mt-1 font-mono text-[11px] text-ink">{unknown.map((d) => d.code).join(', ')}</div>
+              </>
+            )}
+            {unchecked.length > 0 && (
+              <>
+                <div className="mt-2 text-[11px] leading-[1.5] text-secondary">
+                  {unchecked.length > 1 ? 'These could not be checked' : 'This one could not be checked'} at
+                  all — nothing is wrong with the {unchecked.length > 1 ? 'parcels' : 'parcel'}. Sync now will
+                  issue the {unchecked.length > 1 ? 'documents' : 'document'} once the Prep-Center answers:
+                </div>
+                <div className="mt-1 font-mono text-[11px] text-ink">{unchecked.map((d) => d.code).join(', ')}</div>
+                {reason && <div className="mt-1.5 text-[10.5px] leading-[1.45] text-light">{reason}</div>}
+              </>
+            )}
           </div>
-          <div className="mt-1 text-[11px] leading-[1.5] text-secondary">
-            The Prep-Center did not recognise these tracking IDs, so they are on no DDT:
-          </div>
-          <div className="mt-1 font-mono text-[11px] text-ink">{confirmedDoc.ddtExcluded.join(', ')}</div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* The delivery notes go with the driver, so they have to be printable
           here, at the bay — one per shipment, because that is how they were

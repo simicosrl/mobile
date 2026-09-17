@@ -779,20 +779,30 @@ export function AppProvider({ children }) {
     const outstanding = parcels
       .filter((p) => p.shipmentStatus !== 'ok' && !shipmentByCode.has(p.code))
       .map((p) => p.code);
+    // The catch-up's own outcome is the freshest word on the boxes it covered —
+    // more recent than whatever they were marked with while scanning.
+    let catchUp = null;
     if (outstanding.length && apiConfigRef.current?.baseUrl) {
-      const res = await resolveTrackings(apiConfigRef.current, outstanding);
-      for (const [code, shipment] of res.shipments) {
+      catchUp = await resolveTrackings(apiConfigRef.current, outstanding);
+      for (const [code, shipment] of catchUp.shipments) {
         shipmentByCode.set(code, shipment);
         shipmentCacheRef.current.set(code, shipment);
       }
     }
+    const wasAskedAgain = new Set(outstanding);
 
     const resolved = parcels.map((p) => {
       const shipment = shipmentByCode.get(p.code);
       if (!shipment) {
         // groupForDdt keys on shipmentId; a parcel the prep center rejected
         // outright must not be grouped even if a stale id is still on it.
-        return { ...p, shipmentId: p.shipmentStatus === 'ok' ? p.shipmentId : null };
+        const recheck = catchUp && wasAskedAgain.has(p.code);
+        return {
+          ...p,
+          shipmentId: p.shipmentStatus === 'ok' ? p.shipmentId : null,
+          shipmentStatus: recheck ? (catchUp.ok ? 'unknown' : 'pending') : p.shipmentStatus,
+          shipmentError: recheck ? (catchUp.ok ? 'Not found in Prep-Center' : catchUp.error) : p.shipmentError,
+        };
       }
       const box = shipment.byTracking?.get(p.code);
       return {
@@ -929,7 +939,18 @@ export function AppProvider({ children }) {
     // Outbound only: the delivery notes that travel with the goods. Built here,
     // after the driver has signed, because the signature belongs on every one.
     const { ddts, excluded } = await buildDdtsForSession(document);
-    let updated = ddts.length || excluded.length ? { ...document, ddts, ddtExcluded: excluded.map((p) => p.code) } : document;
+    // Carry the reason, not just the code. "The Prep-Center says this label does
+    // not exist" and "we could not ask it" call for completely different actions
+    // from the operator, and reporting the first when the second happened sends
+    // them looking for a problem that is not theirs.
+    const excludedDetail = excluded.map((p) => ({
+      code: p.code,
+      status: p.shipmentStatus === 'unknown' ? 'unknown' : 'unchecked',
+      error: p.shipmentError || null,
+    }));
+    let updated = ddts.length || excluded.length
+      ? { ...document, ddts, ddtExcluded: excluded.map((p) => p.code), excludedDetail }
+      : document;
     const toastParts = [];
     // Always saved to our own database — this isn't optional, unlike the
     // Prep-Center push below.

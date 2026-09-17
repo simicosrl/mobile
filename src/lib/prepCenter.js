@@ -137,8 +137,28 @@ export async function resolveTrackings(config, trackings, options = {}) {
       return { ok: false, shipments: new Map(), unknown: list, error: describeError({ status: res.status, data }) };
     }
 
+    // "The server replied 200" is not the same as "the server answered our
+    // question", and the difference decides whether a box goes on a delivery
+    // note. Anything that answers 200 without being a resolve response — an API
+    // index, a proxy, a login page, an SPA that serves index.html for every
+    // path — would otherwise be read as an authoritative "this tracking does
+    // not exist", and real boxes would be silently left off a legal document.
+    // Only a recognisable payload counts as an answer; anything else is a
+    // failure to reach the prep center, to be retried, not a verdict.
+    const raw = Array.isArray(data) ? data : pick(data || {}, 'shipments', 'results', 'data');
+    if (!Array.isArray(raw)) {
+      const looksLikeHtml = typeof text === 'string' && text.trim().startsWith('<');
+      return {
+        ok: false,
+        shipments: new Map(),
+        unknown: list,
+        error: looksLikeHtml
+          ? `Prep-Center answered with a web page, not the shipments endpoint (${RESOLVE_PATH})`
+          : `Prep-Center answered without a shipments list — is ${RESOLVE_PATH} implemented?`,
+      };
+    }
+
     const shipments = new Map();
-    const raw = (Array.isArray(data) ? data : pick(data || {}, 'shipments', 'results', 'data')) || [];
     for (const item of raw) {
       const s = normalizeShipment(item);
       if (!s || !s.shipmentId) continue;

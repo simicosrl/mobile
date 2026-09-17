@@ -230,7 +230,12 @@ export default function Scan() {
                   <div className="truncate text-[10px] font-bold text-danger">Not in Prep-Center — no DDT</div>
                 )}
                 {direction === 'out' && r.shipmentStatus === 'pending' && (
-                  <div className="truncate text-[10px] text-[#C2410C]">Shipping pending — resolves at sync</div>
+                  // The reason, not just the state: "couldn't check" reads like a
+                  // silent failure, and the operator has no way to tell a dead
+                  // spot from an endpoint that isn't answering at all.
+                  <div className="truncate text-[10px] text-[#C2410C]" title={r.shipmentError || ''}>
+                    {r.shipmentError ? `Not checked — ${r.shipmentError}` : 'Shipping pending — resolves at sync'}
+                  </div>
                 )}
               </div>
               {r.damage && <div className="flex-none text-[11px] font-bold text-danger">DMG</div>}
