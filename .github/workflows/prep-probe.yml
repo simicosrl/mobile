@@ -121,6 +121,19 @@ jobs:
             show "GET $p" "$BASE$p" "${AUTH[@]}" -H 'Origin: https://localhost'
           done
 
+          echo
+          echo "###############################################################"
+          echo "# Does the manifest know the tracking from the warehouse report?"
+          echo "###############################################################"
+          echo
+          # The manifest is a list of real customer tracking IDs, so this counts
+          # and answers rather than printing it into a file that gets committed.
+          # The question is narrow: does the Prep-Center know this label at all.
+          for d in today $(date -u +%F) $(date -u -d yesterday +%F) $(date -u -d '2 days ago' +%F); do
+            curl -sS -m 25 -o /tmp/m "$BASE/warehouse/manifest?date=$d" "${AUTH[@]}" -H 'Origin: https://localhost' || true
+            python3 -c 'import json,sys;d=sys.argv[1];t=sys.argv[2];ids=(json.load(open("/tmp/m")).get("tracking_ids") or []);near=[x for x in ids if x[:6]==t[:6]];print("   %-12s %5d tracking ids   |   %s present: %s%s" % (d, len(ids), t, "YES" if t in ids else "no", "   (%d share its first 6 chars)" % len(near) if near and t not in ids else ""))' "$d" "$TRACKING" || echo "   $d: could not read the manifest"
+          done
+
           echo "───────────────────────────────────────────────"
           echo "Read the statuses: 404 = no such route, 401 = route wants a key,"
           echo "200 with a shipments list = the route we need already exists."
