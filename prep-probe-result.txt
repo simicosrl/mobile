@@ -2,26 +2,70 @@ Base: https://muswtkzjfrldhgokkmqw.supabase.co/functions/v1/warehouse-scan-api
 Key : present
 
 === tracking IDs to ask about (from their own manifest) ===
-  GET /warehouse/manifest -> 200, 47 ids
+  GET /warehouse/manifest -> 200, 188 ids
   probing with the first 5 (not printed)
 
 === which resolve path is live ===
-  200  POST /warehouse/shipments/resolve  (0 shipment record(s))
+  200  POST /warehouse/shipments/resolve  (4 shipment record(s))
   404  POST /shipments/resolve
 
 === shape of the answer from /warehouse/shipments/resolve ===
   {
-  shipments: list(empty)
+  shipments: list(4) of {
+    shipmentId: str
+    fbaId: str
+    reason: str
+    goodsDescription: str
+    prepAt: str
+    packingGroup: str
+    legalNote: str
+    pickup: {
+      name: str
+      street: str
+      postalCode: str
+      city: str
+      province: str
+      country: str
+      phone: str
+      email: str
+    }
+    customer: {
+      name: str
+      street: str
+      postalCode: str
+      city: str
+      country: str
+      vat: str
+    }
+    destination: {
+      name: str
+      street: str
+      postalCode: str
+      city: str
+      province: str
+      country: str
+    }
+    boxes: list(1) of {
+      tracking: str
+      weightKg: int
+      contents: list(1) of {
+        description: str
+        sku: str
+        asin: str
+        qty: int
+      }
+    }
+  }
 }
 
 === the three things a DDT depends on ===
-  shipment records          : 0
-  per-box list field        : NOT FOUND
-  boxes described           : 0
-  boxes with contents       : 0 of 0
-  boxes with a weight       : 0 of 0
-  of the 5 asked about, resolved: 0
-  shipment id field         : NOT FOUND
+  shipment records          : 4
+  per-box list field        : boxes
+  boxes described           : 5
+  boxes with contents       : 5 of 5
+  boxes with a weight       : 5 of 5
+  of the 5 asked about, resolved: 5
+  shipment id field         : shipmentId
 
 === auth and CORS ===
   no key                    -> 401  (401 expected)
@@ -34,7 +78,7 @@ Key : present
   200, 0 shipment(s) returned (0 expected)
 
 === is the request field named what we think? ===
-  200  {"trackings": [...]}       -> 0 shipment(s)
+  200  {"trackings": [...]}       -> 4 shipment(s)
   400  {"tracking_ids":[ redacted ]}    -> -1 shipment(s)
   400  {"trackingIds": [...]}     -> -1 shipment(s)
   400  {"codes": [...]}           -> -1 shipment(s)
@@ -42,9 +86,9 @@ Key : present
   400  bare array [...]           -> -1 shipment(s)
 
 === does anything in their whole manifest resolve? ===
-  asked about all 47 manifest ids -> 200, 0 shipment(s)
+  asked about all 188 manifest ids -> 200, 133 shipment(s)
   top-level keys in the answer: ['shipments']
 
 === does it say why nothing matched? ===
-  status 200, body length 16
+  status 200, body length 5106
   content-type: application/json
