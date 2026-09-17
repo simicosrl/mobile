@@ -92,10 +92,36 @@ export function buildDdtPdf(ddt, org = {}) {
   doc.setFontSize(9.5);
   doc.text(`no. ${ddt.number} del ${ddt.date}`, PAGE_W - MARGIN_X, 78, { align: 'right' });
 
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(22);
-  doc.setTextColor(...INK);
-  doc.text(org.companyName || 'SIMICO', MARGIN_X, 70);
+  // The prep center's own letterhead, when one has been set in Settings. Each
+  // prep center sets its own, so a note printed in Casazza carries that
+  // company's mark and one printed elsewhere carries theirs. Fitted inside a
+  // fixed box and centred on the title's line, so a wide logo and a tall one
+  // both sit correctly instead of pushing the layout around. Without one, the
+  // company name is drawn as before.
+  const LOGO_MAX_W = 150;
+  const LOGO_MAX_H = 42;
+  let logoDrawn = false;
+  if (org.companyLogo) {
+    try {
+      const props = doc.getImageProperties(org.companyLogo);
+      if (props?.width && props?.height) {
+        const scale = Math.min(LOGO_MAX_W / props.width, LOGO_MAX_H / props.height);
+        const w = props.width * scale;
+        const h = props.height * scale;
+        doc.addImage(org.companyLogo, MARGIN_X, 64 - h / 2, w, h, undefined, 'FAST');
+        logoDrawn = true;
+      }
+    } catch {
+      // A logo that will not decode must never cost the operator the document.
+      logoDrawn = false;
+    }
+  }
+  if (!logoDrawn) {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(22);
+    doc.setTextColor(...INK);
+    doc.text(org.companyName || 'SIMICO', MARGIN_X, 70);
+  }
 
   // --- three address boxes ------------------------------------------------
   const boxTop = 94;

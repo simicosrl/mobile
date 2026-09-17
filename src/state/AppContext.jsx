@@ -822,8 +822,15 @@ export function AppProvider({ children }) {
       const cached = shipmentCacheRef.current.get(p.code);
       if (cached) shipmentByCode.set(p.code, cached);
     }
+    // A typed reference is a fallback, not a verdict. It was never meant to
+    // stop the prep center from answering — it exists for when it cannot. Left
+    // out of this catch-up, a box the operator labelled by hand could never
+    // pick up the real shipping record, so its delivery note went out with no
+    // destination address, no weights and no itemised contents: exactly the
+    // fields the typed reference cannot supply. A real answer replaces it; a
+    // failure leaves it untouched, which is what the guards below do.
     const outstanding = parcels
-      .filter((p) => p.shipmentStatus !== 'ok' && p.shipmentStatus !== 'manual' && !shipmentByCode.has(p.code))
+      .filter((p) => p.shipmentStatus !== 'ok' && !shipmentByCode.has(p.code))
       .map((p) => p.code);
     // The catch-up's own outcome is the freshest word on the boxes it covered —
     // more recent than whatever they were marked with while scanning.

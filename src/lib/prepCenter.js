@@ -105,6 +105,11 @@ export function normalizeShipment(raw) {
     legalNote: pick(raw, 'legalNote', 'notes', 'footerNote'),
     byTracking,
     contentsPerBox,
+    // Their answer exactly as it arrived, stored beside the document we print
+    // from it. If a value on a signed delivery note is ever disputed, this is
+    // what shows where it came from — a normalized copy would already have
+    // lost whatever the disagreement is about.
+    raw,
   };
 }
 

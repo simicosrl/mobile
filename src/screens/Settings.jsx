@@ -26,6 +26,84 @@ function Field({ label, ...props }) {
   );
 }
 
+// The logo that goes on this prep center's delivery notes.
+//
+// It is downscaled before it is stored: the data URL ends up inside every DDT
+// PDF, and every one of those is pushed to the database and kept. A 4 MB photo
+// of a letterhead would be carried, forever, on every note this warehouse ever
+// issues. 480px on the long edge is more than an A4 header can show.
+const LOGO_MAX_EDGE = 480;
+
+function downscaleToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('could not read the file'));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('that file is not an image the app can read'));
+      img.onload = () => {
+        const scale = Math.min(1, LOGO_MAX_EDGE / Math.max(img.width, img.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(img.width * scale));
+        canvas.height = Math.max(1, Math.round(img.height * scale));
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        // PNG, not JPEG: a logo on a white delivery note needs its transparency,
+        // and JPEG would put grey fringing around the lettering.
+        resolve(canvas.toDataURL('image/png'));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function LogoField({ value, onChange }) {
+  const [error, setError] = useState(null);
+  const pick = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';                    // so the same file can be picked again
+    if (!file) return;
+    setError(null);
+    try {
+      onChange(await downscaleToDataUrl(file));
+    } catch (err) {
+      setError(String(err?.message || err));
+    }
+  };
+  return (
+    <div>
+      <div className="mb-2 text-[11px] font-bold uppercase tracking-[.06em] text-secondary">Logo</div>
+      <div className="flex items-center gap-3">
+        <div className="flex h-[58px] w-[112px] flex-none items-center justify-center overflow-hidden rounded-xl border border-inputborder bg-white">
+          {value
+            ? <img src={value} alt="Company logo" data-testid="logo-preview" className="max-h-[52px] max-w-[104px] object-contain" />
+            : <span className="text-[10px] text-light">none</span>}
+        </div>
+        <div className="flex min-w-0 flex-1 flex-col gap-2">
+          <label className="flex min-h-[40px] cursor-pointer items-center justify-center rounded-xl border border-[rgba(148,163,184,.4)] bg-white text-[13px] font-bold text-ink">
+            {value ? 'Replace' : 'Choose image'}
+            <input type="file" accept="image/*" onChange={pick} className="hidden" data-testid="logo-input" />
+          </label>
+          {value && (
+            <button
+              type="button"
+              onClick={() => { setError(null); onChange(null); }}
+              className="min-h-[36px] rounded-xl text-[12px] font-bold text-danger"
+            >
+              Remove
+            </button>
+          )}
+        </div>
+      </div>
+      <div className="mt-2 text-[11px] leading-snug text-secondary">
+        Printed at the top of every delivery note this warehouse issues. Each prep center sets its own.
+      </div>
+      {error && <div className="mt-1.5 text-[11px] font-bold text-danger">{error}</div>}
+    </div>
+  );
+}
+
 // Collapsible so the settings page doesn't turn into one endless scroll as
 // more sections (carriers, company details, updates...) get added —
 // closed sections default to their summary line only.
@@ -127,6 +205,14 @@ export default function Settings() {
       </Section>
 
       <Section title="Company (printed on the A4 document)" summary={org.companyName}>
+        {/* Kept in the local draft like every other field, and also saved on
+            the spot: choosing a picture is a deliberate act, and having it
+            vanish because Save was not pressed afterwards would read as the
+            app losing it. */}
+        <LogoField
+          value={org.companyLogo}
+          onChange={(v) => { setOrg((o) => ({ ...o, companyLogo: v })); updateOrgSettings({ companyLogo: v }); }}
+        />
         <Field label="Company name" value={org.companyName} onChange={set('companyName')} placeholder="SIMICO SRL" />
         <Field label="Address" value={org.companyAddress} onChange={set('companyAddress')} placeholder="Street, city, country" />
         <div className="flex gap-2.5">
