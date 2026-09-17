@@ -399,6 +399,34 @@ export function AppProvider({ children }) {
   const apiConfigRef = useRef(apiConfig);
   useEffect(() => { apiConfigRef.current = apiConfig; }, [apiConfig]);
 
+  // Update one stored document, in state and in storage, applying only the
+  // fields being changed.
+  //
+  // Two sync passes run back to back over the same session — ours, then the
+  // Prep-Center one — and each used to write back the whole document it had
+  // closed over at the start. The second pass therefore undid what the first
+  // had just written. That is how a session could have its delivery notes
+  // issued a second time on the next sync, burning numbers out of a legal
+  // series. The ref is updated before the await so the second pass reads the
+  // first pass's result rather than the copy it started with.
+  const historyRef = useRef([]);
+  useEffect(() => { historyRef.current = history; }, [history]);
+
+  const patchDocument = useCallback(async (docNo, country, patch) => {
+    const list = historyRef.current;
+    const idx = list.findIndex((x) => x.doc === docNo && x.country === country);
+    const base = idx === -1 ? null : list[idx];
+    const merged = { ...(base || {}), ...patch };
+    if (idx !== -1) {
+      const next = list.slice();
+      next[idx] = merged;
+      historyRef.current = next;
+    }
+    await docPut(merged);
+    setHistory((h) => h.map((x) => (x.doc === docNo && x.country === country ? { ...x, ...patch } : x)));
+    return merged;
+  }, []);
+
   const patchParcel = useCallback((code, patch) => {
     setParcels((list) => list.map((p) => (p.code === code ? { ...p, ...patch } : p)));
   }, []);
@@ -731,20 +759,58 @@ export function AppProvider({ children }) {
   // recognise would be a false statement on a legal transport document.
   const buildDdtsForSession = useCallback(async (document) => {
     if (document.direction !== 'out') return { ddts: [], excluded: [] };
-    const { groups, unresolved } = groupForDdt(
-      (document.parcels || []).map((p) => ({
-        ...p,
+    const parcels = document.parcels || [];
+
+    // Catch up on anything still unplaced before deciding what goes on a DDT.
+    //
+    // The lookup during scanning is fire-and-forget, so the last box scanned can
+    // still be in flight when the driver signs — and without this it would be
+    // dropped from the document a second before its answer arrived. Offline, it
+    // is every box: this is also what lets a session scanned with no signal
+    // produce its delivery notes later, from syncNow.
+    //
+    // One call for all of them, and it runs after the signature, so it never
+    // stands between the operator and the next scan.
+    const shipmentByCode = new Map();
+    for (const p of parcels) {
+      const cached = shipmentCacheRef.current.get(p.code);
+      if (cached) shipmentByCode.set(p.code, cached);
+    }
+    const outstanding = parcels
+      .filter((p) => p.shipmentStatus !== 'ok' && !shipmentByCode.has(p.code))
+      .map((p) => p.code);
+    if (outstanding.length && apiConfigRef.current?.baseUrl) {
+      const res = await resolveTrackings(apiConfigRef.current, outstanding);
+      for (const [code, shipment] of res.shipments) {
+        shipmentByCode.set(code, shipment);
+        shipmentCacheRef.current.set(code, shipment);
+      }
+    }
+
+    const resolved = parcels.map((p) => {
+      const shipment = shipmentByCode.get(p.code);
+      if (!shipment) {
         // groupForDdt keys on shipmentId; a parcel the prep center rejected
         // outright must not be grouped even if a stale id is still on it.
-        shipmentId: p.shipmentStatus === 'ok' ? p.shipmentId : null,
-      })),
-    );
+        return { ...p, shipmentId: p.shipmentStatus === 'ok' ? p.shipmentId : null };
+      }
+      const box = shipment.byTracking?.get(p.code);
+      return {
+        ...p,
+        shipmentId: shipment.shipmentId,
+        fbaId: shipment.fbaId || p.fbaId || null,
+        weightKg: p.weightKg ?? box?.weightKg ?? null,
+        contents: (p.contents || []).length ? p.contents : box?.contents || [],
+      };
+    });
+
+    const { groups, unresolved } = groupForDdt(resolved);
     if (!groups.length) return { ddts: [], excluded: unresolved };
 
     const mod = await import('../lib/ddtPdf');
     const ddts = [];
     for (const group of groups) {
-      const shipment = shipmentCacheRef.current.get(group.parcels[0].code) || {};
+      const shipment = shipmentByCode.get(group.parcels[0].code) || {};
       // Each DDT takes its own number from the DDT series. Reserved
       // server-side like every other document number; if that call fails the
       // document is still produced, marked so the office can see the number
@@ -1039,9 +1105,7 @@ export function AppProvider({ children }) {
       const res = await api.pushSession(apiConfig, { ...d, pdfDataUrl });
       const prepSyncError = res.ok ? null : api.describeError(res);
       if (res.ok) ok++; else { fail++; lastError = prepSyncError; }
-      const updated = { ...d, prepSyncStatus: res.ok ? 'ok' : 'failed', prepSyncError };
-      await docPut(updated);
-      setHistory((h) => h.map((x) => (x.doc === d.doc && x.country === d.country ? { ...x, ...updated } : x)));
+      await patchDocument(d.doc, d.country, { prepSyncStatus: res.ok ? 'ok' : 'failed', prepSyncError });
     }
     if (!silent) {
       showToast(
@@ -1051,7 +1115,7 @@ export function AppProvider({ children }) {
       );
     }
     return { attempted: pending.length, ok, fail, lastError };
-  }, [apiConfig, history, shift, showToast, renderPdfDataUrl]);
+  }, [apiConfig, history, shift, showToast, renderPdfDataUrl, patchDocument]);
   const syncPrepPendingRef = useRef(() => {});
   useEffect(() => { syncPrepPendingRef.current = syncPrepPending; }, [syncPrepPending]);
 
@@ -1084,6 +1148,17 @@ export function AppProvider({ children }) {
     const ddtPending = history.filter(
       (d) => d.country === shift?.country && d.syncStatus === 'ok' && d.ddtSyncStatus && d.ddtSyncStatus !== 'ok' && (d.ddts || []).length,
     );
+    // Outbound sessions that produced no delivery notes at all because nothing
+    // could be looked up at the time — scanned with no signal, typically. The
+    // boxes are recorded and signed for; the documents are simply owed. Build
+    // them now that there is a network, rather than leaving them owed forever.
+    const ddtMissing = history.filter(
+      (d) =>
+        d.country === shift?.country &&
+        d.direction === 'out' &&
+        !(d.ddts || []).length &&
+        (d.parcels || []).some((p) => p.shipmentStatus !== 'ok'),
+    );
     let okCount = 0;
     let failCount = 0;
     let lastError = null;
@@ -1092,22 +1167,39 @@ export function AppProvider({ children }) {
       const res = await api.pushSession(internalConfig, { ...d, pdfDataUrl });
       const syncError = res.ok ? null : api.describeError(res);
       if (res.ok) okCount++; else { failCount++; lastError = syncError; }
-      let updated = { ...d, syncStatus: res.ok ? 'ok' : 'failed', syncError };
+      const patch = { syncStatus: res.ok ? 'ok' : 'failed', syncError };
       if (res.ok && (d.ddts || []).length) {
         const ddtRes = await api.pushDdts(internalConfig, d.doc, d.ddts);
-        updated = { ...updated, ddtSyncStatus: ddtRes.ok ? 'ok' : 'failed', ddtSyncError: ddtRes.ok ? null : ddtRes.error };
+        patch.ddtSyncStatus = ddtRes.ok ? 'ok' : 'failed';
+        patch.ddtSyncError = ddtRes.ok ? null : ddtRes.error;
       }
-      await docPut(updated);
-      setHistory((h) => h.map((x) => (x.doc === d.doc && x.country === d.country ? { ...x, ...updated } : x)));
+      await patchDocument(d.doc, d.country, patch);
     }
     let ddtOk = 0;
     let ddtFail = 0;
+    let ddtBuilt = 0;
+    for (const d of ddtMissing) {
+      const { ddts, excluded } = await buildDdtsForSession(d);
+      if (!ddts.length) continue;   // still nothing to place — try again next time
+      ddtBuilt += ddts.length;
+      // Keep the built notes before pushing. They carry reserved numbers from
+      // the DDT series, so a failed push must not cause them to be built a
+      // second time — that would burn numbers and leave gaps in a legal series.
+      await patchDocument(d.doc, d.country, { ddts, ddtExcluded: excluded.map((p) => p.code) });
+      const ddtRes = await api.pushDdts(internalConfig, d.doc, ddts);
+      if (ddtRes.ok) ddtOk++; else ddtFail++;
+      await patchDocument(d.doc, d.country, {
+        ddtSyncStatus: ddtRes.ok ? 'ok' : 'failed',
+        ddtSyncError: ddtRes.ok ? null : ddtRes.error,
+      });
+    }
     for (const d of ddtPending) {
       const ddtRes = await api.pushDdts(internalConfig, d.doc, d.ddts);
       if (ddtRes.ok) ddtOk++; else ddtFail++;
-      const updated = { ...d, ddtSyncStatus: ddtRes.ok ? 'ok' : 'failed', ddtSyncError: ddtRes.ok ? null : ddtRes.error };
-      await docPut(updated);
-      setHistory((h) => h.map((x) => (x.doc === d.doc && x.country === d.country ? { ...x, ...updated } : x)));
+      await patchDocument(d.doc, d.country, {
+        ddtSyncStatus: ddtRes.ok ? 'ok' : 'failed',
+        ddtSyncError: ddtRes.ok ? null : ddtRes.error,
+      });
     }
     // Same pass, second destination — reported together so "Sync now"
     // reads as one action even though it talks to two systems.
@@ -1116,7 +1208,10 @@ export function AppProvider({ children }) {
     const parts = [
       !pending.length ? 'DB: nothing pending' : failCount ? `DB: ${okCount} sent, ${failCount} failed — ${lastError}` : `DB: ${okCount} sent`,
     ];
-    if (ddtOk || ddtFail) parts.push(ddtFail ? `DDT: ${ddtOk} sent, ${ddtFail} failed` : `DDT: ${ddtOk} sent`);
+    if (ddtOk || ddtFail) {
+      const built = ddtBuilt ? ` (${ddtBuilt} newly issued)` : '';
+      parts.push(ddtFail ? `DDT: ${ddtOk} sent, ${ddtFail} failed${built}` : `DDT: ${ddtOk} sent${built}`);
+    }
     if (apiConfig.baseUrl) {
       parts.push(
         !prepResult.attempted ? 'Prep-Center: up to date'
@@ -1125,30 +1220,38 @@ export function AppProvider({ children }) {
       );
     }
     showToast(parts.join(' · '));
-  }, [internalConfig, apiConfig.baseUrl, history, shift, showToast, renderPdfDataUrl, syncPrepPending]);
+  }, [internalConfig, apiConfig.baseUrl, history, shift, showToast, renderPdfDataUrl, syncPrepPending, buildDdtsForSession, patchDocument]);
 
   const retrySync = useCallback(async (doc) => {
     const d = history.find((x) => x.doc === doc && x.country === shift?.country);
     if (!d) return;
     const pdfDataUrl = await renderPdfDataUrl(d);
-    let updated = d;
+    let current = d;
     const parts = [];
     if (internalConfig && d.syncStatus !== 'ok') {
-      const res = await api.pushSession(internalConfig, { ...updated, pdfDataUrl });
+      const res = await api.pushSession(internalConfig, { ...current, pdfDataUrl });
       const syncError = res.ok ? null : api.describeError(res);
-      updated = { ...updated, syncStatus: res.ok ? 'ok' : 'failed', syncError };
+      current = await patchDocument(doc, d.country, { syncStatus: res.ok ? 'ok' : 'failed', syncError });
       parts.push(res.ok ? 'DB sent' : `DB failed — ${syncError}`);
     }
+    // Retrying one row has to cover its delivery notes too, or a session whose
+    // DDT push was the part that failed would report "sent" and still owe them.
+    if (internalConfig && current.syncStatus === 'ok' && (current.ddts || []).length && current.ddtSyncStatus !== 'ok') {
+      const res = await api.pushDdts(internalConfig, doc, current.ddts);
+      current = await patchDocument(doc, d.country, {
+        ddtSyncStatus: res.ok ? 'ok' : 'failed',
+        ddtSyncError: res.ok ? null : res.error,
+      });
+      parts.push(res.ok ? `${current.ddts.length} DDT sent` : `DDT failed — ${res.error}`);
+    }
     if (apiConfig.baseUrl && apiConfig.autoPush && d.prepSyncStatus !== 'ok') {
-      const res = await api.pushSession(apiConfig, { ...updated, pdfDataUrl });
+      const res = await api.pushSession(apiConfig, { ...current, pdfDataUrl });
       const prepSyncError = res.ok ? null : api.describeError(res);
-      updated = { ...updated, prepSyncStatus: res.ok ? 'ok' : 'failed', prepSyncError };
+      current = await patchDocument(doc, d.country, { prepSyncStatus: res.ok ? 'ok' : 'failed', prepSyncError });
       parts.push(res.ok ? 'Prep-Center sent' : `Prep-Center failed — ${prepSyncError}`);
     }
-    await docPut(updated);
-    setHistory((h) => h.map((x) => (x.doc === doc && x.country === d.country ? { ...x, ...updated } : x)));
     showToast(parts.length ? `${doc}: ${parts.join(' · ')}` : `${doc} already up to date`);
-  }, [internalConfig, apiConfig, history, shift, showToast, renderPdfDataUrl]);
+  }, [internalConfig, apiConfig, history, shift, showToast, renderPdfDataUrl, patchDocument]);
 
   // Every screen reads `history`/`driverProfiles` through this context —
   // filtering once, here, means each country only ever sees its own data
