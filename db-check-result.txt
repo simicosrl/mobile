@@ -1,0 +1,324 @@
+
+== connection actually used below ==
+postgresql://postgres.piafchajbkfkyftumxke:<redacted>@aws-1-eu-west-1.pooler.supabase.com:6543/postgres
+
+== admin.badge_countries (who can sign in, and as which country) ==
+      badge_id      | country |      label       | active 
+--------------------+---------+------------------+--------
+ <badge row redacted>
+ <badge row redacted>
+ <badge row redacted>
+ <badge row redacted>
+(4 rows)
+
+
+== admin.scanner_keys ==
+ country | warehouse |           label           | active |          created_at           |        last_used_at        
+---------+-----------+---------------------------+--------+-------------------------------+----------------------------
+ DE      |           | App default key — Germany | t      | 2026-08-24 08:14:54.159429+00 | 2026-08-24 13:10:56.255+00
+ FR      |           | App default key — France  | t      | 2026-08-24 08:14:54.159429+00 | 2026-09-17 12:32:44.049+00
+ IT      |           | Test key — Italy          | t      | 2026-08-24 07:54:43.290641+00 | 2026-09-17 18:22:10.198+00
+(3 rows)
+
+
+== wh_it.sessions (last 10) ==
+-[ RECORD 1 ]------------------------------------
+id         | af8aa5d2-f130-4608-a71a-8e803a7f4c57
+doc        | CI-PROBE-DOC
+direction  | inbound
+carrier    | CI-PROBE
+closed_at  | 2026-01-01 00:00:00+00
+created_at | 2026-09-17 18:21:56.19109+00
+signed     | f
+has_pdf    | f
+-[ RECORD 2 ]------------------------------------
+id         | 6e69fe40-ee95-462f-b86d-8100c945a9df
+doc        | WH-IT-OUT-000079
+direction  | outbound
+carrier    | UPS
+closed_at  | 2026-09-17 18:09:35.686+00
+created_at | 2026-09-17 18:09:40.001753+00
+signed     | t
+has_pdf    | t
+-[ RECORD 3 ]------------------------------------
+id         | e2006637-fd4f-435c-93a7-0e1969c50056
+doc        | WH-IT-OUT-000076
+direction  | outbound
+carrier    | UPS
+closed_at  | 2026-09-17 13:51:50.641+00
+created_at | 2026-09-17 13:51:48.592102+00
+signed     | t
+has_pdf    | t
+-[ RECORD 4 ]------------------------------------
+id         | 631f0708-a9e2-4a20-8827-cdaa624e6234
+doc        | WH-OUT-000081
+direction  | outbound
+carrier    | SDA
+closed_at  | 2026-09-17 12:29:08.108+00
+created_at | 2026-09-17 12:29:05.492892+00
+signed     | t
+has_pdf    | t
+-[ RECORD 5 ]------------------------------------
+id         | 6bd607b4-70fe-44f1-8e41-916227909a75
+doc        | WH-IT-OUT-000074
+direction  | outbound
+carrier    | UPS
+closed_at  | 2026-09-17 10:27:34.588+00
+created_at | 2026-09-17 10:27:37.949983+00
+signed     | t
+has_pdf    | t
+-[ RECORD 6 ]------------------------------------
+id         | 770cd7da-f3b9-4081-bd8a-f1ebe0709ccf
+doc        | WH-IT-IN-000206
+direction  | inbound
+carrier    | UPS
+closed_at  | 2026-09-17 10:25:51.382+00
+created_at | 2026-09-17 10:25:48.851116+00
+signed     | t
+has_pdf    | t
+-[ RECORD 7 ]------------------------------------
+id         | 4ec33865-e1ba-4e4a-a169-b2c7877ed878
+doc        | WH-IT-IN-000205
+direction  | inbound
+carrier    | SDA
+closed_at  | 2026-09-17 10:16:26.932+00
+created_at | 2026-09-17 10:16:24.875772+00
+signed     | t
+has_pdf    | t
+-[ RECORD 8 ]------------------------------------
+id         | 3e6ff78b-ef89-4aec-8f90-646ed51b473f
+doc        | WH-IT-IN-000203
+direction  | inbound
+carrier    | AMAZON
+closed_at  | 2026-09-17 09:13:37.94+00
+created_at | 2026-09-17 09:13:35.462214+00
+signed     | t
+has_pdf    | t
+-[ RECORD 9 ]------------------------------------
+id         | 5c5b28bb-fdf2-4b69-85da-662a70ccdb14
+doc        | WH-IT-IN-000202
+direction  | inbound
+carrier    | BRT
+closed_at  | 2026-09-17 09:02:18.296+00
+created_at | 2026-09-17 09:02:14.993557+00
+signed     | t
+has_pdf    | t
+-[ RECORD 10 ]-----------------------------------
+id         | 73588066-4c7a-45ea-8c75-b1354ef0e7f9
+doc        | WH-IT-IN-000200
+direction  | inbound
+carrier    | BRT
+closed_at  | 2026-09-17 09:01:43.095+00
+created_at | 2026-09-17 09:01:40.830944+00
+signed     | t
+has_pdf    | t
+
+
+== wh_it.parcels, any row with tracking code containing 8007404018060 ==
+-[ RECORD 1 ]-------------------------------------
+id          | 2de65077-b1dd-4b6e-af52-b98a1e2e329b
+session_id  | cf26911e-b1f9-460e-a3c0-e385230388c8
+scan_order  | 1
+boxes       | 1
+expected    | f
+damage_type | 
+no_code     | f
+created_at  | 2026-08-24 12:06:44.907415+00
+-[ RECORD 2 ]-------------------------------------
+id          | 88cd7693-e639-4c75-8356-3f93c4aef86f
+session_id  | 8a17fe23-b627-4635-a194-db86322b2b4c
+scan_order  | 1
+boxes       | 1
+expected    | 
+damage_type | 
+no_code     | f
+created_at  | 2026-08-24 13:03:49.083439+00
+-[ RECORD 3 ]-------------------------------------
+id          | fd38cb78-bf4a-4b80-a52d-40928552c6ce
+session_id  | 77d91dbb-15eb-4f05-9d19-d3bd14f0ac24
+scan_order  | 1
+boxes       | 1
+expected    | f
+damage_type | 
+no_code     | f
+created_at  | 2026-08-26 08:50:26.335634+00
+
+
+== wh_it.parcels (last 10, any code) ==
+-[ RECORD 1 ]-------------------------------------
+id          | 3963c010-69de-4ae7-a27c-21328217b1c8
+session_id  | af8aa5d2-f130-4608-a71a-8e803a7f4c57
+scan_order  | 1
+boxes       | 1
+expected    | 
+damage_type | 
+no_code     | t
+created_at  | 2026-09-17 18:21:56.549578+00
+-[ RECORD 2 ]-------------------------------------
+id          | 17a01e7c-67d3-4737-b6ac-f50562d1aa09
+session_id  | 6e69fe40-ee95-462f-b86d-8100c945a9df
+scan_order  | 1
+boxes       | 1
+expected    | t
+damage_type | 
+no_code     | f
+created_at  | 2026-09-17 18:09:40.098332+00
+-[ RECORD 3 ]-------------------------------------
+id          | 08074560-279b-4650-afa4-d845414e01c0
+session_id  | e2006637-fd4f-435c-93a7-0e1969c50056
+scan_order  | 7
+boxes       | 1
+expected    | f
+damage_type | 
+no_code     | f
+created_at  | 2026-09-17 13:51:48.720775+00
+-[ RECORD 4 ]-------------------------------------
+id          | ba760b8c-5e79-474c-9377-949e3c172494
+session_id  | e2006637-fd4f-435c-93a7-0e1969c50056
+scan_order  | 3
+boxes       | 1
+expected    | f
+damage_type | 
+no_code     | f
+created_at  | 2026-09-17 13:51:48.720775+00
+-[ RECORD 5 ]-------------------------------------
+id          | 45e7df5e-bb08-4cff-a89c-88a380ff3cf6
+session_id  | e2006637-fd4f-435c-93a7-0e1969c50056
+scan_order  | 5
+boxes       | 1
+expected    | f
+damage_type | 
+no_code     | f
+created_at  | 2026-09-17 13:51:48.720775+00
+-[ RECORD 6 ]-------------------------------------
+id          | e14996e0-230e-4a91-be97-f6289fd29523
+session_id  | e2006637-fd4f-435c-93a7-0e1969c50056
+scan_order  | 6
+boxes       | 1
+expected    | f
+damage_type | 
+no_code     | f
+created_at  | 2026-09-17 13:51:48.720775+00
+-[ RECORD 7 ]-------------------------------------
+id          | 712c9d85-fa6b-4e55-af10-239eb0ce761a
+session_id  | e2006637-fd4f-435c-93a7-0e1969c50056
+scan_order  | 2
+boxes       | 1
+expected    | f
+damage_type | 
+no_code     | f
+created_at  | 2026-09-17 13:51:48.720775+00
+-[ RECORD 8 ]-------------------------------------
+id          | 526f69bf-0d95-4772-9e96-9a1c62ff7dd2
+session_id  | e2006637-fd4f-435c-93a7-0e1969c50056
+scan_order  | 4
+boxes       | 1
+expected    | f
+damage_type | 
+no_code     | f
+created_at  | 2026-09-17 13:51:48.720775+00
+-[ RECORD 9 ]-------------------------------------
+id          | 34b08f91-7cf3-4461-9ff0-1a2c76505886
+session_id  | e2006637-fd4f-435c-93a7-0e1969c50056
+scan_order  | 1
+boxes       | 1
+expected    | f
+damage_type | 
+no_code     | f
+created_at  | 2026-09-17 13:51:48.720775+00
+-[ RECORD 10 ]------------------------------------
+id          | fd6cb754-d791-475b-b22b-5b7c74d7720f
+session_id  | e2006637-fd4f-435c-93a7-0e1969c50056
+scan_order  | 8
+boxes       | 1
+expected    | f
+damage_type | 
+no_code     | f
+created_at  | 2026-09-17 13:51:48.720775+00
+
+
+== DDT tables (outbound delivery notes) ==
+ table_schema | table_name 
+--------------+------------
+ wh_de        | ddt
+ wh_de        | ddt_lines
+ wh_fr        | ddt
+ wh_fr        | ddt_lines
+ wh_it        | ddt
+ wh_it        | ddt_lines
+(6 rows)
+
+      doc       |  shipment_id  |    fba_id    |   driver_name   |          created_at           
+----------------+---------------+--------------+-----------------+-------------------------------
+ CI-PROBE-DDT-2 | CI-PROBE-SH-2 |              |                 | 2026-09-17 18:21:59.032299+00
+ CI-PROBE-DDT-1 | CI-PROBE-SH-1 | FBACIPROBE   | CI-PROBE Driver | 2026-09-17 18:21:57.921168+00
+ DDT 3-OUT/2026 | FBA15MGTY4VM  | FBA15MGTY4VM | Test            | 2026-09-17 18:10:51.436617+00
+ DDT 2-OUT/2026 | FBA15MGVR4S6  | FBA15MGVR4S6 | Ibra            | 2026-09-17 18:10:47.449125+00
+ DDT 1-OUT/2026 | FBA15MGVR4S6  | FBA15MGVR4S6 | Jacopo          | 2026-09-17 18:09:42.328864+00
+(5 rows)
+
+-- one row per (session, shipment) even though DDT-1 was pushed twice --
+      doc       |  shipment_id  | lines 
+----------------+---------------+-------
+ CI-PROBE-DDT-1 | CI-PROBE-SH-1 |     1
+ CI-PROBE-DDT-2 | CI-PROBE-SH-2 |     1
+ DDT 1-OUT/2026 | FBA15MGVR4S6  |     1
+ DDT 2-OUT/2026 | FBA15MGVR4S6  |     1
+ DDT 3-OUT/2026 | FBA15MGTY4VM  |     1
+(5 rows)
+
+ country | year | last_number 
+---------+------+-------------
+ IT      | 2026 |           4
+(1 row)
+
+
+== row counts per country schema ==
+ country | sessions | parcels | ddt 
+---------+----------+---------+-----
+ it      |      157 |    1445 |   5
+(1 row)
+
+ country | sessions | parcels 
+---------+----------+---------
+ fr      |       58 |     375
+(1 row)
+
+ country | sessions | parcels 
+---------+----------+---------
+ de      |        0 |       0
+(1 row)
+
+
+== sequences owned by schema admin (for doc numbering) ==
+ sequencename 
+--------------
+(0 rows)
+
+
+== deleting CI-PROBE test rows from wh_it ==
+DELETE 2
+DELETE 2
+UPDATE 1
+DELETE 1
+DELETE 1
+DELETE 1
+DELETE 1
+
+== resetting IT/inbound doc sequence back to 0 (only test docs existed) ==
+ setval 
+--------
+(0 rows)
+
+
+== wh_it state after cleanup ==
+ sessions 
+----------
+      156
+(1 row)
+
+ parcels 
+---------
+    1444
+(1 row)
+
