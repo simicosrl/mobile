@@ -1,20 +1,34 @@
-Probing with a key.
 Base: https://muswtkzjfrldhgokkmqw.supabase.co/functions/v1/warehouse-scan-api
+Key : present
 
-=== routes that are NOT 404 ===
-  200  GET /warehouse/manifest
-        {tracking_ids: [47 x str]}
-  200  GET /warehouse/manifest?date=today
-        {tracking_ids: [47 x str]}
-  (2 routes answered something other than 404)
+=== tracking IDs to ask about (from their own manifest) ===
+  GET /warehouse/manifest -> 200, 47 ids
+  probing with the first 5 (not printed)
 
-=== full shape of the manifest response ===
-  keys: ['tracking_ids']
-  tracking_ids: list of 47, element type str
+=== which resolve path is live ===
+  200  POST /warehouse/shipments/resolve  (0 shipment record(s))
+  404  POST /shipments/resolve
 
-=== is the database readable directly (PostgREST)? ===
-  base: https://muswtkzjfrldhgokkmqw.supabase.co/rest/v1
-  401  GET /rest/v1/   (apikey)
-  401  GET /rest/v1/   (Authorization)
+=== shape of the answer from /warehouse/shipments/resolve ===
+  {
+  shipments: list(empty)
+}
 
-=== likely shipment tables ===
+=== the three things a DDT depends on ===
+  shipment records          : 0
+  per-box list field        : NOT FOUND
+  boxes described           : 0
+  boxes with contents       : 0 of 0
+  boxes with a weight       : 0 of 0
+  of the 5 asked about, resolved: 0
+  shipment id field         : NOT FOUND
+
+=== auth and CORS ===
+  no key                    -> 401  (401 expected)
+  OPTIONS preflight         -> 204
+    Access-Control-Allow-Origin:    *
+    Access-Control-Allow-Headers:   authorization, content-type
+    Access-Control-Allow-Methods:   GET, POST, OPTIONS
+
+=== unknown tracking ===
+  200, 0 shipment(s) returned (0 expected)
