@@ -33,6 +33,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[prepprobe]')
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - name: Ask the endpoint what it answers
         env:
           BASE: ${{ github.event.inputs.base_url || 'https://muswtkzjfrldhgokkmqw.supabase.co/functions/v1/warehouse-scan-api' }}
@@ -40,6 +41,7 @@ jobs:
           TRACKING: ${{ github.event.inputs.tracking || '<a tracking number>' }}
         run: |
           set -u
+          exec > >(tee prep-probe-result.txt) 2>&1
           BASE="${BASE%/}"
 
           # Show status, content-type and the first part of the body — enough to
@@ -99,3 +101,28 @@ jobs:
           echo "───────────────────────────────────────────────"
           echo "Read the statuses: 404 = no such route, 401 = route wants a key,"
           echo "200 with a shipments list = the route we need already exists."
+
+      # The run log cannot be downloaded from the environment this repo is
+      # developed in, so the result comes back through the repo instead —
+      # the same way db-check reports.
+      - name: Commit the result back
+        if: always()
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -f prep-probe-result.txt
+          if git diff --cached --quiet; then echo "Nothing changed"; exit 0; fi
+          git commit -m "ci: prep-center probe result [skip dbcheck]"
+          cp prep-probe-result.txt /tmp/prep-probe-result.txt
+          for i in 1 2 3 4 5; do
+            if git push origin HEAD:main; then exit 0; fi
+            git fetch origin main
+            git reset --hard origin/main
+            cp /tmp/prep-probe-result.txt prep-probe-result.txt
+            git add -f prep-probe-result.txt
+            git commit -m "ci: prep-center probe result [skip dbcheck]"
+            sleep $((i * 3))
+          done
+          echo "Giving up after 5 attempts" >&2
+          exit 1
