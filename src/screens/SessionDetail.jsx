@@ -1,9 +1,31 @@
+import { useEffect, useState } from 'react';
 import { useApp } from '../state/AppContext';
 import { Download, Printer } from '../components/icons';
 
 export default function SessionDetail() {
-  const { history, selectedDocNo, historyQuery, printDocument, printDdt, openPhoto } = useApp();
+  const { history, selectedDocNo, historyQuery, printDocument, printDdt, openPhoto, lookupNoted } = useApp();
   const sel = history.find((h) => h.doc === selectedDocNo);
+
+  // Which delivery note each box actually travels on.
+  //
+  // A session can legitimately end with no note of its own, because every box
+  // on it had already shipped on an earlier one. Looking at that session a day
+  // later, the screen showed nothing at all — no notes, no reason — which reads
+  // as the app having failed to do its job. It is asked of the database rather
+  // than kept locally so it is the same answer on any device, including one
+  // that never saw the session being closed.
+  const [noted, setNoted] = useState(null);
+  const codes = (sel?.parcels || []).map((p) => p.code).join(',');
+  useEffect(() => {
+    let cancelled = false;
+    if (!sel || sel.direction !== 'out' || !codes) { setNoted(null); return undefined; }
+    (async () => {
+      const map = await lookupNoted(codes.split(','));
+      if (!cancelled) setNoted(map);
+    })();
+    return () => { cancelled = true; };
+  }, [sel?.doc, codes, sel?.direction, lookupNoted]);
+
   if (!sel) return null;
   const q = historyQuery.trim().toUpperCase();
   const boxes = sel.parcels.reduce((a, p) => a + p.boxes, 0);
@@ -44,6 +66,23 @@ export default function SessionDetail() {
               <div className="truncate text-[10.5px]" style={{ color: p.noCode || p.damage ? '#DC2626' : '#64748B' }}>
                 {p.noCode ? 'NO VALID CODE' + (p.noCodeNote ? ` — ${p.noCodeNote}` : '') : p.damage || 'Good, sealed'}
               </div>
+              {/* Answered for every box, not only the ones that went wrong: a
+                  green line naming the note is also how the operator confirms
+                  the box did travel, without opening the PDF. */}
+              {sel.direction === 'out' && noted && (
+                noted.has(p.code) ? (
+                  <div className="truncate text-[10.5px] font-bold" style={{ color: '#15803D' }}>
+                    on {noted.get(p.code).doc || 'a delivery note'}
+                    {noted.get(p.code).createdAtIso && !sameDay(noted.get(p.code).createdAtIso, sel.closedAtIso)
+                      ? ` · issued ${shortDate(noted.get(p.code).createdAtIso)}`
+                      : ''}
+                  </div>
+                ) : (
+                  <div className="truncate text-[10.5px] font-bold" style={{ color: '#C2410C' }}>
+                    on no delivery note
+                  </div>
+                )
+              )}
             </div>
             {p.photoDataUrl && (
               <button onClick={() => openPhoto(p.photoDataUrl)} className="flex-none">
@@ -62,6 +101,18 @@ export default function SessionDetail() {
           `ddts` are the full notes this device issued; `ddtSummaries` are what
           the database reports for a session closed on another phone — enough to
           say which notes exist, and reprintable by fetching the stored PDF. */}
+      {/* A session that issued nothing of its own still owes an explanation. */}
+      {sel.direction === 'out' && ddts.length === 0 && noted && (
+        <div className="rounded-2xl border border-[rgba(148,163,184,.35)] bg-white px-[13px] py-3">
+          <div className="text-[12px] font-bold text-ink">No delivery note was issued here</div>
+          <div className="mt-1 text-[11px] leading-[1.5] text-secondary">
+            {(sel.parcels || []).every((p) => noted.has(p.code))
+              ? 'Every parcel in this session already travelled on an earlier note, so no second one was issued — a parcel ships once.'
+              : 'The Prep-Center could not place these parcels, and no shipping reference was given for them.'}
+          </div>
+        </div>
+      )}
+
       {ddts.length > 0 && (
         <div className="overflow-hidden rounded-2xl border border-[rgba(148,163,184,.25)] bg-white">
           <div className="border-b border-[rgba(148,163,184,.25)] bg-page px-3 py-2.5 text-[10px] font-bold uppercase tracking-[.08em] text-secondary">
@@ -95,6 +146,18 @@ export default function SessionDetail() {
       </div>
     </div>
   );
+}
+
+// Dates only matter here when the note is from another day — an earlier
+// shipment is the whole point of the line.
+function sameDay(a, b) {
+  if (!a || !b) return true;
+  return new Date(a).toDateString() === new Date(b).toDateString();
+}
+function shortDate(iso) {
+  const d = new Date(iso);
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}`;
 }
 
 // A note issued here carries its parcels; one summarised by the database

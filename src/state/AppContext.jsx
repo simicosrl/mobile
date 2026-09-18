@@ -1156,6 +1156,20 @@ export function AppProvider({ children }) {
     }
   }, [signReady, showToast, closeSession]);
 
+  // Which delivery note carries each of these boxes, asked of the database.
+  //
+  // Used by the History screen. A session can legitimately end with no note of
+  // its own — every box on it had already shipped — and looking at it a day
+  // later, the screen simply showed nothing, which reads as the app having
+  // failed. Naming the note each box actually travels on answers the question
+  // on the screen where it gets asked.
+  const lookupNoted = useCallback(async (codes) => {
+    const config = internalConfigRef.current;
+    if (!config || !codes?.length) return new Map();
+    const res = await api.lookupNotedTrackings(config, codes);
+    return res.ok ? res.noted : new Map();
+  }, []);
+
   // Print or share one delivery note. The DDT travels with the goods, so the
   // driver needs it at the bay — it is no use only being in the database.
   const printDdt = useCallback(async (ddt) => {
@@ -1498,7 +1512,7 @@ export function AppProvider({ children }) {
     noCodeSheet, openNoCodeSheet, closeNoCodeSheet, setNoCodeNote, setNoCodePhoto, saveNoCode, rejectedScan,
     courierName, setCourierName, plate, setPlate,
     signatureDataUrl, setSignatureDataUrl, sigInk, setSigInk, clearSignature, signReady, toSign, finish, finishing,
-    confirmedDoc, printDocument, printDdt, emailDocument,
+    confirmedDoc, printDocument, printDdt, emailDocument, lookupNoted,
     history: visibleHistory, historyQuery, setHistoryQuery, historyFilter, setHistoryFilter, selectedDocNo, openSession, backToHistory,
     apiConfig, apiShowKey, setApiBaseUrl, setApiKey, generateApiKey, copyApiKey, togglePush, togglePull, toggleShowKey,
     manifest, pulling, pullManifestNow, syncing, syncNow, retrySync, syncPrepPending,
