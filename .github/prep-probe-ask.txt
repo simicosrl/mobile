@@ -12,3 +12,7 @@
 # hash works.
 
 db8eac1041f5c3871ec17febdad74668dac7166f7016a4690c7be0716f80f1f8
+# WH-IT-OUT-000084, box 2 — 18 chars, expected:true on their manifest, no DDT
+27f129b5f2ac0c11604e6b72a790edbfbeff4cac02f1b6021e775724cc0a6b02
+# WH-IT-OUT-000084, box 1 — 12 chars, a truncated label
+b4739b43ce6932b8209ede28d9766e3fba9ddf9b017c96802113d174caf8be13
