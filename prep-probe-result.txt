@@ -101,6 +101,11 @@ Key : present
              total units in the box: 11
              same ID as lower-case -> 1 shipment(s)
   b4739b43ce69…  NOT in the manifest at all
+  0cbc733c3e92…  in the manifest
+             resolve -> 200, shipmentId present: True, fbaId present: True
+             weightKg: 18.5, contents lines: 1
+             total units in the box: 2
+             same ID as lower-case -> 1 shipment(s)
 
 === are the address blocks actually filled? ===
   shipments examined: 133
