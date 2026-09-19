@@ -331,6 +331,45 @@ for f in ('carrier', 'amazonReference', 'reason', 'goodsDescription', 'legalNote
     have = sum(1 for s in ships if str(s.get(f) or '').strip())
     print('  %-18s on %3d of %3d' % (f + ':', have, len(ships)))
 
+
+# ---------------------------------------------------------------------------
+# When most shipments carry a destination and a sizeable minority do not, the
+# useful question is no longer "how many" but "which ones". If the empty set is
+# distinguishable by some other field, their developer has a pointer instead of
+# a count.
+print()
+print('=== what tells the empty-destination shipments apart? ===')
+have = [s for s in ships if filled(s.get('destination'))]
+gone = [s for s in ships if s.get('destination') is not None and not filled(s.get('destination'))]
+print('  with a destination: %d      without: %d' % (len(have), len(gone)))
+
+
+def pct(group, f):
+    if not group:
+        return '   -'
+    n = sum(1 for s in group if str(s.get(f) or '').strip())
+    return '%3d/%-3d' % (n, len(group))
+
+
+def boxpct(group, f):
+    if not group:
+        return '   -'
+    n = sum(1 for s in group for b in (s.get('boxes') or []) if b.get(f) not in (None, ''))
+    t = sum(len(s.get('boxes') or []) for s in group)
+    return '%3d/%-3d' % (n, t)
+
+
+print('  %-20s %-10s %-10s' % ('field', 'with dest', 'without'))
+for f in ('carrier', 'fbaId', 'shipmentId', 'prepAt', 'packingGroup', 'reason', 'legalNote'):
+    print('  %-20s %-10s %-10s' % (f, pct(have, f), pct(gone, f)))
+print('  %-20s %-10s %-10s' % ('boxes[].weightKg', boxpct(have, 'weightKg'), boxpct(gone, 'weightKg')))
+print('  %-20s %-10s %-10s' % ('boxes[].contents', boxpct(have, 'contents'), boxpct(gone, 'contents')))
+# The shape of a filled destination, so they can see what a good one looks like.
+if have:
+    d = have[0].get('destination') or {}
+    print('  a filled destination has values for: %s'
+          % sorted(k for k, v in d.items() if str(v or '').strip()))
+
 print()
 print('=== does it say why nothing matched? ===')
 st, hdrs, tx = call('POST', path, {'trackings': sample})
