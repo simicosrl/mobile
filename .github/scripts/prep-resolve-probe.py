@@ -337,6 +337,25 @@ for f in ('carrier', 'amazonReference', 'reason', 'goodsDescription', 'legalNote
 # useful question is no longer "how many" but "which ones". If the empty set is
 # distinguishable by some other field, their developer has a pointer instead of
 # a count.
+
+# A shipment record can cover several boxes, so "134 shipments" says nothing
+# about how many of the listed IDs a scan will actually place. Every ID that
+# does not come back is a box the operator has to type a reference for by hand.
+print()
+print('=== how many listed IDs actually resolve? ===')
+covered_all = set()
+for sh in ships:
+    for bx in (sh.get('boxes') or []):
+        for k in ('tracking', 'trackingId', 'trackingNumber', 'carrierTracking'):
+            if bx.get(k):
+                covered_all.add(str(bx[k]))
+asked = set(ids)
+print('  listed in the manifest : %d' % len(asked))
+print('  resolvable             : %d' % len(asked & covered_all))
+print('  listed but unresolvable: %d' % len(asked - covered_all))
+print('  (boxes described in total: %d, across %d shipments)'
+      % (sum(len(sh.get('boxes') or []) for sh in ships), len(ships)))
+
 print()
 print('=== what tells the empty-destination shipments apart? ===')
 have = [s for s in ships if filled(s.get('destination'))]
