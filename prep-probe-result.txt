@@ -2,7 +2,7 @@ Base: https://muswtkzjfrldhgokkmqw.supabase.co/functions/v1/warehouse-scan-api
 Key : present
 
 === tracking IDs to ask about (from their own manifest) ===
-  GET /warehouse/manifest -> 200, 188 ids
+  GET /warehouse/manifest -> 200, 190 ids
   probing with the first 5 (not printed)
 
 === which resolve path is live ===
@@ -14,6 +14,7 @@ Key : present
   shipments: list(4) of {
     shipmentId: str
     fbaId: str
+    carrier: str
     reason: str
     goodsDescription: str
     prepAt: str
@@ -45,10 +46,10 @@ Key : present
       province: str
       country: str
     }
-    boxes: list(1) of {
+    boxes: list(2) of {
       tracking: str
       weightKg: int
-      contents: list(1) of {
+      contents: list(2) of {
         description: str
         sku: str
         asin: str
@@ -86,7 +87,7 @@ Key : present
   400  bare array [...]           -> -1 shipment(s)
 
 === does anything in their whole manifest resolve? ===
-  asked about all 188 manifest ids -> 200, 133 shipment(s)
+  asked about all 190 manifest ids -> 200, 134 shipment(s)
   top-level keys in the answer: ['shipments']
 
 === the specific parcels asked about ===
@@ -108,19 +109,19 @@ Key : present
              same ID as lower-case -> 1 shipment(s)
 
 === are the address blocks actually filled? ===
-  shipments examined: 133
-  pickup:      present on 133, filled on 133
-  customer:    present on 133, filled on 133
-  destination: present on 133, filled on   3
-  destination is an empty shell on 130 of 133 shipments
+  shipments examined: 134
+  pickup:      present on 134, filled on 134
+  customer:    present on 134, filled on 134
+  destination: present on 134, filled on  38
+  destination is an empty shell on 96 of 134 shipments
   its keys are: ['city', 'country', 'name', 'postalCode', 'province', 'street']
-  carrier:           on   4 of 133
-  amazonReference:   on   0 of 133
-  reason:            on 133 of 133
-  goodsDescription:  on 133 of 133
-  legalNote:         on 133 of 133
-  packingGroup:      on 133 of 133
+  carrier:           on 124 of 134
+  amazonReference:   on   0 of 134
+  reason:            on 134 of 134
+  goodsDescription:  on 134 of 134
+  legalNote:         on 134 of 134
+  packingGroup:      on 134 of 134
 
 === does it say why nothing matched? ===
-  status 200, body length 5106
+  status 200, body length 5390
   content-type: application/json
