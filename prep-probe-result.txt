@@ -122,6 +122,20 @@ Key : present
   legalNote:         on 134 of 134
   packingGroup:      on 134 of 134
 
+=== what tells the empty-destination shipments apart? ===
+  with a destination: 38      without: 96
+  field                with dest  without   
+  carrier               34/38      90/96    
+  fbaId                 38/38      96/96    
+  shipmentId            38/38      96/96    
+  prepAt                38/38      96/96    
+  packingGroup          38/38      96/96    
+  reason                38/38      96/96    
+  legalNote             38/38      96/96    
+  boxes[].weightKg      46/46     143/144   
+  boxes[].contents      46/46     144/144   
+  a filled destination has values for: ['city', 'country', 'name', 'postalCode', 'province', 'street']
+
 === does it say why nothing matched? ===
   status 200, body length 5390
   content-type: application/json
