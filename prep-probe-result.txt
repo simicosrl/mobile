@@ -122,6 +122,12 @@ Key : present
   legalNote:         on 134 of 134
   packingGroup:      on 134 of 134
 
+=== how many listed IDs actually resolve? ===
+  listed in the manifest : 190
+  resolvable             : 190
+  listed but unresolvable: 0
+  (boxes described in total: 190, across 134 shipments)
+
 === what tells the empty-destination shipments apart? ===
   with a destination: 38      without: 96
   field                with dest  without   
