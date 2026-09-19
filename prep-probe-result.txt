@@ -56,6 +56,7 @@ Key : present
         qty: int
       }
     }
+    amazonReference: str
   }
 }
 
@@ -112,11 +113,11 @@ Key : present
   shipments examined: 134
   pickup:      present on 134, filled on 134
   customer:    present on 134, filled on 134
-  destination: present on 134, filled on  38
-  destination is an empty shell on 96 of 134 shipments
-  its keys are: ['city', 'country', 'name', 'postalCode', 'province', 'street']
+  destination: present on 134, filled on 132
+  destination is an empty shell on 2 of 134 shipments
+  its keys are: []
   carrier:           on 124 of 134
-  amazonReference:   on   0 of 134
+  amazonReference:   on   4 of 134
   reason:            on 134 of 134
   goodsDescription:  on 134 of 134
   legalNote:         on 134 of 134
@@ -129,19 +130,19 @@ Key : present
   (boxes described in total: 190, across 134 shipments)
 
 === what tells the empty-destination shipments apart? ===
-  with a destination: 38      without: 96
+  with a destination: 132      without: 2
   field                with dest  without   
-  carrier               34/38      90/96    
-  fbaId                 38/38      96/96    
-  shipmentId            38/38      96/96    
-  prepAt                38/38      96/96    
-  packingGroup          38/38      96/96    
-  reason                38/38      96/96    
-  legalNote             38/38      96/96    
-  boxes[].weightKg      46/46     143/144   
-  boxes[].contents      46/46     144/144   
+  carrier              122/132      2/2     
+  fbaId                132/132      2/2     
+  shipmentId           132/132      2/2     
+  prepAt               132/132      2/2     
+  packingGroup         132/132      2/2     
+  reason               132/132      2/2     
+  legalNote            132/132      2/2     
+  boxes[].weightKg     187/188      2/2     
+  boxes[].contents     188/188      2/2     
   a filled destination has values for: ['city', 'country', 'name', 'postalCode', 'province', 'street']
 
 === does it say why nothing matched? ===
-  status 200, body length 5390
+  status 200, body length 5718
   content-type: application/json
