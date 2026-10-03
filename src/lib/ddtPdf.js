@@ -1,5 +1,6 @@
 import { jsPDF } from 'jspdf';
 import { productLines, boxCount, totalWeightKg } from './ddtGrouping';
+import { ddtLogoForCountry } from './ddtLogos';
 
 // The DDT (delivery note) that travels with an outbound shipment, rebuilt to
 // match the prep center's own layout field for field — header, the three
@@ -92,23 +93,24 @@ export function buildDdtPdf(ddt, org = {}) {
   doc.setFontSize(9.5);
   doc.text(`no. ${ddt.number} del ${ddt.date}`, PAGE_W - MARGIN_X, 78, { align: 'right' });
 
-  // The prep center's own letterhead, when one has been set in Settings. Each
-  // prep center sets its own, so a note printed in Casazza carries that
-  // company's mark and one printed elsewhere carries theirs. Fitted inside a
+  // The issuing company's letterhead, picked by the session's country: SIMICO
+  // for Italy, Ecom Prep Hub for France and Germany. A country without one
+  // falls back to the logo set in Settings. Fitted inside a
   // fixed box and centred on the title's line, so a wide logo and a tall one
   // both sit correctly instead of pushing the layout around. Without one, the
   // company name is drawn as before.
   const LOGO_MAX_W = 150;
   const LOGO_MAX_H = 42;
   let logoDrawn = false;
-  if (org.companyLogo) {
+  const logo = ddtLogoForCountry(ddt.country) || org.companyLogo;
+  if (logo) {
     try {
-      const props = doc.getImageProperties(org.companyLogo);
+      const props = doc.getImageProperties(logo);
       if (props?.width && props?.height) {
         const scale = Math.min(LOGO_MAX_W / props.width, LOGO_MAX_H / props.height);
         const w = props.width * scale;
         const h = props.height * scale;
-        doc.addImage(org.companyLogo, MARGIN_X, 64 - h / 2, w, h, undefined, 'FAST');
+        doc.addImage(logo, MARGIN_X, 64 - h / 2, w, h, undefined, 'FAST');
         logoDrawn = true;
       }
     } catch {

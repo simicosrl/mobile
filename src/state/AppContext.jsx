@@ -959,6 +959,9 @@ export function AppProvider({ children }) {
         ...group,
         number: number || `DDT (local) ${group.shipmentId}`,
         numberReserved: Boolean(number),
+        // Picks the letterhead (see ddtLogos.js) — kept on the note so a reprint
+        // carries the same one.
+        country: document.country || null,
         // A DDT is dated, not timestamped — `document.date` carries the time
         // too ("16/09/2026 · 20:56"), which belongs in the collection field,
         // not in "no. DDT 211-OUT/2026 del ...".
