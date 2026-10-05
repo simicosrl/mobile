@@ -10,6 +10,10 @@
 // rather than a generic "bring your own ERP" placeholder. Still editable —
 // this is just the default so a fresh install doesn't need it typed in.
 export const DEFAULT_BASE_URL = 'https://piafchajbkfkyftumxke.supabase.co/functions/v1/wms-api';
+
+// The Prep-Center connection every install starts with, so nobody has to type
+// it. Still editable on the API screen; only the key is left to enter.
+export const DEFAULT_PREP_BASE_URL = 'https://muswtkzjfrldhgokkmqw.supabase.co/functions/v1/warehouse-scan-api';
 // One static key per country, registered server-side against that
 // country's schema only (see admin.scanner_keys) — baked in so the app is
 // connected to its own database out of the box, with zero setup from the

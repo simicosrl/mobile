@@ -15,15 +15,15 @@ const AppCtx = createContext(null);
 // api.fetchBadgeCountry can use them without a circular import back into
 // this file) — re-exported here under the same names since the rest of
 // this file already refers to them by these names throughout.
-const { DEFAULT_BASE_URL, DEFAULT_SCANNER_KEYS } = api;
+const { DEFAULT_BASE_URL, DEFAULT_SCANNER_KEYS, DEFAULT_PREP_BASE_URL } = api;
 // `apiConfig` (below) is the operator-facing "API" screen connection — a
-// separate, optional, external system (e.g. Prep-Center), starting
-// unconfigured. It has nothing to do with our own database, which is
+// separate, optional, external system (e.g. Prep-Center), starting on the
+// default Prep-Center address (DEFAULT_PREP_BASE_URL). It has nothing to do with our own database, which is
 // wired up automatically and unconditionally via `internalConfig`
 // (derived from the country's badge lock, never user-editable) — see
 // that definition for why these two used to be conflated and had to be
 // split apart.
-const INITIAL_API_CONFIG = { baseUrl: '', apiKey: '', autoPush: true, autoPull: false, keySecured: false };
+const INITIAL_API_CONFIG = { baseUrl: DEFAULT_PREP_BASE_URL, apiKey: '', autoPush: true, autoPull: false, keySecured: false };
 
 export function AppProvider({ children }) {
   const [ready, setReady] = useState(false);
@@ -161,6 +161,12 @@ export function AppProvider({ children }) {
           apiToUse = { ...apiToUse, baseUrl: '', apiKey: '', keySecured: false };
         }
         await kvSet('prepConfigSplitV1', true);
+      }
+      // An install with no Prep-Center address gets the default one — once, so
+      // an operator who later clears the field on purpose keeps it cleared.
+      if (!(await kvGet('prepDefaultUrlV1', false))) {
+        if (!apiToUse.baseUrl) apiToUse = { ...apiToUse, baseUrl: DEFAULT_PREP_BASE_URL };
+        await kvSet('prepDefaultUrlV1', true);
       }
       setApiConfig(apiToUse);
       setManifest(manifestState);

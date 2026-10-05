@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useApp } from '../state/AppContext';
 import { Globe, Download, RefreshCw } from '../components/icons';
-import { ENDPOINTS, PAYLOAD_SAMPLE, DEFAULT_BASE_URL } from '../lib/api';
+import { ENDPOINTS, PAYLOAD_SAMPLE, DEFAULT_BASE_URL, DEFAULT_PREP_BASE_URL } from '../lib/api';
 
 function Toggle({ on, onClick }) {
   return (
@@ -80,7 +80,7 @@ export default function ApiScreen() {
           value={apiConfig.baseUrl}
           onChange={(e) => setApiBaseUrl(e.target.value)}
           onBlur={checkPrepConnection}
-          placeholder="https://api.simico.srl/v1"
+          placeholder={DEFAULT_PREP_BASE_URL}
           className="min-h-12 w-full rounded-xl border border-inputborder bg-page px-4 font-mono text-[12.5px] text-ink"
         />
       </div>
