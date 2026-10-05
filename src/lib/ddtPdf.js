@@ -32,6 +32,23 @@ const PANEL = [248, 250, 252];
 // and a zone). On the note it reads like every other date we print —
 // "02/10/2026 · 15:23", local time. Anything that will not parse is shown as
 // it came rather than dropped.
+// The PDF's built-in Helvetica only has the Windows-1252 character set. A
+// single character outside it — the "ē" in "Garmin fēnix" — makes jsPDF write
+// the whole line in a two-byte encoding the font cannot show: every letter
+// came out spaced apart, the width was mis-measured, and the line ran across
+// the QTY column and off the page. Accented letters fall back to their base
+// letter (ē → e); anything else unprintable becomes "?".
+const CP1252_EXTRA = new Set('€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ');
+const FALLBACK = { ł: 'l', Ł: 'L', đ: 'd', Đ: 'D', ı: 'i', ŀ: 'l', ħ: 'h' };
+export function pdfSafe(text) {
+  return Array.from(String(text), (ch) => {
+    if (ch.charCodeAt(0) <= 0xff || CP1252_EXTRA.has(ch)) return ch;
+    if (FALLBACK[ch]) return FALLBACK[ch];
+    const base = ch.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    return base && Array.from(base).every((c) => c.charCodeAt(0) <= 0xff) ? base : '?';
+  }).join('');
+}
+
 function prepStamp(value) {
   if (!value) return '—';
   const d = new Date(value);
@@ -74,15 +91,27 @@ function ensureSpace(doc, y, need) {
   return PAGE_TOP;
 }
 
-function addressBlock(doc, heading, lines, x, y, w, h) {
+// Each address line wrapped to the box width, measured in the font it is
+// drawn in (the first line is bold). A long street — "Amazon Italia Logistica
+// S.R.L, Strada Provinciale 299" — otherwise ran straight out of the box and
+// off the page.
+function addressLines(doc, lines, w) {
+  return lines.filter(Boolean).flatMap((line, i) => {
+    doc.setFont('helvetica', i === 0 ? 'bold' : 'normal');
+    doc.setFontSize(8.5);
+    return doc.splitTextToSize(String(line), w - 18).map((text) => ({ text, bold: i === 0 }));
+  });
+}
+
+function addressBlock(doc, heading, rows, x, y, w, h) {
   box(doc, x, y, w, h);
   doc.setFillColor(...PANEL);
   doc.rect(x, y, w, 20, 'F');
   box(doc, x, y, w, 20);
   label(doc, heading, x + 9, y + 13.5);
   let ly = y + 32;
-  lines.filter(Boolean).forEach((line, i) => {
-    value(doc, String(line), x + 9, ly, 8.5, i === 0);
+  rows.forEach((row) => {
+    value(doc, row.text, x + 9, ly, 8.5, row.bold);
     ly += 12.5;
   });
 }
@@ -94,6 +123,13 @@ function addressBlock(doc, heading, lines, x, y, w, h) {
  */
 export function buildDdtPdf(ddt, org = {}) {
   const doc = new jsPDF({ unit: 'pt', format: 'a4', compress: true });
+  // Every string drawn or measured on this document goes through pdfSafe, so
+  // no product title or address from the prep center can break a line.
+  const rawText = doc.text.bind(doc);
+  const rawSplit = doc.splitTextToSize.bind(doc);
+  const safe = (t) => (Array.isArray(t) ? t.map(pdfSafe) : pdfSafe(t));
+  doc.text = (t, ...rest) => rawText(safe(t), ...rest);
+  doc.splitTextToSize = (t, ...rest) => rawSplit(safe(t), ...rest);
 
   // --- header -------------------------------------------------------------
   doc.setFont('helvetica', 'bold');
@@ -141,16 +177,15 @@ export function buildDdtPdf(ddt, org = {}) {
   // Height follows the longest of the three addresses. A fixed height either
   // wastes the page or, worse, cuts the last line off — and the last line of a
   // pick-up address is exactly the kind of thing (email, VAT) that must be there.
-  const addrRows = Math.max(
-    1,
-    ...[ddt.pickup, ddt.customer, ddt.destination].map((l) => (l || []).filter(Boolean).length)
-  );
-  const boxH = 40 + (addrRows - 1) * 12.5;
   const gap = 8;
   const colW = (PAGE_W - MARGIN_X * 2 - gap * 2) / 3;
-  addressBlock(doc, 'PICK-UP ADDRESS', ddt.pickup || [], MARGIN_X, boxTop, colW, boxH);
-  addressBlock(doc, 'CUSTOMER', ddt.customer || [], MARGIN_X + colW + gap, boxTop, colW, boxH);
-  addressBlock(doc, 'MERCHANDISE DESTINATION', ddt.destination || [], MARGIN_X + (colW + gap) * 2, boxTop, colW, boxH);
+  const [pickupRows, customerRows, destinationRows] = [ddt.pickup, ddt.customer, ddt.destination]
+    .map((l) => addressLines(doc, l || [], colW));
+  const addrRows = Math.max(1, pickupRows.length, customerRows.length, destinationRows.length);
+  const boxH = 40 + (addrRows - 1) * 12.5;
+  addressBlock(doc, 'PICK-UP ADDRESS', pickupRows, MARGIN_X, boxTop, colW, boxH);
+  addressBlock(doc, 'CUSTOMER', customerRows, MARGIN_X + colW + gap, boxTop, colW, boxH);
+  addressBlock(doc, 'MERCHANDISE DESTINATION', destinationRows, MARGIN_X + (colW + gap) * 2, boxTop, colW, boxH);
 
   // --- products and services ---------------------------------------------
   let y = boxTop + boxH + 20;
@@ -195,6 +230,10 @@ export function buildDdtPdf(ddt, org = {}) {
     y += rowH;
   }
   lines.forEach((item, i) => {
+    // Measured in the font it is drawn in, not the bold QTY font the previous
+    // row left set — that wrapped every row after the first too early.
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
     const desc = doc.splitTextToSize(String(item.description || ''), descW - 18);
     const ref = [item.sku ? `SKU: ${item.sku}` : null, item.asin ? `ASIN: ${item.asin}` : null]
       .filter(Boolean)
