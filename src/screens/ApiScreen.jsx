@@ -14,7 +14,7 @@ function Toggle({ on, onClick }) {
 export default function ApiScreen() {
   const {
     shift, apiConfig, apiShowKey, setApiBaseUrl, setApiKey, generateApiKey, copyApiKey, togglePush, togglePull, toggleShowKey,
-    manifest, pulling, pullManifestNow, syncing, syncNow, retrySync, syncPrepPending, history,
+    manifest, pulling, pullManifestNow, syncing, syncNow, retrySync, syncPrepPending, allHistory: history,
   } = useApp();
   const [showManifestList, setShowManifestList] = useState(false);
 
@@ -35,12 +35,6 @@ export default function ApiScreen() {
       ? apiConfig.apiKey
       : apiConfig.apiKey.slice(0, 8) + (apiConfig.apiKey.length > 8 ? '••••••••••••' : '');
 
-  const okCount = history.filter((d) => d.syncStatus === 'ok').length;
-  const pendingCount = history.filter((d) => d.syncStatus === 'pending' || d.syncStatus === undefined).length;
-  const failCount = history.filter((d) => d.syncStatus === 'failed').length;
-  const prepOkCount = history.filter((d) => d.prepSyncStatus === 'ok').length;
-  const prepPendingCount = history.filter((d) => d.prepSyncStatus !== 'ok' && d.prepSyncStatus !== 'failed').length;
-  const prepFailCount = history.filter((d) => d.prepSyncStatus === 'failed').length;
   // Right after the operator finishes typing a connection (blur, not every
   // keystroke) — sends anything already closed the moment it looks usable.
   const checkPrepConnection = () => syncPrepPending();
@@ -196,57 +190,54 @@ export default function ApiScreen() {
       </div>
 
       <div>
-        <div className="mb-2 flex flex-col gap-0.5">
-          <div className="flex items-center gap-2">
-            <div className="text-[10px] font-bold uppercase tracking-[.1em] text-light">Outgoing · your database</div>
-            <div className="ml-auto text-[11px] text-secondary">{okCount} sent · {pendingCount} pending · {failCount} failed</div>
-          </div>
-          {online && (
-            <div className="flex items-center gap-2">
-              <div className="text-[10px] font-bold uppercase tracking-[.1em] text-light">Outgoing · Prep-Center</div>
-              <div className="ml-auto text-[11px] text-secondary">{prepOkCount} sent · {prepPendingCount} pending · {prepFailCount} failed</div>
-            </div>
-          )}
+        <div className="mb-2 text-[10px] font-bold uppercase tracking-[.1em] text-light">
+          Outgoing · your database{online ? ' & Prep-Center' : ''}
         </div>
         <div className="overflow-hidden rounded-[14px] border border-[rgba(148,163,184,.25)] bg-white">
-          {history.map((h) => {
-            const status = h.syncStatus || 'pending';
-            const bg = status === 'ok' ? 'rgba(22,163,74,.12)' : status === 'failed' ? 'rgba(220,38,38,.12)' : 'rgba(255,122,0,.14)';
-            const color = status === 'ok' ? '#15803D' : status === 'failed' ? '#B91C1C' : '#C2410C';
-            const prepStatus = h.prepSyncStatus || 'pending';
-            const prepBg = prepStatus === 'ok' ? 'rgba(22,163,74,.12)' : prepStatus === 'failed' ? 'rgba(220,38,38,.12)' : 'rgba(255,122,0,.14)';
-            const prepColor = prepStatus === 'ok' ? '#15803D' : prepStatus === 'failed' ? '#B91C1C' : '#C2410C';
-            const boxes = h.parcels.reduce((a, p) => a + p.boxes, 0);
+          {/* One line for the state of the whole queue. Documents are listed
+              only while something is wrong with them — a row per document
+              saying "DB sent" told the operator nothing they needed. */}
+          {(() => {
+            const unsent = history.filter((h) => h.syncStatus !== 'ok' || (online && h.prepSyncStatus !== 'ok'));
+            const anyFailed = unsent.some((h) => h.syncStatus === 'failed' || (online && h.prepSyncStatus === 'failed'));
+            const color = !unsent.length ? '#15803D' : anyFailed ? '#B91C1C' : '#C2410C';
+            const bg = !unsent.length ? 'rgba(22,163,74,.1)' : anyFailed ? 'rgba(220,38,38,.1)' : 'rgba(255,122,0,.12)';
             return (
-              <div key={h.doc} className="flex items-center gap-2.5 border-b border-[rgba(148,163,184,.15)] p-[11px_12px] last:border-b-0">
-                <div className="min-w-0 flex-1">
-                  <div className="truncate font-mono text-xs font-bold">{h.doc}</div>
-                  <div className="truncate text-[10.5px] text-secondary">{h.carrier} · {h.parcels.length} parcels · {boxes} boxes</div>
-                  {status === 'failed' && h.syncError && (
-                    <div className="truncate text-[10px] font-medium text-[#B91C1C]">DB: {h.syncError}</div>
-                  )}
-                  {online && prepStatus === 'failed' && h.prepSyncError && (
-                    <div className="truncate text-[10px] font-medium text-[#B91C1C]">Prep-Center: {h.prepSyncError}</div>
-                  )}
-                </div>
-                <div className="flex flex-none flex-col items-end gap-1">
-                  <div className="rounded-full px-2 py-1 text-[10px] font-extrabold uppercase tracking-[.05em]" style={{ background: bg, color }}>
-                    {status === 'ok' ? 'DB sent' : `DB ${status}`}
+              <>
+                <div className="flex items-center gap-2.5 border-b border-[rgba(148,163,184,.15)] p-[13px]" style={{ background: bg }}>
+                  <div className="h-[9px] w-[9px] flex-none rounded-full" style={{ background: color }} />
+                  <div className="text-[13.5px] font-extrabold" style={{ color }}>
+                    {!unsent.length
+                      ? 'All synced'
+                      : `${unsent.length} document${unsent.length === 1 ? '' : 's'} not synced`}
                   </div>
-                  {online && (
-                    <div className="rounded-full px-2 py-1 text-[10px] font-extrabold uppercase tracking-[.05em]" style={{ background: prepBg, color: prepColor }}>
-                      {prepStatus === 'ok' ? 'prep sent' : `prep ${prepStatus}`}
-                    </div>
-                  )}
                 </div>
-                {(status === 'failed' || (online && prepStatus === 'failed')) && (
-                  <button onClick={() => retrySync(h.doc)} className="h-8 flex-none rounded-[9px] border border-[rgba(148,163,184,.35)] bg-white px-2.5 text-[11px] font-bold text-ink">
-                    Retry
-                  </button>
-                )}
-              </div>
+                {unsent.map((h) => {
+                  const dbFailed = h.syncStatus === 'failed';
+                  const prepFailed = online && h.prepSyncStatus === 'failed';
+                  return (
+                    <div key={h.doc} className="flex items-center gap-2.5 border-b border-[rgba(148,163,184,.15)] p-[11px_12px]">
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate font-mono text-xs font-bold">{h.doc}</div>
+                        {dbFailed && h.syncError && (
+                          <div className="truncate text-[10px] font-medium text-[#B91C1C]">DB: {h.syncError}</div>
+                        )}
+                        {prepFailed && h.prepSyncError && (
+                          <div className="truncate text-[10px] font-medium text-[#B91C1C]">Prep-Center: {h.prepSyncError}</div>
+                        )}
+                        {!dbFailed && !prepFailed && <div className="text-[10.5px] text-secondary">Waiting to send</div>}
+                      </div>
+                      {(dbFailed || prepFailed) && (
+                        <button onClick={() => retrySync(h.doc)} className="h-8 flex-none rounded-[9px] border border-[rgba(148,163,184,.35)] bg-white px-2.5 text-[11px] font-bold text-ink">
+                          Retry
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </>
             );
-          })}
+          })()}
           <button onClick={syncNow} className="flex min-h-[50px] w-full items-center justify-center gap-2 bg-primary text-sm font-extrabold text-white">
             <RefreshCw size={17} strokeWidth={2} /> {syncing ? 'Sending…' : 'Sync now'}
           </button>

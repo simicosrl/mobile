@@ -1486,6 +1486,19 @@ export function AppProvider({ children }) {
   // legitimately need to see or migrate every country's data on this
   // device, not just the currently active one.
   const visibleHistory = useMemo(() => history.filter((d) => d.country === shift?.country), [history, shift]);
+  // What the screens list (History, Documents): the last 7 days only. On the
+  // phone nobody looks further back, and the full list grew long enough to
+  // bury today's work. Older documents stay stored and keep syncing — the
+  // sync screen still counts every one of them (`allHistory`).
+  // Re-cut once an hour, not on every tick of the one-second clock.
+  const hourNow = Math.floor(now / 3600000);
+  const recentHistory = useMemo(() => {
+    const cutoff = (hourNow + 1) * 3600000 - 7 * 86400000;
+    return visibleHistory.filter((d) => {
+      const t = d.closedAtIso ? Date.parse(d.closedAtIso) : NaN;
+      return Number.isNaN(t) || t >= cutoff;
+    });
+  }, [visibleHistory, hourNow]);
   const visibleDriverProfiles = useMemo(() => driverProfiles.filter((p) => p.country === shift?.country), [driverProfiles, shift]);
   // Always merges in the built-in static list (lib/carriers.js) underneath
   // whatever's been synced/added locally for this country — a fresh
@@ -1517,7 +1530,7 @@ export function AppProvider({ children }) {
     courierName, setCourierName, plate, setPlate,
     signatureDataUrl, setSignatureDataUrl, sigInk, setSigInk, clearSignature, signReady, toSign, finish, finishing,
     confirmedDoc, printDocument, printDdt, emailDocument, lookupNoted,
-    history: visibleHistory, historyQuery, setHistoryQuery, historyFilter, setHistoryFilter, selectedDocNo, openSession, backToHistory,
+    history: recentHistory, allHistory: visibleHistory, historyQuery, setHistoryQuery, historyFilter, setHistoryFilter, selectedDocNo, openSession, backToHistory,
     apiConfig, apiShowKey, setApiBaseUrl, setApiKey, generateApiKey, copyApiKey, togglePush, togglePull, toggleShowKey,
     manifest, pulling, pullManifestNow, syncing, syncNow, retrySync, syncPrepPending,
     orgSettings, updateOrgSettings,
@@ -1535,7 +1548,7 @@ export function AppProvider({ children }) {
     damageSheet, openDamage, closeDamage, toggleDamageType, setDamageNote, setDamagePhoto, saveDamage,
     noCodeSheet, openNoCodeSheet, closeNoCodeSheet, setNoCodeNote, setNoCodePhoto, saveNoCode, rejectedScan,
     courierName, plate, signatureDataUrl, sigInk, clearSignature, signReady, toSign, finish, finishing,
-    confirmedDoc, printDocument, printDdt, emailDocument, visibleHistory, historyQuery, historyFilter, selectedDocNo, openSession, backToHistory,
+    confirmedDoc, printDocument, printDdt, emailDocument, visibleHistory, recentHistory, historyQuery, historyFilter, selectedDocNo, openSession, backToHistory,
     apiConfig, apiShowKey, setApiBaseUrl, setApiKey, generateApiKey, copyApiKey, togglePush, togglePull, toggleShowKey,
     manifest, pulling, pullManifestNow, syncing, syncNow, retrySync, syncPrepPending,
     orgSettings, updateOrgSettings, visibleDriverProfiles, applyDriverProfile, visibleCarriers, saveCarrier, viewingPhoto, openPhoto, closePhoto,
