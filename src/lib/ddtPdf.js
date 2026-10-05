@@ -1,6 +1,7 @@
 import { jsPDF } from 'jspdf';
 import { productLines, boxCount, totalWeightKg } from './ddtGrouping';
 import { ddtLogoForCountry } from './ddtLogos';
+import { stamp } from './format';
 
 // The DDT (delivery note) that travels with an outbound shipment, rebuilt to
 // match the prep center's own layout field for field — header, the three
@@ -26,6 +27,16 @@ const INK = [15, 23, 42];
 const SECONDARY = [100, 116, 139];
 const LINE = [203, 213, 225];
 const PANEL = [248, 250, 252];
+
+// The prep center sends the prep time as a raw timestamp (ISO, with seconds
+// and a zone). On the note it reads like every other date we print —
+// "02/10/2026 · 15:23", local time. Anything that will not parse is shown as
+// it came rather than dropped.
+function prepStamp(value) {
+  if (!value) return '—';
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? String(value) : stamp(d);
+}
 
 function box(doc, x, y, w, h) {
   doc.setDrawColor(...LINE);
@@ -225,7 +236,7 @@ export function buildDdtPdf(ddt, org = {}) {
     { head: ['DESCRIPTION', 'OF GOODS'], w: 84, v: ddt.goodsDescription || 'Box' },
     { head: ['WEIGHT'], w: 62, v: totalWeightKg(ddt) === null ? '—' : `${totalWeightKg(ddt).toFixed(2)} kg` },
     { head: ['DATE TIME OF', 'COLLECTION'], w: 0, v: ddt.collectionAt || '—' },
-    { head: ['DATE TIME', 'OF PREP'], w: 0, v: ddt.prepAt || '—' },
+    { head: ['DATE TIME', 'OF PREP'], w: 0, v: prepStamp(ddt.prepAt) },
   ];
   const fixed = cols.reduce((a, c) => a + c.w, 0);
   const flexW = (PAGE_W - MARGIN_X * 2 - fixed) / 2;
