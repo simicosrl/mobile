@@ -2,6 +2,7 @@ import { jsPDF } from 'jspdf';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 import { Capacitor } from '@capacitor/core';
+import { stamp } from './format';
 
 // A4 at 72dpi == 595.28 x 841.89 pt, matching the design spec's 595x842px sheet.
 const PAGE_W = 595.28;
@@ -44,9 +45,26 @@ function condition(p) {
 }
 
 /** Builds the handover document as a single-page jsPDF instance. */
-export function buildHandoverPdf(document, org) {
+export function buildHandoverPdf(source, org) {
   const company = { ...DEFAULT_COMPANY, ...(org || {}) };
+  // A session pulled from the shared history (another phone's, or every one
+  // of them on a fresh device such as the PC) carries only what the server
+  // stores: no docTime, and operator can be empty. Both went straight into
+  // jsPDF.text, which throws on undefined — every older document failed with
+  // "Invalid arguments passed to jsPDF.text".
+  const closed = source.closedAtIso ? new Date(source.closedAtIso) : null;
+  const document = {
+    ...source,
+    docTime: source.docTime || source.date || (closed && !Number.isNaN(closed.getTime()) ? stamp(closed) : '—'),
+    operator: source.operator || '—',
+    carrier: source.carrier || '—',
+    parcels: (source.parcels || []).map((p) => ({ ...p, boxes: Number(p.boxes) || 1, time: p.time || '' })),
+  };
   const doc = new jsPDF({ unit: 'pt', format: [PAGE_W, PAGE_H] });
+  // Last line of defence: an empty field prints as nothing, never takes the
+  // whole document down.
+  const rawText = doc.text.bind(doc);
+  doc.text = (t, ...rest) => rawText(t == null ? '' : Array.isArray(t) ? t.map((x) => (x == null ? '' : String(x))) : String(t), ...rest);
   const contentW = PAGE_W - MARGIN_X * 2;
   let y = MARGIN_TOP;
 

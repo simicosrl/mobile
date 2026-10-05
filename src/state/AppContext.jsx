@@ -831,6 +831,7 @@ export function AppProvider({ children }) {
           country: countryCode,
           syncStatus: 'ok',
           date: stamp(closedDate),
+          docTime: stamp(closedDate),
           parcels: remote.parcels.map((p) => ({ ...p, time: p.createdAtIso ? hhmm(new Date(p.createdAtIso)) : '' })),
         });
       }
