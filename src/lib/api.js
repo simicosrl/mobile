@@ -135,28 +135,6 @@ export async function pullManifest(config) {
   return { ok: false, error: describeError(res) };
 }
 
-// Looks up which country a badge belongs to — the authoritative,
-// server-side source now that operators can no longer pick their own
-// country. Any of the three per-country keys works here (the route isn't
-// schema-scoped); IT is just an arbitrary fixed choice. A strict 404 is the
-// only thing treated as "this badge really has no assignment" — every other
-// outcome (network error, timeout, 500, malformed response) must be treated
-// as "couldn't check", never misread as "unassigned", or a bad deploy/DB
-// hiccup would fleet-lock every operator out with a false "contact the
-// office" message.
-export async function fetchBadgeCountry(badgeId) {
-  const res = await request(
-    { baseUrl: DEFAULT_BASE_URL, apiKey: DEFAULT_SCANNER_KEYS.IT },
-    `/admin/badge-country/${encodeURIComponent(badgeId)}`,
-  );
-  if (res.status === 404) return { ok: false, notFound: true };
-  // `label` is the operator's registered name for this badge — badge login
-  // is scan-only, so this is the only source for a name, never something
-  // typed in on the device.
-  if (res.ok && res.data?.country) return { ok: true, country: res.data.country, label: res.data.label || null };
-  return { ok: false, notFound: false };
-}
-
 // Records a successful badge login for the audit trail (Settings › Login
 // history) — fire-and-forget from the caller, a failure here must never
 // block or fail an actual login.

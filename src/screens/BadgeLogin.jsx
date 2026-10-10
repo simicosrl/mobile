@@ -24,7 +24,6 @@ import { useBarcodeScanner, isCameraScanSupported } from '../hooks/useBarcodeSca
 
 // Why a login was refused, in the operator's terms.
 const REASONS = {
-  unassigned: 'This badge has no country assigned yet. Contact the office to get it set up before scanning.',
   offline: "Couldn't reach the server — check the connection and try again.",
   badCredentials: 'Wrong email or password.',
   emailNotConfirmed: 'This Prep-Center account has not confirmed its email yet.',
@@ -45,7 +44,7 @@ const primaryBtn = 'flex min-h-[52px] w-full items-center justify-center gap-2 r
 const linkBtn = 'self-center text-[12.5px] font-bold text-white/80 underline underline-offset-2 disabled:opacity-60';
 
 export default function BadgeLogin() {
-  const { loginWithBadge, loginWithLegacyBadge, prepSignIn, prepVerifyMfa, prepChooseCountry } = useApp();
+  const { loginWithBadge, prepSignIn, prepVerifyMfa, prepChooseCountry } = useApp();
   const [busy, setBusy] = useState(false);
   // What the screen is asking for. null = waiting for a badge scan.
   //   { kind: 'error', badgeId, reason }
@@ -117,11 +116,6 @@ export default function BadgeLogin() {
     if (!code.trim()) return;
     const { pending } = step;
     run(() => prepVerifyMfa(pending, code), (reason) => setStep((s) => ({ ...s, error: reason })));
-  };
-
-  const useLegacy = () => {
-    const badgeId = step.badgeId;
-    run(() => loginWithLegacyBadge(badgeId));
   };
 
   const handleBadge = async (raw) => {
@@ -223,7 +217,6 @@ export default function BadgeLogin() {
             {busy ? 'Signing in…' : 'Sign in'}
           </button>
           <button type="button" onClick={tryAgain} disabled={busy} className={linkBtn}>Cancel</button>
-          <button type="button" onClick={useLegacy} disabled={busy} className={linkBtn}>Use the old badge login instead</button>
         </form>
       ) : step?.kind === 'mfa' ? (
         <form onSubmit={submitMfa} className="flex flex-col gap-3">

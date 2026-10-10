@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { docsGetAll, docPut, docsClearAll, kvGet, kvSet } from '../lib/db';
-import { DEFAULT_BADGE_NAMES, DEFAULT_ORG_SETTINGS } from '../lib/seed';
+import { DEFAULT_ORG_SETTINGS } from '../lib/seed';
 import { DAMAGE_TYPES, carriersForCountry } from '../lib/carriers';
 import { hhmm, stamp, docNumber } from '../lib/format';
 import { feedback } from '../lib/audio';
@@ -12,10 +12,8 @@ import { checkForUpdate, openDownload } from '../lib/updateCheck';
 
 const AppCtx = createContext(null);
 
-// DEFAULT_BASE_URL / DEFAULT_SCANNER_KEYS live in lib/api.js now (so
-// api.fetchBadgeCountry can use them without a circular import back into
-// this file) — re-exported here under the same names since the rest of
-// this file already refers to them by these names throughout.
+// DEFAULT_BASE_URL / DEFAULT_SCANNER_KEYS live in lib/api.js — picked up
+// here under the same names the rest of this file uses.
 const { DEFAULT_BASE_URL, DEFAULT_SCANNER_KEYS, DEFAULT_PREP_BASE_URL } = api;
 // `apiConfig` (below) is the operator-facing "API" screen connection — a
 // separate, optional, external system (e.g. Prep-Center), starting on the
@@ -80,7 +78,6 @@ export function AppProvider({ children }) {
   const [orgSettings, setOrgSettings] = useState(DEFAULT_ORG_SETTINGS);
   const [driverProfiles, setDriverProfiles] = useState([]); // [{ name, courierCompany, plate, lastUsedAt }]
   const [carriers, setCarriers] = useState([]); // [{ name, pattern, country }] — pattern is a required tracking-code prefix, or null
-  const [badgeCountries, setBadgeCountries] = useState({}); // { [badgeId]: 'IT' | 'FR' | 'DE' }
   // Prep-Center operators who have signed in on this phone, keyed by their
   // Prep-Center user id: { userId, email, name, profile, refreshToken, ... }.
   // Never a password — only the session, like "keep me signed in" on the web.
@@ -110,7 +107,7 @@ export function AppProvider({ children }) {
   // ---- initial load ----
   useEffect(() => {
     (async () => {
-      const [savedShift, savedApi, savedManifest, savedSeq, savedOrg, docs, docSeqReset, historyWiped, savedDriverProfiles, savedBadgeCountries, driverProfilesCountryTagged, savedCarriers] = await Promise.all([
+      const [savedShift, savedApi, savedManifest, savedSeq, savedOrg, docs, docSeqReset, historyWiped, savedDriverProfiles, driverProfilesCountryTagged, savedCarriers] = await Promise.all([
         kvGet('shift', null),
         kvGet('apiConfig', INITIAL_API_CONFIG),
         kvGet('manifest', { codes: [], lastPulledAt: null }),
@@ -120,7 +117,6 @@ export function AppProvider({ children }) {
         kvGet('docSeqResetV2', false),
         kvGet('historyWipeV1', false),
         kvGet('driverProfiles', []),
-        kvGet('badgeCountries', {}),
         kvGet('driverProfilesCountryTaggedV1', false),
         kvGet('carriers', []),
       ]);
@@ -153,9 +149,6 @@ export function AppProvider({ children }) {
         await kvSet('historyWipeV1', true);
       }
       const manifestState = savedManifest;
-      const savedBadgeNames = (await kvGet('badgeNames', {})) || {};
-      const mergedBadgeNames = { ...DEFAULT_BADGE_NAMES, ...savedBadgeNames };
-      await kvSet('badgeNames', mergedBadgeNames);
       setHistory(docList.slice().sort((a, b) => (a.closedAtIso < b.closedAtIso ? 1 : -1)));
       // One-time repair for a real bug: the masked display value (with •
       // bullet characters) could get written back as the actual key, which
@@ -214,10 +207,13 @@ export function AppProvider({ children }) {
       setCarriers(savedCarriers);
       if (savedInternalConfig && savedShift?.country) pullCarriersNowRef.current(savedInternalConfig, savedShift.country);
       if (savedInternalConfig && savedShift?.country) pullHistoryNowRef.current(savedInternalConfig, savedShift.country);
-      setBadgeCountries(savedBadgeCountries);
-      if (savedShift) {
+      // Only Prep-Center sign-ins resume. A shift left open by the old
+      // badge-only login (removed) asks for the badge again.
+      if (savedShift?.prep) {
         setShift(savedShift);
         setScreen('home');
+      } else if (savedShift) {
+        await kvSet('shift', null);
       }
       setReady(true);
     })();
@@ -239,7 +235,6 @@ export function AppProvider({ children }) {
   useEffect(() => { if (ready && shift) kvSet('shift', shift); }, [ready, shift]);
   useEffect(() => { if (ready) kvSet('orgSettings', orgSettings); }, [ready, orgSettings]);
   useEffect(() => { if (ready) kvSet('driverProfiles', driverProfiles); }, [ready, driverProfiles]);
-  useEffect(() => { if (ready) kvSet('badgeCountries', badgeCountries); }, [ready, badgeCountries]);
   useEffect(() => { if (ready) kvSet('carriers', carriers); }, [ready, carriers]);
 
   // ---- update check (once per app open) ----
@@ -299,24 +294,7 @@ export function AppProvider({ children }) {
     // path, but should still read as "this country starts clean".
     setDocSeq({ in: 1, out: 1 });
   }, []);
-  // Country is no longer something the operator picks — it's a fact of the
-  // badge, looked up server-side on every login (admin.badge_countries).
-  // `badgeCountries` stays as a local read-through cache, keyed by badge id:
-  // a country code once confirmed, or `null` for "confirmed unassigned as of
-  // last check" (distinct from "never checked", i.e. the key absent
-  // entirely) — that distinction lets an offline retry of a never-assigned
-  // badge still show "contact the office" instead of "no connection".
-  // Returns { ok: true } on success, or { ok: false, reason: 'unassigned' |
-  // 'offline' } so BadgeLogin can render the right blocking message —
-  // deliberately never navigates to 'home' except on a real, live-confirmed
-  // (or offline-with-prior-confirmation) success, since the whole point of
-  // this change is an authoritative check, not an optimistic guess.
-  // Badge login is scan-only end to end — the operator's name is never
-  // typed in here, only ever resolved from the badge's own server-side
-  // registration (admin.badge_countries.label), with the local cache below
-  // as an offline fallback for a badge seen before.
-  // Everything a login does once it knows who and where — shared by the
-  // Prep-Center login and the legacy badge-only login.
+  // Everything a login does once it knows who and where.
   const startShift = useCallback(({ badgeId, operatorName, country, prep = null }) => {
     setShift({ badgeId, operatorName, startedAt: Date.now(), country, ...(prep ? { prep } : {}) });
     setScreen('home');
@@ -494,40 +472,6 @@ export function AppProvider({ children }) {
     setScreen('login');
   }, [shift?.prep?.userId, savePrepOperators, savePrepBadgeLinks]);
 
-  const loginWithLegacyBadge = useCallback(async (badgeId) => {
-    const id = badgeId || 'BADGE-0000';
-    const hasCached = Object.prototype.hasOwnProperty.call(badgeCountries, id);
-    const cachedCountry = badgeCountries[id];
-    const res = await api.fetchBadgeCountry(id);
-    let country;
-    let operatorName;
-    if (res.ok) {
-      country = res.country;
-      setBadgeCountries((c) => ({ ...c, [id]: country }));
-      const knownNames = (await kvGet('badgeNames', {})) || {};
-      operatorName = res.label || knownNames[id] || 'Operator';
-      if (res.label && knownNames[id] !== res.label) {
-        await kvSet('badgeNames', { ...knownNames, [id]: res.label });
-      }
-    } else if (res.notFound) {
-      setBadgeCountries((c) => ({ ...c, [id]: null }));
-      return { ok: false, reason: 'unassigned' };
-    } else if (hasCached && cachedCountry) {
-      // Couldn't reach the server, but this badge's country was confirmed
-      // before — proceed offline rather than blocking someone mid-shift
-      // over a transient network blip. Name comes from whatever was
-      // cached the last time this badge's label was actually resolved.
-      country = cachedCountry;
-      const knownNames = (await kvGet('badgeNames', {})) || {};
-      operatorName = knownNames[id] || 'Operator';
-    } else if (hasCached && cachedCountry === null) {
-      return { ok: false, reason: 'unassigned' };
-    } else {
-      return { ok: false, reason: 'offline' };
-    }
-    startShift({ badgeId: id, operatorName, country });
-    return { ok: true };
-  }, [badgeCountries, startShift]);
   const endShift = useCallback(() => {
     setShift(null);
     kvSet('shift', null);
@@ -538,16 +482,6 @@ export function AppProvider({ children }) {
   // tap "End shift" themselves (previously auto-logged-out after 5 minutes
   // of inactivity, which was more disruptive than useful on a warehouse
   // floor where a phone can sit idle between scans for longer than that).
-  const updateOperatorName = useCallback(async (name) => {
-    const trimmed = name.trim();
-    // A Prep-Center operator's name is the one on their Prep-Center profile.
-    if (!trimmed || !shift || shift.prep) return;
-    setShift((s) => ({ ...s, operatorName: trimmed }));
-    const knownNames = (await kvGet('badgeNames', {})) || {};
-    knownNames[shift.badgeId] = trimmed;
-    await kvSet('badgeNames', knownNames);
-  }, [shift]);
-
   // ---- org / warehouse / company settings ----
   const updateOrgSettings = useCallback((partial) => {
     setOrgSettings((s) => ({ ...s, ...partial }));
@@ -1716,7 +1650,7 @@ export function AppProvider({ children }) {
 
   const value = useMemo(() => ({
     ready, now,
-    shift, loginWithBadge, loginWithLegacyBadge, prepSignIn, prepVerifyMfa, prepChooseCountry, forgetPrepOperator, prepOperators, prepBadgeLinks, withPrep, endShift, updateOperatorName,
+    shift, loginWithBadge, prepSignIn, prepVerifyMfa, prepChooseCountry, forgetPrepOperator, prepOperators, prepBadgeLinks, withPrep, endShift,
     screen, setScreen, canGoBack, goBack, goHome, goToHistoryTab, goToDocsTab, goToApiTab, goToSettings,
     direction, carrier, setCarrier, courierCompany, setCourierCompany, shipment, setShipment: setShipmentRef,
     destination, setDestination,
@@ -1740,7 +1674,7 @@ export function AppProvider({ children }) {
     toast, showToast,
     inputRef,
   }), [
-    ready, now, shift, loginWithBadge, loginWithLegacyBadge, prepSignIn, prepVerifyMfa, prepChooseCountry, forgetPrepOperator, prepOperators, prepBadgeLinks, withPrep, endShift, updateOperatorName, screen, canGoBack, goBack, goHome, goToHistoryTab, goToDocsTab, goToApiTab, goToSettings,
+    ready, now, shift, loginWithBadge, prepSignIn, prepVerifyMfa, prepChooseCountry, forgetPrepOperator, prepOperators, prepBadgeLinks, withPrep, endShift, screen, canGoBack, goBack, goHome, goToHistoryTab, goToDocsTab, goToApiTab, goToSettings,
     direction, carrier, courierCompany, shipment, parcels, sessionStartedAt, startSession, toScan, docSeq,
     submitScan, accept, dupCode, dupTime, closeDup, dupAddBox, boxPlus, boxMinus, removeLast, removeParcel, flash,
     damageSheet, openDamage, closeDamage, toggleDamageType, setDamageNote, setDamagePhoto, saveDamage,

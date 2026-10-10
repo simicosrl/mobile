@@ -174,4 +174,8 @@ Reproduce `applyReceivedUnits` din `src/components/admin/AdminReceiving.jsx`
    După predarea de la curier (Inbound): „Receive these parcels into stock” caută
    recepțiile tuturor coletelor (potrivire exactă); una se deschide direct, mai
    multe sunt listate, coletele fără recepție sunt numite.
-6. Retragerea login-ului vechi pe badge.
+6. ✅ Retragerea login-ului vechi pe badge — scos din aplicație (butonul de rezervă,
+   căutarea țării după badge, numele editabil). O tură veche rămasă deschisă pe un
+   telefon nu se mai reia: se cere badge-ul. Tabelul `admin.badge_countries` și ruta
+   `/admin/badge-country` din `wms-api` rămân pe server, pentru APK-urile vechi încă
+   instalate; pot fi scoase după ce toate telefoanele au update-ul.

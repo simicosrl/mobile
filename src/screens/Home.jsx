@@ -89,8 +89,7 @@ export default function Home() {
           <ChevronRight size={18} strokeWidth={2.2} className="ml-auto flex-none text-light" />
         </button>
 
-        {/* Receiving reads and (later) writes the Prep-Center as the operator,
-            so it needs a Prep-Center sign-in, not the legacy badge login. */}
+        {/* Receiving reads and writes the Prep-Center as the operator on shift. */}
         {shift?.prep && (
           <button
             onClick={() => setScreen('recvStart')}
