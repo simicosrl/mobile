@@ -179,3 +179,25 @@ Reproduce `applyReceivedUnits` din `src/components/admin/AdminReceiving.jsx`
    telefon nu se mai reia: se cere badge-ul. Tabelul `admin.badge_countries` și ruta
    `/admin/badge-country` din `wms-api` rămân pe server, pentru APK-urile vechi încă
    instalate; pot fi scoase după ce toate telefoanele au update-ul.
+
+## 8. Stock check și mutări între rafturi
+
+Home → **Stock check** (`src/screens/StockCheck.jsx`, date în `src/lib/prepWarehouse.js`).
+Un singur câmp de scanare: un cod de raft din depozitul țării deschide **raftul**,
+orice alt cod caută **produsul**.
+
+- **Produs** — câte un card pe client (același EAN poate fi al mai multor clienți;
+  fiecare `stock_items` e al unui singur client). Avertisment sus când codul e la
+  mai mulți clienți; fiecare client are culoarea lui. Pe card: stoc în țară
+  (`prep_qty_by_country[țară]`, altfel `qty` — ca pe web), pe rafturi, nepus pe raft,
+  rafturile (`warehouse_locations` legate prin `stock_item_id`, cu lot/expirare) și
+  recepțiile deschise care îl mai așteaptă (inclusiv anunțate fără produs în stoc).
+- **Raft** — ce e pe el, grupat pe client, starea raftului (liber / ocupat /
+  blocat / de verificat gol).
+- **Move** (un rând), **Move everything** (tot raftul), **Quick move** (scanezi
+  bucățile luate, apoi raftul de destinație) — `warehouse_relocate_product`, ca
+  „Relocate” din Warehouse pe web; stocul nu se schimbă. Destinația e verificată
+  pentru fiecare client implicat; serverul verifică din nou (capacitate, depozit).
+- **↩︎ Recv.** — înapoi în zona de recepție: `warehouse_unassign_product`.
+- Fiecare confirmare are cheia ei de idempotență, păstrată la reîncercare.
+  Mutările cer conexiune (nu intră în coada offline).

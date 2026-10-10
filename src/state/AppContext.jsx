@@ -257,7 +257,7 @@ export function AppProvider({ children }) {
   }, []);
 
   // ---- navigation ----
-  const canGoBack = ['setup', 'scan', 'sign', 'doc', 'session', 'settings', 'recvStart', 'recvOrder'].includes(screen);
+  const canGoBack = ['setup', 'scan', 'sign', 'doc', 'session', 'settings', 'recvStart', 'recvOrder', 'stockCheck'].includes(screen);
   const goBack = useCallback(() => {
     setScreen((s) => {
       if (s === 'setup') return 'home';
@@ -267,6 +267,7 @@ export function AppProvider({ children }) {
       if (s === 'settings') return 'home';
       if (s === 'recvOrder') return 'recvStart';
       if (s === 'recvStart') return 'home';
+      if (s === 'stockCheck') return 'home';
       if (s === 'doc') return previousScreen === 'confirm' ? 'confirm' : 'home';
       return 'home';
     });

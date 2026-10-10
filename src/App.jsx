@@ -22,6 +22,7 @@ import ApiScreen from './screens/ApiScreen';
 import Settings from './screens/Settings';
 import ReceivingStart from './screens/ReceivingStart';
 import ReceivingOrder from './screens/ReceivingOrder';
+import StockCheck from './screens/StockCheck';
 import { ReceivingProvider } from './state/ReceivingContext';
 
 const SCREENS = {
@@ -37,6 +38,7 @@ const SCREENS = {
   settings: Settings,
   recvStart: ReceivingStart,
   recvOrder: ReceivingOrder,
+  stockCheck: StockCheck,
 };
 
 function Shell() {

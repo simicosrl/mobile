@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useApp } from '../state/AppContext';
 import { useReceiving } from '../state/ReceivingContext';
-import { ArrowDownToLine, Truck, ChevronRight, Download, X, PackageCheck } from '../components/icons';
+import { ArrowDownToLine, Truck, ChevronRight, Download, X, PackageCheck, Search } from '../components/icons';
 import { hhmm } from '../lib/format';
 
 export default function Home() {
@@ -102,6 +102,22 @@ export default function Home() {
             <div className="min-w-0">
               <div className="text-[18px] font-extrabold tracking-[-.02em]">Receiving</div>
               <div className="text-xs leading-snug text-secondary">Receive a client's goods into stock</div>
+            </div>
+            <ChevronRight size={18} strokeWidth={2.2} className="ml-auto flex-none text-light" />
+          </button>
+        )}
+        {shift?.prep && (
+          <button
+            onClick={() => setScreen('stockCheck')}
+            className="flex items-center gap-3.5 rounded-2xl border border-[rgba(124,58,237,.3)] text-left"
+            style={{ background: 'linear-gradient(135deg,rgba(124,58,237,.09),rgba(124,58,237,.02))', padding: '18px 16px' }}
+          >
+            <div className="flex h-[52px] w-[52px] flex-none items-center justify-center rounded-2xl text-white" style={{ background: '#7C3AED' }}>
+              <Search size={25} strokeWidth={1.9} />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[18px] font-extrabold tracking-[-.02em]">Stock check</div>
+              <div className="text-xs leading-snug text-secondary">Whose a product is, what is on a shelf, moves</div>
             </div>
             <ChevronRight size={18} strokeWidth={2.2} className="ml-auto flex-none text-light" />
           </button>

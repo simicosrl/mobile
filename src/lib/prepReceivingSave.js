@@ -139,7 +139,7 @@ const claimOwner = (c) =>
 
 // utils/warehousePlacement.js isStoragePlaceAvailableForClient, with the
 // website's own messages (AdminReceiving saveInlinePlacementDraft).
-function shelfAvailability(place, claim, clientId) {
+export function shelfAvailability(place, claim, clientId) {
   if (!place || place.active === false || place.blocked === true) return { ok: false, reason: 'shelfInactive', message: `Shelf ${place?.code || ''} is not active.` };
   if (!claim) return { ok: true };
   if (claim.status === 'empty_pending_check') {
@@ -151,7 +151,7 @@ function shelfAvailability(place, claim, clientId) {
   return { ok: true };
 }
 
-async function readShelf(token, { id = null, code = null, country }) {
+export async function readShelf(token, { id = null, code = null, country }) {
   const warehouses = await rest(token, `/rest/v1/warehouses?country=eq.${encodeURIComponent(country)}&select=id`);
   const ids = (warehouses || []).map((w) => w.id);
   if (!ids.length) return null;
@@ -168,7 +168,7 @@ async function readShelf(token, { id = null, code = null, country }) {
   return exact.length === 1 ? exact[0] : null;
 }
 
-async function readClaim(token, placeId) {
+export async function readClaim(token, placeId) {
   const rows = await rest(token,
     `/rest/v1/storage_place_claims?storage_place_id=eq.${encodeURIComponent(placeId)}` +
     '&select=storage_place_id,client_id,status,client:profiles!storage_place_claims_client_id_fkey(company_name,store_name,first_name,last_name)');

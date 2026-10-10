@@ -9,6 +9,7 @@ function headerCopy(app) {
   const sessionDocLabel = docNumber(direction, docSeq[direction]);
   const docLabel = confirmedDoc?.doc || sessionDocLabel;
 
+  if (screen === 'stockCheck') return { title: 'Stock check', sub: 'Products, shelves and moves' };
   if (screen === 'recvStart') return { title: 'Receiving', sub: 'Receive goods into stock' };
   if (screen === 'recvOrder') return { title: 'Reception', sub: 'Products to receive' };
   if (screen === 'api') return { title: 'API & integrations', sub: 'Send and receive warehouse data' };
