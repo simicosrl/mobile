@@ -166,8 +166,8 @@ Reproduce `applyReceivedUnits` din `src/components/admin/AdminReceiving.jsx`
    pe care stă produsul.
 5. ✅ Finalizare + „Începe recepția” din Inbound —
    „Finish reception”: așteaptă salvarea cozii, arată complet / lipsă / în plus și
-   propune un mesaj despre diferențe, trimis în firul recepției exact ca din web
-   (`receiving_shipment_notes`, `sender_type: 'admin'`; clientul îl vede). Starea
+   propune o notă despre diferențe, salvată automat la „Finish” (fără buton separat) în firul recepției exact ca din web
+   (`receiving_shipment_notes`, `sender_type: 'admin'`; în admin apare la „Notes with client”; clientul o vede). Starea
    recepției n-o schimbă aplicația: Prep-Center o derivă din linii (totul complet →
    Received; altfel rămâne Partial). Bulk „Mark as received” din web NU e folosit —
    ar trece în stoc cantitatea anunțată, nu cea primită.

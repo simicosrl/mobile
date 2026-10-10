@@ -200,12 +200,21 @@ function FinishSheet({ reception, unsaved, onSend, onClose, onDone }) {
     return out.length ? `Reception checked in the warehouse:\n${out.join('\n')}` : '';
   };
   const [text, setText] = useState(draftText);
-  const [state, setState] = useState({ sending: false, sent: false, error: null });
+  const [state, setState] = useState({ sending: false, error: null });
 
-  const send = async () => {
-    setState({ sending: true, sent: false, error: null });
-    const res = await onSend(text);
-    setState(res.ok ? { sending: false, sent: true, error: null } : { sending: false, sent: false, error: res.message || recvErrorText(res.reason) });
+  // Finishing saves the message with it: no separate send step to forget.
+  // If it can't be saved the sheet stays open with the text, so nothing the
+  // operator wrote is lost.
+  const finish = async () => {
+    if (text.trim()) {
+      setState({ sending: true, error: null });
+      const res = await onSend(text);
+      if (!res.ok) {
+        setState({ sending: false, error: `Message not saved: ${res.message || recvErrorText(res.reason)}` });
+        return;
+      }
+    }
+    onDone();
   };
 
   return (
@@ -248,34 +257,24 @@ function FinishSheet({ reception, unsaved, onSend, onClose, onDone }) {
       )}
 
       <div className="mt-3">
-        <div className="mb-1 text-[10px] font-bold uppercase tracking-[.08em] text-light">Message on the reception (the client sees it)</div>
+        <div className="mb-1 text-[10px] font-bold uppercase tracking-[.08em] text-light">Note — saved on the reception when you finish (the client sees it)</div>
         <textarea
           value={text}
-          onChange={(e) => { setText(e.target.value); setState((st) => ({ ...st, sent: false })); }}
+          onChange={(e) => { setText(e.target.value); setState((st) => ({ ...st, error: null })); }}
           rows={3}
           placeholder="Optional — e.g. damaged boxes, missing units…"
           className="w-full rounded-xl border border-inputborder px-3 py-2 text-[13px] text-ink"
         />
         {state.error && <div className="mt-1 text-[12px] font-bold text-danger">{state.error}</div>}
-        {state.sent && <div className="mt-1 text-[12px] font-bold text-success-dark">Message sent on the reception.</div>}
       </div>
 
-      <div className="mt-3 flex gap-2.5">
-        <button
-          onClick={send}
-          disabled={!text.trim() || state.sending || state.sent}
-          className="flex min-h-[50px] flex-1 items-center justify-center rounded-xl border border-inputborder text-[13.5px] font-bold text-primary disabled:text-light"
-        >
-          {state.sending ? 'Sending…' : state.sent ? 'Sent' : 'Send message'}
-        </button>
-        <button
-          onClick={onDone}
-          disabled={unsaved.length > 0}
-          className="flex min-h-[50px] flex-[1.3] items-center justify-center rounded-xl bg-primary text-[14px] font-extrabold text-white disabled:opacity-50"
-        >
-          Done
-        </button>
-      </div>
+      <button
+        onClick={finish}
+        disabled={unsaved.length > 0 || state.sending}
+        className="mt-3 flex min-h-[52px] w-full items-center justify-center rounded-xl bg-primary text-[15px] font-extrabold text-white disabled:opacity-50"
+      >
+        {state.sending ? 'Saving the note…' : text.trim() ? 'Finish & save note' : 'Finish'}
+      </button>
     </Sheet>
   );
 }
