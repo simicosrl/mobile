@@ -1202,7 +1202,6 @@ export function AppProvider({ children }) {
     setHistory((h) => [document, ...h]);
     setDocSeq((s) => ({ ...s, [direction]: s[direction] + 1 }));
     setConfirmedDoc(document);
-    setPreviousScreen('confirm');
     setScreen('confirm');
     // Clear the working session now that it's captured in `document` and
     // saved — otherwise parcels.length > 0 keeps looking like an open
