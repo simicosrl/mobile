@@ -19,9 +19,11 @@ function headerCopy(app) {
   if (screen === 'scan') return { title: isOut ? 'Outbound scan' : 'Inbound scan', sub: `${sessionDocLabel} · ${carrier}` };
   if (screen === 'sign') return { title: 'Driver signature', sub: `${sessionDocLabel} · ${carrier}` };
   if (screen === 'confirm') return { title: 'Session closed', sub: `${docLabel} · ${carrier}` };
-  if (screen === 'doc') return { title: 'Documents', sub: `${history.length} handover document${history.length === 1 ? '' : 's'}` };
   if (screen === 'session') return { title: sel ? sel.doc : 'Session', sub: sel ? `${sel.direction === 'out' ? 'Outbound' : 'Inbound'} · ${sel.date}` : '' };
-  return { title: 'History', sub: 'Sessions and parcels' };
+  if (screen === 'inbound') return { title: 'Inbound', sub: 'Parcels received from couriers · last 7 days' };
+  if (screen === 'outbound') return { title: 'Outbound', sub: 'Parcels handed to couriers · last 7 days' };
+  if (screen === 'ddts') return { title: 'DDT', sub: 'Delivery notes · last 7 days' };
+  return { title: 'WMS App', sub: '' };
 }
 
 export default function Header() {

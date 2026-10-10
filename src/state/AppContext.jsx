@@ -28,7 +28,8 @@ export function AppProvider({ children }) {
   const [ready, setReady] = useState(false);
   const [shift, setShift] = useState(null);
   const [screen, setScreen] = useState('login');
-  const [previousScreen, setPreviousScreen] = useState('home');
+  // Which list a handover was opened from, so Back returns to it.
+  const [listScreen, setListScreen] = useState('inbound');
 
   const [direction, setDirection] = useState('in');
   const [carrier, setCarrier] = useState('DHL');
@@ -62,7 +63,6 @@ export function AppProvider({ children }) {
   const [confirmedDoc, setConfirmedDoc] = useState(null);
   const [history, setHistory] = useState([]);
   const [historyQuery, setHistoryQuery] = useState('');
-  const [historyFilter, setHistoryFilter] = useState('all');
   const [selectedDocNo, setSelectedDocNo] = useState(null);
 
   const [apiConfig, setApiConfig] = useState(INITIAL_API_CONFIG);
@@ -257,24 +257,25 @@ export function AppProvider({ children }) {
   }, []);
 
   // ---- navigation ----
-  const canGoBack = ['setup', 'scan', 'sign', 'doc', 'session', 'settings', 'recvStart', 'recvOrder', 'stockCheck'].includes(screen);
+  const canGoBack = ['setup', 'scan', 'sign', 'session', 'settings', 'api', 'recvStart', 'recvOrder', 'stockCheck'].includes(screen);
   const goBack = useCallback(() => {
     setScreen((s) => {
       if (s === 'setup') return 'home';
       if (s === 'scan') return 'setup';
       if (s === 'sign') return 'scan';
-      if (s === 'session') return 'history';
+      if (s === 'session') return listScreen;
+      if (s === 'api') return 'settings';
       if (s === 'settings') return 'home';
       if (s === 'recvOrder') return 'recvStart';
       if (s === 'recvStart') return 'home';
       if (s === 'stockCheck') return 'home';
-      if (s === 'doc') return previousScreen === 'confirm' ? 'confirm' : 'home';
       return 'home';
     });
-  }, [previousScreen]);
+  }, [listScreen]);
   const goHome = useCallback(() => setScreen('home'), []);
-  const goToHistoryTab = useCallback(() => setScreen('history'), []);
-  const goToDocsTab = useCallback(() => { setPreviousScreen(screen); setScreen('doc'); }, [screen]);
+  const goToInboundTab = useCallback(() => setScreen('inbound'), []);
+  const goToOutboundTab = useCallback(() => setScreen('outbound'), []);
+  const goToDdtTab = useCallback(() => setScreen('ddts'), []);
   const goToApiTab = useCallback(() => setScreen('api'), []);
   const goToSettings = useCallback(() => setScreen('settings'), []);
 
@@ -1359,8 +1360,14 @@ export function AppProvider({ children }) {
   }, [printDocument, showToast]);
 
   // ---- history ----
-  const openSession = useCallback((doc) => { setSelectedDocNo(doc); setScreen('session'); }, []);
-  const backToHistory = useCallback(() => { setSelectedDocNo(null); setScreen('history'); }, []);
+  // `from`: the list to come back to; by default the handover's own direction.
+  const openSession = useCallback((doc, from) => {
+    const h = history.find((x) => x.doc === doc);
+    setListScreen(from || (h?.direction === 'out' ? 'outbound' : 'inbound'));
+    setSelectedDocNo(doc);
+    setScreen('session');
+  }, [history]);
+  const backToHistory = useCallback(() => { setSelectedDocNo(null); setScreen(listScreen); }, [listScreen]);
 
   // ---- API tab ----
   const setApiBaseUrl = useCallback((v) => setApiConfig((c) => ({ ...c, baseUrl: v })), []);
@@ -1652,7 +1659,7 @@ export function AppProvider({ children }) {
   const value = useMemo(() => ({
     ready, now,
     shift, loginWithBadge, prepSignIn, prepVerifyMfa, prepChooseCountry, forgetPrepOperator, prepOperators, prepBadgeLinks, withPrep, endShift,
-    screen, setScreen, canGoBack, goBack, goHome, goToHistoryTab, goToDocsTab, goToApiTab, goToSettings,
+    screen, setScreen, canGoBack, goBack, goHome, goToInboundTab, goToOutboundTab, goToDdtTab, goToApiTab, goToSettings,
     direction, carrier, setCarrier, courierCompany, setCourierCompany, shipment, setShipment: setShipmentRef,
     destination, setDestination,
     parcels, sessionStartedAt, startSession, toScan, docSeq,
@@ -1663,7 +1670,7 @@ export function AppProvider({ children }) {
     courierName, setCourierName, plate, setPlate,
     signatureDataUrl, setSignatureDataUrl, sigInk, setSigInk, clearSignature, signReady, toSign, finish, finishing,
     confirmedDoc, printDocument, printDdt, emailDocument, lookupNoted,
-    history: recentHistory, allHistory: visibleHistory, historyQuery, setHistoryQuery, historyFilter, setHistoryFilter, selectedDocNo, openSession, backToHistory,
+    history: recentHistory, allHistory: visibleHistory, historyQuery, setHistoryQuery, selectedDocNo, openSession, backToHistory,
     apiConfig, apiShowKey, setApiBaseUrl, setApiKey, generateApiKey, copyApiKey, togglePush, togglePull, toggleShowKey,
     manifest, pulling, pullManifestNow, syncing, syncNow, retrySync, syncPrepPending,
     orgSettings, updateOrgSettings,
@@ -1675,13 +1682,13 @@ export function AppProvider({ children }) {
     toast, showToast,
     inputRef,
   }), [
-    ready, now, shift, loginWithBadge, prepSignIn, prepVerifyMfa, prepChooseCountry, forgetPrepOperator, prepOperators, prepBadgeLinks, withPrep, endShift, screen, canGoBack, goBack, goHome, goToHistoryTab, goToDocsTab, goToApiTab, goToSettings,
+    ready, now, shift, loginWithBadge, prepSignIn, prepVerifyMfa, prepChooseCountry, forgetPrepOperator, prepOperators, prepBadgeLinks, withPrep, endShift, screen, canGoBack, goBack, goHome, goToInboundTab, goToOutboundTab, goToDdtTab, goToApiTab, goToSettings,
     direction, carrier, courierCompany, shipment, parcels, sessionStartedAt, startSession, toScan, docSeq,
     submitScan, accept, dupCode, dupTime, closeDup, dupAddBox, boxPlus, boxMinus, removeLast, removeParcel, flash,
     damageSheet, openDamage, closeDamage, toggleDamageType, setDamageNote, setDamagePhoto, saveDamage,
     noCodeSheet, openNoCodeSheet, closeNoCodeSheet, setNoCodeNote, setNoCodePhoto, saveNoCode, rejectedScan,
     courierName, plate, signatureDataUrl, sigInk, clearSignature, signReady, toSign, finish, finishing,
-    confirmedDoc, printDocument, printDdt, emailDocument, visibleHistory, recentHistory, historyQuery, historyFilter, selectedDocNo, openSession, backToHistory,
+    confirmedDoc, printDocument, printDdt, emailDocument, visibleHistory, recentHistory, historyQuery, selectedDocNo, openSession, backToHistory,
     apiConfig, apiShowKey, setApiBaseUrl, setApiKey, generateApiKey, copyApiKey, togglePush, togglePull, toggleShowKey,
     manifest, pulling, pullManifestNow, syncing, syncNow, retrySync, syncPrepPending,
     orgSettings, updateOrgSettings, visibleDriverProfiles, applyDriverProfile, visibleCarriers, saveCarrier, viewingPhoto, openPhoto, closePhoto,

@@ -3,7 +3,7 @@ import { useReceiving } from '../state/ReceivingContext';
 import { Check, Printer, FileText, Mail, PackageCheck } from '../components/icons';
 
 export default function Confirmation() {
-  const { confirmedDoc, printDocument, printDdt, emailDocument, goToDocsTab, shift } = useApp();
+  const { confirmedDoc, printDocument, printDdt, emailDocument, openSession, shift } = useApp();
   const { lookupHandover } = useReceiving();
   if (!confirmedDoc) return null;
   // Parcels a courier just delivered: the next job is receiving their goods.
@@ -141,7 +141,7 @@ export default function Confirmation() {
         <button onClick={() => printDocument(confirmedDoc)} className="flex min-h-[54px] w-full items-center justify-center gap-2.5 rounded-xl bg-primary text-[15px] font-extrabold text-white">
           <Printer size={18} strokeWidth={2} /> Print A4 document
         </button>
-        <button onClick={goToDocsTab} className="flex min-h-[52px] w-full items-center justify-center gap-2.5 rounded-xl border border-[rgba(148,163,184,.4)] bg-white text-sm font-bold text-ink">
+        <button onClick={() => openSession(confirmedDoc.doc)} className="flex min-h-[52px] w-full items-center justify-center gap-2.5 rounded-xl border border-[rgba(148,163,184,.4)] bg-white text-sm font-bold text-ink">
           <FileText size={17} strokeWidth={2} /> View document
         </button>
         <button onClick={() => emailDocument(confirmedDoc)} className="flex min-h-[52px] w-full items-center justify-center gap-2.5 rounded-xl border border-[rgba(148,163,184,.4)] bg-white text-sm font-bold text-ink">

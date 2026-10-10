@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import { useApp } from '../state/AppContext';
-import { Check, Download, ChevronDown, Plus, RefreshCw } from '../components/icons';
+import { Check, Download, ChevronDown, ChevronRight, Plus, RefreshCw, Globe } from '../components/icons';
 import KeyboardDiagnostics from '../components/KeyboardDiagnostics';
 
 // e.g. "25/08/2026 14:47" in the operator's own timezone, from the
@@ -147,7 +147,7 @@ function CarrierRow({ carrier, onSave }) {
 export default function Settings() {
   const {
     shift, orgSettings, updateOrgSettings, showToast, updateInfo, checkUpdateNow, downloadUpdate, carriers, saveCarrier,
-    loginEvents, pullingLoginEvents, pullLoginEventsNow, forgetPrepOperator,
+    loginEvents, pullingLoginEvents, pullLoginEventsNow, forgetPrepOperator, goToApiTab,
   } = useApp();
   const [org, setOrg] = useState(orgSettings);
   const [saved, setSaved] = useState(false);
@@ -214,6 +214,19 @@ export default function Settings() {
           </button>
         )}
       </Section>
+
+      {/* Moved here from the bottom bar: set up once, rarely opened. */}
+      <button
+        onClick={goToApiTab}
+        className="flex items-center gap-3 rounded-2xl border border-[rgba(148,163,184,.25)] bg-white p-3.5 text-left"
+      >
+        <Globe size={18} strokeWidth={2} className="flex-none text-primary" />
+        <div className="min-w-0 flex-1">
+          <div className="text-[10px] font-bold uppercase tracking-[.1em] text-light">API &amp; integrations</div>
+          <div className="mt-0.5 truncate text-[11.5px] text-secondary">Prep-Center connection, sync and manifest</div>
+        </div>
+        <ChevronRight size={16} strokeWidth={2.2} className="flex-none text-light" />
+      </button>
 
       <Section title="Warehouse" summary={org.warehouseLocation}>
         <Field label="Location" value={org.warehouseLocation} onChange={set('warehouseLocation')} placeholder="Casazza (BG)" />

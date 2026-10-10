@@ -15,8 +15,8 @@ import SessionSetup from './screens/SessionSetup';
 import Scan from './screens/Scan';
 import Signature from './screens/Signature';
 import Confirmation from './screens/Confirmation';
-import DocumentScreen from './screens/DocumentScreen';
 import History from './screens/History';
+import DdtList from './screens/DdtList';
 import SessionDetail from './screens/SessionDetail';
 import ApiScreen from './screens/ApiScreen';
 import Settings from './screens/Settings';
@@ -31,8 +31,9 @@ const SCREENS = {
   scan: Scan,
   sign: Signature,
   confirm: Confirmation,
-  doc: DocumentScreen,
-  history: History,
+  inbound: () => <History direction="in" />,
+  outbound: () => <History direction="out" />,
+  ddts: DdtList,
   session: SessionDetail,
   api: ApiScreen,
   settings: Settings,

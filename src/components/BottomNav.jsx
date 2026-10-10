@@ -1,5 +1,5 @@
 import { useApp } from '../state/AppContext';
-import { House, ClockIcon, FileText, Globe } from './icons';
+import { House, ArrowDownToLine, Truck, FileText } from './icons';
 
 function Tab({ active, label, Icon, onClick }) {
   return (
@@ -16,14 +16,17 @@ function Tab({ active, label, Icon, onClick }) {
   );
 }
 
+// Home · Inbound · Outbound · DDT. A handover opened from a list keeps that
+// list's tab lit; API & integrations lives in Settings.
 export default function BottomNav() {
-  const { screen, goHome, goToHistoryTab, goToDocsTab, goToApiTab } = useApp();
+  const { screen, goHome, goToInboundTab, goToOutboundTab, goToDdtTab, history, selectedDocNo } = useApp();
+  const openDir = screen === 'session' ? history.find((h) => h.doc === selectedDocNo)?.direction : null;
   return (
     <div className="flex border-t border-[rgba(148,163,184,.25)] bg-white safe-bottom">
-      <Tab active={['home', 'setup', 'scan', 'sign', 'recvStart', 'recvOrder', 'stockCheck'].includes(screen)} label="Home" Icon={House} onClick={goHome} />
-      <Tab active={screen === 'history' || screen === 'session'} label="History" Icon={ClockIcon} onClick={goToHistoryTab} />
-      <Tab active={screen === 'doc' || screen === 'confirm'} label="Docs" Icon={FileText} onClick={goToDocsTab} />
-      <Tab active={screen === 'api'} label="API" Icon={Globe} onClick={goToApiTab} />
+      <Tab active={['home', 'setup', 'scan', 'sign', 'confirm', 'recvStart', 'recvOrder', 'stockCheck'].includes(screen)} label="Home" Icon={House} onClick={goHome} />
+      <Tab active={screen === 'inbound' || openDir === 'in'} label="Inbound" Icon={ArrowDownToLine} onClick={goToInboundTab} />
+      <Tab active={screen === 'outbound' || openDir === 'out'} label="Outbound" Icon={Truck} onClick={goToOutboundTab} />
+      <Tab active={screen === 'ddts'} label="DDT" Icon={FileText} onClick={goToDdtTab} />
     </div>
   );
 }
