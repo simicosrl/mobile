@@ -19,6 +19,13 @@ export function StatusChip({ status }) {
   return <span className={`flex-none rounded-full px-2 py-[3px] text-[10px] font-extrabold uppercase tracking-[.04em] ${s.cls}`}>{s.label}</span>;
 }
 
+/** "10 Oct" — a date that can't be mistaken for a count like 9/10. */
+export function dayMonth(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+}
+
 export function shortDate(iso) {
   if (!iso) return '';
   const d = new Date(iso);
@@ -44,7 +51,7 @@ export function ReceptionRow({ row, onOpen, highlight }) {
         </div>
         <div className="mt-0.5 text-[11px] text-secondary">
           {Number(row.line_count || 0)} product{Number(row.line_count) === 1 ? '' : 's'} · {Number(row.total_units || 0)} units
-          {row.created_at ? ` · ${shortDate(row.created_at)}` : ''}
+          {row.created_at ? ` · announced ${dayMonth(row.created_at)}` : ''}
           {String(row.import_source || '').toLowerCase() === 'amazon_removal_order' ? ' · Amazon removal' : ''}
         </div>
       </div>

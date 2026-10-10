@@ -4,7 +4,7 @@ import { useReceiving, recvErrorText } from '../state/ReceivingContext';
 import { useScanInput } from '../hooks/useScanInput';
 import { useBarcodeScanner, isCameraScanSupported } from '../hooks/useBarcodeScanner';
 import CameraScanOverlay from '../components/CameraScanOverlay';
-import { StatusChip, shortDate } from '../components/ReceptionBits';
+import { StatusChip, shortDate, dayMonth } from '../components/ReceptionBits';
 import { matchLines, normalizeTracking } from '../lib/prepReceiving';
 import { feedback } from '../lib/audio';
 import { Camera, RefreshCw, TriangleAlert, ScanLine, Keyboard as KeyboardIcon, X, Plus } from '../components/icons';
@@ -346,7 +346,7 @@ export default function ReceivingOrder() {
           ))}
         </div>
         <div className="mt-1.5 text-[11px] text-secondary">
-          {[r.carrier, r.createdAt && `Announced ${shortDate(r.createdAt)}`, `#${String(r.id).slice(0, 8)}`].filter(Boolean).join(' · ')}
+          {[r.carrier, r.createdAt && `Announced ${dayMonth(r.createdAt)}`, `#${String(r.id).slice(0, 8)}`].filter(Boolean).join(' · ')}
         </div>
         <div className="mt-3 flex items-baseline justify-between">
           <div className="text-[12px] font-bold text-ink">
