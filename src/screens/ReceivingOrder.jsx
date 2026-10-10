@@ -7,7 +7,7 @@ import CameraScanOverlay from '../components/CameraScanOverlay';
 import { StatusChip, shortDate, dayMonth } from '../components/ReceptionBits';
 import { matchLines, normalizeTracking } from '../lib/prepReceiving';
 import { feedback } from '../lib/audio';
-import { Camera, RefreshCw, TriangleAlert, ScanLine, Keyboard as KeyboardIcon, X, Plus } from '../components/icons';
+import { Camera, RefreshCw, TriangleAlert, ScanLine, Keyboard as KeyboardIcon, X, Plus, MapPin } from '../components/icons';
 
 // Receiving, step two: the client's reception — every product with its
 // picture, codes and the client's notes — and recording what arrived:
@@ -23,6 +23,9 @@ const FILTERS = [
 ];
 
 // `l.shown` is the count on screen: the Prep-Center's plus anything not sent yet.
+// A shelf that exists but can't take this client's goods.
+const SHELF_REFUSALS = new Set(['shelfUnavailable', 'shelfInactive']);
+
 function lineState(l) {
   const got = l.shown ?? l.received;
   if (l.expected > 0 && got > l.expected) return 'over';
@@ -148,6 +151,14 @@ function ProductCard({ line, highlighted, cardRef, onPhoto, onTap, entry, result
       <div className="mt-2.5 h-1 overflow-hidden rounded-full bg-segtrack">
         <div className={`h-full ${style.bar}`} style={{ width: `${state === 'over' ? 100 : pct}%` }} />
       </div>
+      {line.shelves.length > 0 && (
+        <div className="mt-2 flex flex-wrap items-center gap-1 text-[11px] text-secondary">
+          <MapPin size={12} strokeWidth={2.2} className="flex-none" />
+          {line.shelves.map((sh) => (
+            <span key={sh.code} className="rounded-md bg-success-tint2 px-1.5 py-[1px] font-mono font-bold text-success-dark">{sh.code} ×{sh.qty}</span>
+          ))}
+        </div>
+      )}
       <SyncLine entry={entry} result={result} onRetry={onRetry} onDiscard={onDiscard} />
       {line.notes.length > 0 && (
         <div className="mt-2.5 flex flex-col gap-1.5">
@@ -165,6 +176,55 @@ function Sheet({ children, onClose }) {
         {children}
       </div>
     </div>
+  );
+}
+
+// Shelf by label scan (the field takes the scanner's input) or typed code.
+function ShelfSheet({ onSubmit, onClose, onUseDefault, defaultCode }) {
+  const [code, setCode] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const submit = async (e) => {
+    e?.preventDefault();
+    const c = code.trim();
+    if (!c || busy) return;
+    setBusy(true);
+    setError(null);
+    const res = await onSubmit(c);
+    setBusy(false);
+    if (!res.ok) setError(res.reason === 'notShelf' ? `No shelf ${c.toUpperCase()} in this warehouse.` : res.message || recvErrorText(res.reason));
+  };
+  return (
+    <Sheet onClose={onClose}>
+      <div className="flex items-start gap-2">
+        <div className="min-w-0 flex-1">
+          <div className="text-[14px] font-extrabold">Shelf</div>
+          <div className="mt-0.5 text-[11.5px] text-secondary">Scan the shelf label or type its code. Units you scan next go on it.</div>
+        </div>
+        <button onClick={onClose} aria-label="Close" className="flex h-8 w-8 flex-none items-center justify-center rounded-full text-light"><X size={17} /></button>
+      </div>
+      <form onSubmit={submit} className="mt-3 flex gap-2">
+        <input
+          autoFocus
+          value={code}
+          onChange={(e) => setCode(e.target.value)}
+          autoCapitalize="characters"
+          autoCorrect="off"
+          spellCheck={false}
+          placeholder="e.g. K-3"
+          className="min-h-[50px] min-w-0 flex-1 rounded-xl border-2 border-primary px-3.5 font-mono text-[16px] uppercase text-ink"
+        />
+        <button type="submit" disabled={!code.trim() || busy} className="flex min-h-[50px] flex-none items-center justify-center rounded-xl bg-primary px-4 text-[14px] font-extrabold text-white disabled:opacity-60">
+          {busy ? '…' : 'Use'}
+        </button>
+      </form>
+      {error && <div className="mt-2 text-[12px] font-bold text-danger">{error}</div>}
+      {onUseDefault && (
+        <button onClick={onUseDefault} className="mt-3 text-[12px] font-bold text-primary underline underline-offset-2">
+          {defaultCode ? `Back to the client's shelf ${defaultCode}` : 'Stop using a shelf (receiving area)'}
+        </button>
+      )}
+    </Sheet>
   );
 }
 
@@ -213,7 +273,8 @@ function QtySheet({ line, onSave, onClose }) {
 export default function ReceivingOrder() {
   const { showToast, openPhoto } = useApp();
   const {
-    current, reloadCurrent, queue, results, shownReceived, addUnits, setUnits, undoLast, undoTop, retryLine, discardLine,
+    current, reloadCurrent, lineEntry, results, shownReceived, addUnits, setUnits, undoLast, undoTop, retryLine, discardLine,
+    activeShelf, defaultShelf, setShelfByCode, clearShelf,
   } = useReceiving();
   const raw = current.reception;
   // Lines with the count to show (Prep-Center's + not yet sent).
@@ -260,13 +321,38 @@ export default function ReceivingOrder() {
       setHighlight(hits.map((l) => l.id));
       return;
     }
-    feedback(true);
     setHighlight([]);
-    showToast(
-      r.trackings.includes(normalizeTracking(code))
-        ? 'That is a parcel of this reception — scan a product barcode'
-        : `${code} is not in this reception — it can't be received into stock`,
-    );
+    if (r.trackings.includes(normalizeTracking(code))) {
+      feedback(true);
+      showToast('That is a parcel of this reception — scan a product barcode');
+      return;
+    }
+    if (canReceive) {
+      // Not a product of this reception: maybe a shelf label.
+      chooseShelf(code).then((res) => {
+        if (res.ok || SHELF_REFUSALS.has(res.reason)) return;
+        feedback(true);
+        showToast(`${code} is not in this reception — it can't be received into stock`);
+      });
+      return;
+    }
+    feedback(true);
+    showToast(`${code} is not in this reception — it can't be received into stock`);
+  };
+
+  // A shelf code, scanned or typed: from now on new units go there.
+  const chooseShelf = async (code) => {
+    const res = await setShelfByCode(code);
+    if (res.ok) {
+      feedback(false);
+      showToast(`Shelf ${res.shelf.code} — units you scan now go on this shelf`);
+    } else if (SHELF_REFUSALS.has(res.reason)) {
+      // A real shelf this client can't use. Anything else (not a shelf, no
+      // connection) is reported by the caller.
+      feedback(true);
+      showToast(res.message);
+    }
+    return res;
   };
   const scanner = useScanInput(onProductCode, { paused: scanning || !r || !!sheet });
 
@@ -379,13 +465,44 @@ export default function ReceivingOrder() {
         </div>
       )}
 
+      {canReceive && r.lines.length > 0 && (
+        <div
+          className={
+            'flex items-center gap-2.5 rounded-[14px] border p-3 ' +
+            (activeShelf ? 'border-[rgba(22,163,74,.35)] bg-success-tint2' : 'border-[rgba(148,163,184,.25)] bg-white')
+          }
+        >
+          <MapPin size={18} strokeWidth={2.1} className={'flex-none ' + (activeShelf ? 'text-success-dark' : 'text-secondary')} />
+          <div className="min-w-0 flex-1">
+            <div className="text-[10px] font-bold uppercase tracking-[.08em] text-light">Units go on</div>
+            {activeShelf ? (
+              <div className="truncate text-[15px] font-extrabold text-success-dark">Shelf {activeShelf.code}</div>
+            ) : defaultShelf.loading ? (
+              <div className="text-[12.5px] text-secondary">Checking the client's shelf…</div>
+            ) : defaultShelf.shelf ? (
+              <div className="truncate text-[13.5px] font-bold text-ink">Client's shelf {defaultShelf.shelf.code} <span className="font-normal text-secondary">(default)</span></div>
+            ) : (
+              <div className="text-[12.5px] leading-snug text-secondary">No shelf — units stay in the receiving area. Scan a shelf label to put them away.</div>
+            )}
+          </div>
+          {activeShelf && (
+            <button onClick={clearShelf} aria-label="Stop using this shelf" className="flex h-8 w-8 flex-none items-center justify-center rounded-full text-secondary">
+              <X size={16} strokeWidth={2.2} />
+            </button>
+          )}
+          <button onClick={() => setSheet({ kind: 'shelf' })} className="flex-none rounded-lg border border-inputborder bg-white px-2.5 py-1.5 text-[11.5px] font-bold text-primary">
+            {activeShelf ? 'Change' : 'Set shelf'}
+          </button>
+        </div>
+      )}
+
       {!isRemoval && r.lines.length > 0 && (
         <div className="rounded-[14px] border border-[rgba(148,163,184,.25)] bg-white p-3">
           <div className="flex items-center gap-2">
             <ScanLine size={16} strokeWidth={2} className="flex-none text-primary" />
             <div className="min-w-0 flex-1 text-[11.5px] leading-snug text-secondary">
               {canReceive
-                ? 'Scan a product barcode to receive one unit. Tap a product to type the count.'
+                ? 'Scan a product barcode to receive one unit, or a shelf label to change the shelf. Tap a product to type the count.'
                 : 'Scan a product barcode to find it in this reception.'}
             </div>
           </div>
@@ -452,7 +569,7 @@ export default function ReceivingOrder() {
             highlighted={highlight.includes(line.id)}
             onPhoto={openPhoto}
             onTap={canReceive ? () => setSheet({ kind: 'qty', line }) : undefined}
-            entry={queue[line.id]}
+            entry={lineEntry(line.id)}
             result={results[line.id]}
             onRetry={() => retryLine(line.id)}
             onDiscard={() => discardLine(line.id)}
@@ -469,6 +586,18 @@ export default function ReceivingOrder() {
           line={r.lines.find((l) => l.id === sheet.line.id) || sheet.line}
           onClose={() => setSheet(null)}
           onSave={(n) => { setUnits(sheet.line, n); setHighlight([sheet.line.id]); setSheet(null); }}
+        />
+      )}
+      {sheet?.kind === 'shelf' && (
+        <ShelfSheet
+          onClose={() => setSheet(null)}
+          onUseDefault={activeShelf ? () => { clearShelf(); setSheet(null); } : null}
+          defaultCode={defaultShelf.shelf?.code || null}
+          onSubmit={async (code) => {
+            const res = await chooseShelf(code);
+            if (res.ok) setSheet(null);
+            return res;
+          }}
         />
       )}
       {sheet?.kind === 'choose' && (

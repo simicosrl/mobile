@@ -124,6 +124,111 @@ async function clientDefaultShelf(token, clientId, country) {
   return hit ? { id: hit.storage_place.id, code: hit.storage_place.code, warehouseId: hit.storage_place.warehouse_id || hit.warehouse_id } : null;
 }
 
+/** The client's default shelf, for showing where units will go. Never throws. */
+export async function loadClientDefaultShelf(token, clientId, country) {
+  try {
+    return { ok: true, shelf: await clientDefaultShelf(token, clientId, country) };
+  } catch (err) {
+    return { ok: false, reason: err.reason || 'failed', status: err.status };
+  }
+}
+
+const claimOwner = (c) =>
+  c?.client?.company_name || c?.client?.store_name ||
+  [c?.client?.first_name, c?.client?.last_name].filter(Boolean).join(' ') || 'another client';
+
+// utils/warehousePlacement.js isStoragePlaceAvailableForClient, with the
+// website's own messages (AdminReceiving saveInlinePlacementDraft).
+function shelfAvailability(place, claim, clientId) {
+  if (!place || place.active === false || place.blocked === true) return { ok: false, reason: 'shelfInactive', message: `Shelf ${place?.code || ''} is not active.` };
+  if (!claim) return { ok: true };
+  if (claim.status === 'empty_pending_check') {
+    return { ok: false, reason: 'shelfUnavailable', message: `Shelf ${place.code} must be verified empty before reuse.` };
+  }
+  if (claim.status === 'conflict' || String(claim.client_id || '').trim() !== String(clientId || '').trim()) {
+    return { ok: false, reason: 'shelfUnavailable', message: `Shelf ${place.code} is unavailable (${claimOwner(claim)}).` };
+  }
+  return { ok: true };
+}
+
+async function readShelf(token, { id = null, code = null, country }) {
+  const warehouses = await rest(token, `/rest/v1/warehouses?country=eq.${encodeURIComponent(country)}&select=id`);
+  const ids = (warehouses || []).map((w) => w.id);
+  if (!ids.length) return null;
+  // Codes compare trimmed and case-insensitively (normalizeStoragePlaceCode);
+  // ilike with no wildcards is exactly that, once % and _ are escaped.
+  const wanted = String(code || '').trim().toUpperCase();
+  if (!id && (!wanted || wanted.includes('*'))) return null; // * is PostgREST's wildcard
+  const filter = id
+    ? `id=eq.${encodeURIComponent(id)}`
+    : `code=ilike.${encodeURIComponent(wanted.replace(/[\\%_]/g, (m) => `\\${m}`))}`;
+  const places = await rest(token, `/rest/v1/storage_places?${filter}&warehouse_id=in.(${ids.join(',')})&select=*&limit=5`);
+  const exact = (Array.isArray(places) ? places : [])
+    .filter((pl) => id || String(pl.code || '').trim().toUpperCase() === wanted);
+  return exact.length === 1 ? exact[0] : null;
+}
+
+async function readClaim(token, placeId) {
+  const rows = await rest(token,
+    `/rest/v1/storage_place_claims?storage_place_id=eq.${encodeURIComponent(placeId)}` +
+    '&select=storage_place_id,client_id,status,client:profiles!storage_place_claims_client_id_fkey(company_name,store_name,first_name,last_name)');
+  return Array.isArray(rows) ? rows[0] || null : null;
+}
+
+/**
+ * A scanned or typed shelf code → the shelf, if it exists in this country and
+ * may take this client's goods. { ok, shelf: { id, code, warehouseId } } |
+ * { ok: false, reason: 'notShelf' | 'shelfUnavailable' | 'shelfInactive' | ..., message }.
+ */
+export async function findShelf(token, { code, country, clientId }) {
+  try {
+    const place = await readShelf(token, { code, country });
+    if (!place) return { ok: false, reason: 'notShelf' };
+    const avail = shelfAvailability(place, await readClaim(token, place.id), clientId);
+    if (!avail.ok) return { ok: false, ...avail };
+    return { ok: true, shelf: { id: place.id, code: place.code, warehouseId: place.warehouse_id } };
+  } catch (err) {
+    return { ok: false, reason: err.reason || 'failed', message: err.message, status: err.status };
+  }
+}
+
+// Units of this line from this reception sitting on one shelf right now.
+async function quantityOnShelf(token, shipmentId, itemId, placeId) {
+  const rows = await rest(token,
+    `/rest/v1/warehouse_locations?origin_ref_type=eq.receiving_shipment&origin_ref_id=eq.${encodeURIComponent(shipmentId)}` +
+    `&origin_ref_item_id=eq.${encodeURIComponent(itemId)}&storage_place_id=eq.${encodeURIComponent(placeId)}&quantity=gt.0&select=quantity`);
+  return (rows || []).reduce((a, r) => a + Number(r.quantity || 0), 0);
+}
+
+// AdminReceiving saveInlinePlacementDraft → setWarehouseProductPlacement:
+// the line's units on `shelf` go from `base` to `target` (more: placed from
+// the receiving area; fewer: unassigned back to it).
+async function setShelfQuantity(token, { shelf, shipment, item, base, target }) {
+  const stock = item.stock_item || {};
+  await rest(token, '/rest/v1/rpc/warehouse_set_product_placement', {
+    method: 'POST',
+    body: {
+      p_warehouse_id: shelf.warehouseId,
+      p_client_id: shipment.user_id || null,
+      p_base_quantity: base,
+      p_target_quantity: target,
+      p_from_storage_place_id: base > 0 ? shelf.id : null,
+      p_to_storage_place_id: shelf.id,
+      p_stock_item_id: item.stock_item_id || stock.id || null,
+      p_product_title: item.product_name || stock.name || null,
+      p_sku: item.sku || stock.sku || null,
+      p_asin: item.asin || stock.asin || item.ean_asin || item.ean || null,
+      p_lot_code: null,
+      p_expiration_date: null,
+      p_notes: null,
+      p_source_ref_type: 'receiving_shipment',
+      p_source_ref_id: shipment.id,
+      p_source_ref_item_id: item.id,
+      p_idempotency_key: opKey('placement'),
+    },
+  });
+}
+
 /** A line's received units as the Prep-Center has them right now. */
 export async function readReceivedUnits(token, itemId) {
   try {
@@ -140,10 +245,16 @@ export async function readReceivedUnits(token, itemId) {
  * "Received units" field does. Re-reads the line first; every step is safe to
  * repeat with the same target (the stock step is a target, not a delta).
  *
+ * `shelf` ({ id, code, warehouseId }): put the newly received units on that
+ * shelf, as the website's storage-place field does. Without it they go to
+ * the client's default shelf, as the website does automatically. Lowering
+ * the count first takes the units back off that same shelf (the website
+ * makes the operator unassign before lowering; this does both steps).
+ *
  * Returns { ok, received, placedOn, placementError, unchanged } or
  * { ok: false, reason, message }.
  */
-export async function setReceivedUnits(token, { shipmentId, itemId, target, actorId, country }) {
+export async function setReceivedUnits(token, { shipmentId, itemId, target, actorId, country, shelf = null }) {
   try {
     const parsed = Math.max(0, Math.floor(Number(target) || 0));
     const shipment = await loadShipmentForSave(token, shipmentId);
@@ -166,8 +277,18 @@ export async function setReceivedUnits(token, { shipmentId, itemId, target, acto
       return { ok: true, received: current, unchanged: true };
     }
 
-    const assigned = await assignedQuantity(token, shipmentId, item);
-    if (parsed < assigned) return { ok: false, reason: 'belowAssigned', assigned, received: current };
+    const shipmentCountry = shipment.warehouse_country || country;
+    let assigned = await assignedQuantity(token, shipmentId, item);
+    if (parsed < assigned) {
+      // Take the surplus back off the shelf these units were put on — the
+      // chosen one, else the client's default — if it holds enough of them.
+      const from = shelf || await clientDefaultShelf(token, shipment.user_id, shipmentCountry);
+      const need = assigned - parsed;
+      const onShelf = from ? await quantityOnShelf(token, shipmentId, item.id, from.id) : 0;
+      if (!from?.warehouseId || onShelf < need) return { ok: false, reason: 'belowAssigned', assigned, received: current };
+      await setShelfQuantity(token, { shelf: from, shipment, item, base: onShelf, target: onShelf - need });
+      assigned -= need;
+    }
 
     // --- applyReceivedUnits: the line's new values ---
     const delta = parsed - current;
@@ -219,7 +340,7 @@ export async function setReceivedUnits(token, { shipmentId, itemId, target, acto
     const reconciledDelta = Number(inv?.quantity_moved || 0);
 
     if (reconciledDelta !== 0) {
-      const warehouseId = await warehouseForCountry(token, shipment.warehouse_country || country);
+      const warehouseId = await warehouseForCountry(token, shipmentCountry);
       if (warehouseId) {
         await rest(token, '/rest/v1/warehouse_movements', {
           method: 'POST',
@@ -270,35 +391,48 @@ export async function setReceivedUnits(token, { shipmentId, itemId, target, acto
       });
     }
 
-    // --- autoPlaceNewStockOnClientShelf: never undoes the receipt ---
+    // --- placement: never undoes the receipt ---
     let placedOn = null;
     let placementError = null;
     if (reconciledDelta > 0 && shipment.user_id) {
       try {
-        const shelf = await clientDefaultShelf(token, shipment.user_id, shipment.warehouse_country || country);
-        if (shelf?.warehouseId) {
-          await rest(token, '/rest/v1/rpc/warehouse_auto_place_received_stock', {
-            method: 'POST',
-            body: {
-              p_payload: {
-                warehouse_id: shelf.warehouseId,
-                client_id: shipment.user_id,
-                quantity: reconciledDelta,
-                storage_place_id: shelf.id,
-                movement_type: 'relocate',
-                stock_item_id: stockItemId || stock.id || null,
-                product_title: item.product_name || stock.name || null,
-                sku: item.sku || stock.sku || null,
-                asin: item.asin || stock.asin || item.ean_asin || item.ean || null,
-                source_ref_type: 'receiving_shipment',
-                source_ref_id: shipmentId,
-                source_ref_item_id: item.id,
-                notes: 'Automatically placed on the client shelf.',
-                idempotency_key: opKey('auto-receiving'),
+        if (shelf) {
+          // saveInlinePlacementDraft: re-check the shelf is still this
+          // client's, then add the new units to what the line has there.
+          const place = await readShelf(token, { id: shelf.id, country: shipmentCountry });
+          const avail = shelfAvailability(place, place ? await readClaim(token, place.id) : null, shipment.user_id);
+          if (!avail.ok) throw new Error(avail.message || 'Shelf unavailable');
+          const target = { id: place.id, code: place.code, warehouseId: place.warehouse_id };
+          const base = await quantityOnShelf(token, shipmentId, item.id, place.id);
+          await setShelfQuantity(token, { shelf: target, shipment, item, base, target: base + reconciledDelta });
+          placedOn = place.code;
+        } else {
+          // autoPlaceNewStockOnClientShelf
+          const def = await clientDefaultShelf(token, shipment.user_id, shipmentCountry);
+          if (def?.warehouseId) {
+            await rest(token, '/rest/v1/rpc/warehouse_auto_place_received_stock', {
+              method: 'POST',
+              body: {
+                p_payload: {
+                  warehouse_id: def.warehouseId,
+                  client_id: shipment.user_id,
+                  quantity: reconciledDelta,
+                  storage_place_id: def.id,
+                  movement_type: 'relocate',
+                  stock_item_id: stockItemId || stock.id || null,
+                  product_title: item.product_name || stock.name || null,
+                  sku: item.sku || stock.sku || null,
+                  asin: item.asin || stock.asin || item.ean_asin || item.ean || null,
+                  source_ref_type: 'receiving_shipment',
+                  source_ref_id: shipmentId,
+                  source_ref_item_id: item.id,
+                  notes: 'Automatically placed on the client shelf.',
+                  idempotency_key: opKey('auto-receiving'),
+                },
               },
-            },
-          });
-          placedOn = shelf.code;
+            });
+            placedOn = def.code;
+          }
         }
       } catch (err) {
         placementError = err.message || String(err);

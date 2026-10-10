@@ -104,6 +104,7 @@ function lineFromItem(item) {
     fbaQty: Number(item.fba_qty || 0),
     stockItemId: item.stock_item_id || stock.id || null,
     notes: [],
+    shelves: [], // [{ code, qty }] where this line's units are now
   };
 }
 
@@ -134,13 +135,19 @@ export async function loadReception(token, id) {
   const row = Array.isArray(shipmentRes.data) ? shipmentRes.data[0] : null;
   if (!row) return { ok: false, status: 404, reason: 'notFound' };
 
-  const [clientRes, notesRes] = await Promise.all([
+  const [clientRes, notesRes, shelvesRes] = await Promise.all([
     row.user_id
       ? prepFetch(`/rest/v1/profiles?id=eq.${encodeURIComponent(row.user_id)}&select=first_name,last_name,company_name,store_name,email,phone`, { token })
       : Promise.resolve({ ok: true, data: [] }),
     prepFetch(
       `/rest/v1/receiving_shipment_notes?receiving_shipment_id=eq.${encodeURIComponent(id)}` +
         '&select=id,sender_type,body,kind,line_id,created_at&order=created_at.asc',
+      { token },
+    ),
+    // Where this reception's units are now (utils/receivingPlacements.js).
+    prepFetch(
+      `/rest/v1/warehouse_locations?origin_ref_type=eq.receiving_shipment&origin_ref_id=eq.${encodeURIComponent(id)}` +
+        '&quantity=gt.0&select=quantity,sku,asin,origin_ref_item_id,storage_place:storage_places(code)',
       { token },
     ),
   ]);
@@ -158,6 +165,25 @@ export async function loadReception(token, id) {
     if (line) line.notes.push(note);
     else generalNotes.push(note);
   }
+  // Units on shelves, per line: by line id, else by the product's SKU/ASIN
+  // as the website matches older rows.
+  const norm = (v) => String(v || '').toLowerCase().trim();
+  const items = row.receiving_items || [];
+  for (const loc of (shelvesRes.ok && Array.isArray(shelvesRes.data) ? shelvesRes.data : [])) {
+    let line = loc.origin_ref_item_id ? byId.get(loc.origin_ref_item_id) : null;
+    if (!line && !loc.origin_ref_item_id) {
+      const it = items.find((i) =>
+        norm(i.sku || i.stock_item?.sku) === norm(loc.sku) &&
+        norm(i.asin || i.stock_item?.asin || i.ean_asin) === norm(loc.asin));
+      line = it ? byId.get(it.id) : null;
+    }
+    if (!line) continue;
+    const code = loc.storage_place?.code || '?';
+    const hit = line.shelves.find((x) => x.code === code);
+    if (hit) hit.qty += Number(loc.quantity || 0);
+    else line.shelves.push({ code, qty: Number(loc.quantity || 0) });
+  }
+
   // The intake note (receiving_shipments.notes) was copied into the thread
   // when the thread was introduced; show it only when it says something the
   // thread does not already.
@@ -176,6 +202,7 @@ export async function loadReception(token, id) {
       createdAt: row.created_at,
       receivedAt: row.received_at,
       warehouseCountry: row.warehouse_country,
+      clientId: row.user_id || null,
       carrier: row.carrier === 'other' ? row.carrier_other || 'Other' : row.carrier || null,
       trackings: receptionTrackings(row),
       importSource: String(row.import_source || '').toLowerCase() || null,

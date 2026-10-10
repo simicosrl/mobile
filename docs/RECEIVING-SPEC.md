@@ -155,6 +155,14 @@ Reproduce `applyReceivedUnits` din `src/components/admin/AdminReceiving.jsx`
    salvată înainte de scriere, deci retrimiterea nu dublează), `ReceivingOrder.jsx`
    (scanare +1, confirmare peste cantitatea anunțată, alegere când un cod e pe mai
    multe linii, tastatură numerică, „Undo last”, stare salvare pe fiecare card).
-4. Raft activ.
+4. ✅ Raft activ — scanarea unei etichete de raft (sau „Set shelf”) îl face activ;
+   raftul e verificat ca pe web (`storage_places` din țară, `storage_place_claims`:
+   liber sau al acestui client). Bucățile noi merg pe el prin
+   `warehouse_set_product_placement` (ca `saveInlinePlacementDraft`); fără raft activ,
+   pe raftul implicit al clientului (`warehouse_auto_place_received_stock`).
+   Coada ține minte raftul fiecărei scanări. La scădere (Undo / cantitate mai mică),
+   bucățile se scot întâi de pe raftul lor (pasul pe care web-ul îl cere manual);
+   dacă stau pe alt raft, scăderea e refuzată cu mesaj. Cardul arată rafturile
+   pe care stă produsul.
 5. Finalizare + „Începe recepția” din Inbound.
 6. Retragerea login-ului vechi pe badge.

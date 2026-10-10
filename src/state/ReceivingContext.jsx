@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useApp } from './AppContext';
 import * as rx from '../lib/prepReceiving';
-import { readReceivedUnits, setReceivedUnits } from '../lib/prepReceivingSave';
+import { readReceivedUnits, setReceivedUnits, findShelf, loadClientDefaultShelf } from '../lib/prepReceivingSave';
 import { kvGet, kvSet } from '../lib/db';
 
 // Receiving ("Recepție marfă") state, kept apart from AppContext, which already
@@ -17,6 +17,15 @@ import { kvGet, kvSet } from '../lib/db';
 // (so two operators on one line add up); the moment it is sent it becomes an
 // absolute target, stored before the write starts, so a retry after a lost
 // answer writes the same number again instead of adding the units twice.
+//
+// Entries are per line *and shelf* (key "lineId@shelfId", or "@default" for
+// the client's default shelf): units scanned with shelf A active go to A even
+// if the operator has moved on to shelf B before they are sent.
+
+const DEFAULT_SHELF = 'default';
+const entryKey = (lineId, shelf) => `${lineId}@${shelf?.id || DEFAULT_SHELF}`;
+const byCreation = (a, b) => (a.createdAt ?? a.updatedAt) - (b.createdAt ?? b.updatedAt);
+const STATUS_RANK = { error: 4, waiting: 3, sending: 2, pending: 1 };
 
 const RecvCtx = createContext(null);
 
@@ -57,13 +66,25 @@ export function ReceivingProvider({ children }) {
     setQueue(next);
     kvSet('recvQueue', next);
   }, []);
-  const updateEntry = useCallback((lineId, fn) => {
-    const nextEntry = fn(queueRef.current[lineId] || null);
+  const updateEntry = useCallback((key, fn) => {
+    const nextEntry = fn(queueRef.current[key] || null);
     const next = { ...queueRef.current };
-    if (nextEntry) next[lineId] = { ...nextEntry, updatedAt: Date.now() };
-    else delete next[lineId];
+    if (nextEntry) next[key] = { ...nextEntry, updatedAt: Date.now() };
+    else delete next[key];
     commitQueue(next);
   }, [commitQueue]);
+
+  // ---- shelf ----
+  // The shelf the operator scanned last for this reception: new units go
+  // there. null = the client's default shelf (as the website does), shown as
+  // `defaultShelf` ({ loading, shelf }).
+  const [activeShelf, setActiveShelfState] = useState(null);
+  const activeShelfRef = useRef(null);
+  const setActiveShelf = useCallback((shelf) => {
+    activeShelfRef.current = shelf;
+    setActiveShelfState(shelf);
+  }, []);
+  const [defaultShelf, setDefaultShelf] = useState({ loading: false, shelf: null });
 
   // The line's count as the Prep-Center has it, once a save comes back.
   const applyServerReceived = useCallback((lineId, received) => {
@@ -85,10 +106,13 @@ export function ReceivingProvider({ children }) {
   }, [country, withPrep]);
 
   const openReception = useCallback(async (id) => {
-    // A different reception starts a fresh undo history.
+    // A different reception starts a fresh undo history and shelf choice: a
+    // shelf is checked against the reception's client.
     if (currentIdRef.current !== id) {
       undoStackRef.current = [];
       setUndoTop(null);
+      setActiveShelf(null);
+      setDefaultShelf({ loading: true, shelf: null });
     }
     currentIdRef.current = id;
     setCurrent((c) => ({ id, reception: c.id === id ? c.reception : null, loading: true, error: null }));
@@ -98,7 +122,22 @@ export function ReceivingProvider({ children }) {
     setCurrent((c) => (res.ok
       ? { id, reception: res.reception, loading: false, error: null }
       : { ...c, loading: false, error: res.reason }));
-  }, [withPrep, setScreen]);
+    if (res.ok) {
+      const r = res.reception;
+      const def = await withPrep((t) => loadClientDefaultShelf(t, r.clientId, r.warehouseCountry || shiftRef.current?.country));
+      if (currentIdRef.current === id) setDefaultShelf({ loading: false, shelf: def.ok ? def.shelf : null });
+    }
+  }, [withPrep, setScreen, setActiveShelf]);
+
+  /** A scanned or typed shelf code → the active shelf, if this client may use it. */
+  const setShelfByCode = useCallback(async (code) => {
+    const r = current.reception;
+    if (!r) return { ok: false, reason: 'notFound' };
+    const res = await withPrep((t) => findShelf(t, { code, country: r.warehouseCountry || country, clientId: r.clientId }));
+    if (res.ok && currentIdRef.current === r.id) setActiveShelf(res.shelf);
+    return res;
+  }, [current.reception, withPrep, country, setActiveShelf]);
+  const clearShelf = useCallback(() => setActiveShelf(null), [setActiveShelf]);
 
   const reloadCurrent = useCallback(() => {
     if (currentIdRef.current) openReception(currentIdRef.current);
@@ -145,9 +184,9 @@ export function ReceivingProvider({ children }) {
         if (!actorId) break;
         const entry = Object.values(queueRef.current)
           .filter((e) => e.actorId === actorId && e.status === 'pending')
-          .sort((a, b) => a.updatedAt - b.updatedAt)[0];
+          .sort(byCreation)[0];
         if (!entry) break;
-        const { lineId, shipmentId } = entry;
+        const { key, lineId, shipmentId, shelf } = entry;
 
         let target = entry.inflightTarget;
         if (target == null) {
@@ -157,41 +196,41 @@ export function ReceivingProvider({ children }) {
             const r = await withPrep((t) => readReceivedUnits(t, lineId));
             if (!r.ok) {
               const soft = ['offline', 'expired', 'unauthorized', 'notSignedIn'].includes(r.reason);
-              updateEntry(lineId, (e) => e && { ...e, status: soft ? 'waiting' : 'error', error: r.reason, message: r.message || null });
+              updateEntry(key, (e) => e && { ...e, status: soft ? 'waiting' : 'error', error: r.reason, message: r.message || null });
               continue;
             }
             target = r.received + entry.pendingDelta;
           }
           target = Math.max(0, target);
           const fixed = target;
-          updateEntry(lineId, (e) => e && { ...e, inflightTarget: fixed, pendingSet: null, pendingDelta: 0, status: 'sending', error: null });
+          updateEntry(key, (e) => e && { ...e, inflightTarget: fixed, pendingSet: null, pendingDelta: 0, status: 'sending', error: null });
         } else {
-          updateEntry(lineId, (e) => e && { ...e, status: 'sending', error: null });
+          updateEntry(key, (e) => e && { ...e, status: 'sending', error: null });
         }
 
-        const res = await withPrep((t) => setReceivedUnits(t, { shipmentId, itemId: lineId, target, actorId, country: shiftCountry }));
+        const res = await withPrep((t) => setReceivedUnits(t, { shipmentId, itemId: lineId, target, actorId, country: shiftCountry, shelf: shelf || null }));
         touchedShipments.add(shipmentId);
         if (res.ok) {
           applyServerReceived(lineId, res.received);
           if (!res.unchanged) setResults((m) => ({ ...m, [lineId]: { placedOn: res.placedOn || null, placementError: res.placementError || null } }));
-          updateEntry(lineId, (e) => {
+          updateEntry(key, (e) => {
             if (!e) return null;
             const rest = { ...e, inflightTarget: null, status: 'pending', error: null, message: null };
             return rest.pendingDelta === 0 && rest.pendingSet == null ? null : rest;
           });
         } else if (['offline', 'expired', 'unauthorized', 'notSignedIn'].includes(res.reason)) {
-          updateEntry(lineId, (e) => e && { ...e, status: 'waiting', error: res.reason });
+          updateEntry(key, (e) => e && { ...e, status: 'waiting', error: res.reason });
         } else if (res.reason === 'belowAssigned') {
           // Nothing was written. Show the Prep-Center's count and why.
           if (res.received != null) applyServerReceived(lineId, res.received);
           setResults((m) => ({ ...m, [lineId]: { belowAssigned: res.assigned } }));
-          updateEntry(lineId, (e) => {
+          updateEntry(key, (e) => {
             if (!e) return null;
             const rest = { ...e, inflightTarget: null, status: 'pending', error: null };
             return rest.pendingDelta === 0 && rest.pendingSet == null ? null : rest;
           });
         } else {
-          updateEntry(lineId, (e) => e && { ...e, status: 'error', error: res.reason, message: res.message || null });
+          updateEntry(key, (e) => e && { ...e, status: 'error', error: res.reason, message: res.message || null });
         }
       }
     } finally {
@@ -212,7 +251,11 @@ export function ReceivingProvider({ children }) {
     kvGet('recvQueue', {}).then((saved) => {
       if (!alive || !saved || typeof saved !== 'object') return;
       // Anything caught mid-send is resent with its stored target.
-      const restored = Object.fromEntries(Object.entries(saved).map(([k, e]) => [k, { ...e, status: e.status === 'error' ? 'error' : 'pending' }]));
+      // Entries saved before shelves existed were keyed by line alone.
+      const restored = Object.fromEntries(Object.values(saved).filter((e) => e?.lineId).map((e) => {
+        const key = e.key || entryKey(e.lineId, e.shelf);
+        return [key, { ...e, key, createdAt: e.createdAt ?? e.updatedAt ?? Date.now(), status: e.status === 'error' ? 'error' : 'pending' }];
+      }));
       queueRef.current = { ...restored, ...queueRef.current };
       setQueue(queueRef.current);
       drain();
@@ -229,7 +272,7 @@ export function ReceivingProvider({ children }) {
       const waiting = Object.values(queueRef.current).filter((e) => e.status === 'waiting');
       if (!waiting.length) return;
       const next = { ...queueRef.current };
-      for (const e of waiting) next[e.lineId] = { ...e, status: 'pending' };
+      for (const e of waiting) next[e.key] = { ...e, status: 'pending' };
       commitQueue(next);
       drain();
     };
@@ -238,59 +281,75 @@ export function ReceivingProvider({ children }) {
     return () => { clearInterval(t); window.removeEventListener('online', retryWaiting); };
   }, [commitQueue, drain]);
 
-  const newEntry = (line, shipmentId) => ({
-    lineId: line.id, shipmentId, actorId: shiftRef.current?.prep?.userId,
+  const newEntry = (line, shipmentId, shelf) => ({
+    key: entryKey(line.id, shelf), lineId: line.id, shipmentId, shelf: shelf || null,
+    actorId: shiftRef.current?.prep?.userId, createdAt: Date.now(),
     pendingDelta: 0, pendingSet: null, inflightTarget: null, status: 'pending', error: null, message: null,
   });
+  const clearResult = (lineId) => setResults((m) => { if (!m[lineId]) return m; const { [lineId]: _x, ...rest } = m; return rest; });
+  const entriesOf = (q, lineId) => Object.values(q).filter((e) => e.lineId === lineId);
 
-  const addUnits = useCallback((line, n = 1, { undoable = true } = {}) => {
+  // `shelf` defaults to the active shelf; undo passes the shelf the units
+  // were scanned to, so they come back off that one.
+  const addUnits = useCallback((line, n = 1, { undoable = true, shelf } = {}) => {
     const shipmentId = currentIdRef.current;
     if (!shipmentId || !n) return;
-    updateEntry(line.id, (e) => {
-      const base = e || newEntry(line, shipmentId);
+    const target = shelf === undefined ? activeShelfRef.current : shelf;
+    updateEntry(entryKey(line.id, target), (e) => {
+      const base = e || newEntry(line, shipmentId, target);
       return { ...base, pendingDelta: base.pendingDelta + n, status: base.status === 'sending' ? 'sending' : 'pending', error: null };
     });
-    setResults((m) => { if (!m[line.id]) return m; const { [line.id]: _x, ...rest } = m; return rest; });
+    clearResult(line.id);
     if (undoable) {
-      undoStackRef.current = [...undoStackRef.current.slice(-49), { lineId: line.id, name: line.name, n, line }];
+      undoStackRef.current = [...undoStackRef.current.slice(-49), { lineId: line.id, name: line.name, n, line, shelf: target }];
       setUndoTop(undoStackRef.current[undoStackRef.current.length - 1]);
     }
     drain();
   }, [updateEntry, drain]);
 
+  // A typed total replaces whatever this phone had not sent yet for the line.
   const setUnits = useCallback((line, value) => {
     const shipmentId = currentIdRef.current;
     if (!shipmentId) return;
     const v = Math.max(0, Math.floor(Number(value) || 0));
-    updateEntry(line.id, (e) => {
-      const base = e || newEntry(line, shipmentId);
-      return { ...base, pendingSet: v, pendingDelta: 0, status: base.status === 'sending' ? 'sending' : 'pending', error: null };
-    });
-    setResults((m) => { if (!m[line.id]) return m; const { [line.id]: _x, ...rest } = m; return rest; });
-    // A typed count replaces what was scanned before it; scan-undo stops here.
+    const shelf = activeShelfRef.current;
+    const key = entryKey(line.id, shelf);
+    const next = { ...queueRef.current };
+    for (const e of entriesOf(next, line.id)) {
+      if (e.key !== key && e.inflightTarget == null && e.status !== 'sending') delete next[e.key];
+    }
+    const base = next[key] || newEntry(line, shipmentId, shelf);
+    next[key] = { ...base, pendingSet: v, pendingDelta: 0, status: base.status === 'sending' ? 'sending' : 'pending', error: null, updatedAt: Date.now() };
+    commitQueue(next);
+    clearResult(line.id);
+    // Scan-undo stops at a typed count.
     undoStackRef.current = undoStackRef.current.filter((a) => a.lineId !== line.id);
     setUndoTop(undoStackRef.current[undoStackRef.current.length - 1] || null);
     drain();
-  }, [updateEntry, drain]);
+  }, [commitQueue, drain]);
 
   const undoLast = useCallback(() => {
     const last = undoStackRef.current[undoStackRef.current.length - 1];
     if (!last) return null;
     undoStackRef.current = undoStackRef.current.slice(0, -1);
     setUndoTop(undoStackRef.current[undoStackRef.current.length - 1] || null);
-    addUnits(last.line, -last.n, { undoable: false });
+    addUnits(last.line, -last.n, { undoable: false, shelf: last.shelf || null });
     return last;
   }, [addUnits]);
 
   const retryLine = useCallback((lineId) => {
-    updateEntry(lineId, (e) => e && { ...e, status: 'pending', error: null });
+    const next = { ...queueRef.current };
+    for (const e of entriesOf(next, lineId)) if (e.status === 'error') next[e.key] = { ...e, status: 'pending', error: null };
+    commitQueue(next);
     drain();
-  }, [updateEntry, drain]);
+  }, [commitQueue, drain]);
 
   // Gives up on what this phone still had to send for a line, and shows the
   // Prep-Center's own count again.
   const discardLine = useCallback((lineId) => {
-    updateEntry(lineId, () => null);
+    const next = { ...queueRef.current };
+    for (const e of entriesOf(next, lineId)) delete next[e.key];
+    commitQueue(next);
     undoStackRef.current = undoStackRef.current.filter((a) => a.lineId !== lineId);
     setUndoTop(undoStackRef.current[undoStackRef.current.length - 1] || null);
     if (currentIdRef.current) {
@@ -299,7 +358,11 @@ export function ReceivingProvider({ children }) {
         if (res.ok && currentIdRef.current === id) setCurrent((c) => ({ ...c, reception: res.reception }));
       });
     }
-  }, [updateEntry, withPrep]);
+  }, [commitQueue, withPrep]);
+
+  /** The entry that best describes a line's sync state (an error beats waiting beats sending). */
+  const lineEntry = useCallback((lineId) => entriesOf(queue, lineId)
+    .sort((a, b) => (STATUS_RANK[b.status] || 0) - (STATUS_RANK[a.status] || 0))[0] || null, [queue]);
 
   // Counts this operator still has to send (End shift warns about them).
   const pendingCount = useMemo(
@@ -309,18 +372,23 @@ export function ReceivingProvider({ children }) {
 
   /** What the operator should see for a line: the Prep-Center's count plus anything not sent yet. */
   const shownReceived = useCallback((line) => {
-    const e = queue[line.id];
-    if (!e) return line.received;
-    const base = e.inflightTarget ?? line.received;
-    return Math.max(0, (e.pendingSet ?? base) + e.pendingDelta);
+    let v = line.received;
+    for (const e of entriesOf(queue, line.id).sort(byCreation)) {
+      if (e.inflightTarget != null) v = e.inflightTarget;
+      if (e.pendingSet != null) v = e.pendingSet;
+      v += e.pendingDelta;
+    }
+    return Math.max(0, v);
   }, [queue]);
 
   const value = useMemo(() => ({
     country, open, refreshOpen, lookup, looking, lookupTracking, searchReceptions, clearLookup,
     current, openReception, reloadCurrent,
-    queue, results, shownReceived, addUnits, setUnits, undoLast, undoTop, retryLine, discardLine, pendingCount,
+    queue, lineEntry, results, shownReceived, addUnits, setUnits, undoLast, undoTop, retryLine, discardLine, pendingCount,
+    activeShelf, defaultShelf, setShelfByCode, clearShelf,
   }), [country, open, refreshOpen, lookup, looking, lookupTracking, searchReceptions, clearLookup, current, openReception, reloadCurrent,
-    queue, results, shownReceived, addUnits, setUnits, undoLast, undoTop, retryLine, discardLine, pendingCount]);
+    queue, lineEntry, results, shownReceived, addUnits, setUnits, undoLast, undoTop, retryLine, discardLine, pendingCount,
+    activeShelf, defaultShelf, setShelfByCode, clearShelf]);
 
   return <RecvCtx.Provider value={value}>{children}</RecvCtx.Provider>;
 }
