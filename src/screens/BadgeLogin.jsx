@@ -13,31 +13,116 @@ import { useBarcodeScanner, isCameraScanSupported } from '../hooks/useBarcodeSca
 // its own, since a focused, editable text input still asks the OS for its
 // on-screen keyboard regardless of how it's styled. Phones/tablets with no
 // hardware scanner attached use the camera button instead, which opens the
-// native ML Kit scanner (see hooks/useBarcodeScanner.js). The operator's
-// name is never typed in here either — it comes straight from the badge's
-// own server-side registration (admin.badge_countries.label).
+// native ML Kit scanner (see hooks/useBarcodeScanner.js).
+//
+// Operators are Prep-Center staff accounts. A badge already linked on this
+// phone signs straight in; the first scan of any other badge asks for that
+// operator's Prep-Center email and password once (plus their authenticator
+// code if they use one), then links the badge. That one-time form is the only
+// place a keyboard appears. Name, country and permissions come from the
+// Prep-Center profile, never typed here.
+
+// Why a login was refused, in the operator's terms.
+const REASONS = {
+  unassigned: 'This badge has no country assigned yet. Contact the office to get it set up before scanning.',
+  offline: "Couldn't reach the server — check the connection and try again.",
+  badCredentials: 'Wrong email or password.',
+  emailNotConfirmed: 'This Prep-Center account has not confirmed its email yet.',
+  authFailed: "The Prep-Center didn't accept the sign-in.",
+  badMfaCode: 'That code is not valid. Enter the current code from your authenticator app.',
+  noProfile: 'No Prep-Center profile was found for this account.',
+  inactive: 'This Prep-Center account is disabled. Contact the office.',
+  notStaff: 'Only Prep-Center staff accounts can use this app.',
+  noWarehousePermission: 'Your Prep-Center account does not have the Warehouse permission. Ask an administrator to grant it.',
+  noCountry: 'Your Prep-Center profile has no warehouse country (IT, FR or DE). Ask an administrator to set it.',
+  warehouseNetwork: 'Your account can only be used on the warehouse network. Connect to the warehouse Wi-Fi and try again.',
+  warehouseNetworkUnverified: "Your account can only be used on the warehouse network, and that couldn't be checked. Connect to the warehouse Wi-Fi and try again.",
+};
+const COUNTRY_NAMES = { IT: 'Italy', FR: 'France', DE: 'Germany' };
+
+const inputCls = 'min-h-[52px] w-full rounded-xl border-0 bg-white px-4 text-[15px] text-ink outline-none placeholder:text-secondary';
+const primaryBtn = 'flex min-h-[52px] w-full items-center justify-center gap-2 rounded-xl bg-white text-[15px] font-extrabold text-primary disabled:opacity-60';
+const linkBtn = 'self-center text-[12.5px] font-bold text-white/80 underline underline-offset-2 disabled:opacity-60';
+
 export default function BadgeLogin() {
-  const { loginWithBadge } = useApp();
+  const { loginWithBadge, loginWithLegacyBadge, prepSignIn, prepVerifyMfa, prepChooseCountry } = useApp();
   const [busy, setBusy] = useState(false);
-  // { badgeId, reason: 'unassigned' | 'offline' } | null — country is
-  // looked up server-side on every login now (no more manual picker), so a
-  // badge with nothing assigned yet, or a lookup that couldn't be reached at
-  // all, both need to block here rather than let the operator through.
-  const [loginError, setLoginError] = useState(null);
+  // What the screen is asking for. null = waiting for a badge scan.
+  //   { kind: 'error', badgeId, reason }
+  //   { kind: 'signin', badgeId, email, expired, error }
+  //   { kind: 'mfa', pending, error }
+  //   { kind: 'country', pending, countries }
+  const [step, setStep] = useState(null);
+  const loginError = step?.kind === 'error' ? step : null;
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [code, setCode] = useState('');
   const hiddenRef = useRef(null);
   const debounceRef = useRef(null);
   const { scan, scanning, error } = useBarcodeScanner();
 
   useEffect(() => {
     const refocus = () => {
-      if (!busy && !loginError && hiddenRef.current && document.activeElement !== hiddenRef.current) {
+      if (!busy && !step && hiddenRef.current && document.activeElement !== hiddenRef.current) {
         try { hiddenRef.current.focus({ preventScroll: true }); } catch { /* ignore */ }
       }
     };
     refocus();
     const t = setInterval(refocus, 400);
     return () => clearInterval(t);
-  }, [busy, loginError]);
+  }, [busy, step]);
+
+  // Any answer from the context: either the shift started (the app moves on
+  // by itself) or the next thing to ask for.
+  const follow = (res, badgeId) => {
+    if (res.ok) { setStep(null); return; }
+    if (res.reason === 'needsPrepLogin') {
+      setEmail(res.email || '');
+      setPassword('');
+      setStep({ kind: 'signin', badgeId: res.badgeId || badgeId, expired: !!res.expired });
+    } else if (res.reason === 'mfa') {
+      setCode('');
+      setStep({ kind: 'mfa', pending: res.pending });
+    } else if (res.reason === 'chooseCountry') {
+      setStep({ kind: 'country', pending: res.pending, countries: res.countries });
+    } else {
+      setStep({ kind: 'error', badgeId, reason: res.reason });
+    }
+  };
+
+  const run = async (fn, onError) => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const res = await fn();
+      if (!res.ok && onError && ['badCredentials', 'badMfaCode', 'offline', 'authFailed', 'emailNotConfirmed'].includes(res.reason)) {
+        onError(res.reason);
+      } else {
+        follow(res, step?.badgeId || step?.pending?.badgeId);
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const submitSignIn = (e) => {
+    e?.preventDefault();
+    if (!email.trim() || !password) return;
+    const badgeId = step.badgeId;
+    run(() => prepSignIn({ badgeId, email, password }), (reason) => setStep((s) => ({ ...s, error: reason })));
+  };
+
+  const submitMfa = (e) => {
+    e?.preventDefault();
+    if (!code.trim()) return;
+    const { pending } = step;
+    run(() => prepVerifyMfa(pending, code), (reason) => setStep((s) => ({ ...s, error: reason })));
+  };
+
+  const useLegacy = () => {
+    const badgeId = step.badgeId;
+    run(() => loginWithLegacyBadge(badgeId));
+  };
 
   const handleBadge = async (raw) => {
     // Re-entrancy guard — the hidden input stays live (and its 400ms
@@ -46,11 +131,13 @@ export default function BadgeLogin() {
     if (busy) return;
     const badgeId = String(raw || '').trim().toUpperCase();
     if (!badgeId) return;
-    setLoginError(null);
+    setStep(null);
     setBusy(true);
-    const res = await loginWithBadge(badgeId);
-    setBusy(false);
-    if (!res.ok) setLoginError({ badgeId, reason: res.reason });
+    try {
+      follow(await loginWithBadge(badgeId), badgeId);
+    } finally {
+      setBusy(false);
+    }
   };
 
   const scanWithCamera = async () => {
@@ -58,7 +145,7 @@ export default function BadgeLogin() {
     if (code) handleBadge(code);
   };
 
-  const tryAgain = () => setLoginError(null);
+  const tryAgain = () => setStep(null);
 
   return (
     <div
@@ -113,23 +200,70 @@ export default function BadgeLogin() {
         </div>
       </div>
 
-      {loginError ? (
+      {step?.kind === 'signin' ? (
+        <form onSubmit={submitSignIn} className="flex flex-col gap-3">
+          <div>
+            <div className="text-[20px] font-extrabold leading-[1.25] tracking-[-.02em]">Badge {step.badgeId}</div>
+            <div className="mt-2 text-[13px] text-white/75">
+              {step.expired
+                ? 'Your Prep-Center session on this phone has ended. Sign in again to continue.'
+                : 'First time on this phone: sign in with your Prep-Center account. Next time, the badge is enough.'}
+            </div>
+          </div>
+          <input
+            type="email" autoComplete="username" inputMode="email" autoCapitalize="none" spellCheck={false}
+            value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Prep-Center email" className={inputCls}
+          />
+          <input
+            type="password" autoComplete="current-password"
+            value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" className={inputCls}
+          />
+          {step.error && <div className="text-[13px] font-bold text-white">{REASONS[step.error] || REASONS.authFailed}</div>}
+          <button type="submit" disabled={busy || !email.trim() || !password} className={primaryBtn}>
+            {busy ? 'Signing in…' : 'Sign in'}
+          </button>
+          <button type="button" onClick={tryAgain} disabled={busy} className={linkBtn}>Cancel</button>
+          <button type="button" onClick={useLegacy} disabled={busy} className={linkBtn}>Use the old badge login instead</button>
+        </form>
+      ) : step?.kind === 'mfa' ? (
+        <form onSubmit={submitMfa} className="flex flex-col gap-3">
+          <div>
+            <div className="text-[20px] font-extrabold leading-[1.25] tracking-[-.02em]">Authenticator code</div>
+            <div className="mt-2 text-[13px] text-white/75">Enter the 6-digit code from your authenticator app, as on the Prep-Center website.</div>
+          </div>
+          <input
+            inputMode="numeric" autoComplete="one-time-code" maxLength={8}
+            value={code} onChange={(e) => setCode(e.target.value.replace(/[^0-9]/g, ''))} placeholder="123456"
+            className={`${inputCls} text-center font-mono text-[20px] tracking-[.3em]`}
+          />
+          {step.error && <div className="text-[13px] font-bold text-white">{REASONS[step.error] || REASONS.authFailed}</div>}
+          <button type="submit" disabled={busy || code.length < 6} className={primaryBtn}>
+            {busy ? 'Checking…' : 'Confirm'}
+          </button>
+          <button type="button" onClick={tryAgain} disabled={busy} className={linkBtn}>Cancel</button>
+        </form>
+      ) : step?.kind === 'country' ? (
+        <div className="flex flex-col gap-3">
+          <div>
+            <div className="text-[20px] font-extrabold leading-[1.25] tracking-[-.02em]">Which warehouse?</div>
+            <div className="mt-2 text-[13px] text-white/75">Your account covers more than one country. Choose where this shift is.</div>
+          </div>
+          {step.countries.map((c) => (
+            <button key={c} onClick={() => follow(prepChooseCountry(step.pending, c), step.pending.badgeId)} className={primaryBtn}>
+              {COUNTRY_NAMES[c] || c} · {c}
+            </button>
+          ))}
+          <button type="button" onClick={tryAgain} className={linkBtn}>Cancel</button>
+        </div>
+      ) : loginError ? (
         <div className="flex flex-col gap-3">
           <div>
             <div className="text-[20px] font-extrabold leading-[1.25] tracking-[-.02em]">Badge {loginError.badgeId}</div>
-            {loginError.reason === 'unassigned' ? (
-              <div className="mt-2 text-[13px] text-white/75">
-                This badge has no country assigned yet. Contact the office to get it set up before scanning.
-              </div>
-            ) : (
-              <div className="mt-2 text-[13px] text-white/75">
-                Couldn't reach the server to check this badge — check the connection and try again.
-              </div>
-            )}
+            <div className="mt-2 text-[13px] text-white/75">{REASONS[loginError.reason] || REASONS.authFailed}</div>
           </div>
           <button
             onClick={tryAgain}
-            className="flex min-h-[52px] w-full items-center justify-center gap-2 rounded-xl bg-white text-[15px] font-extrabold text-primary"
+            className={primaryBtn}
           >
             Try again
           </button>

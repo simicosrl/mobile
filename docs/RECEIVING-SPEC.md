@@ -41,11 +41,18 @@ permisiunile de admin se aplică exact ca pe web.
 a acelui operator. Badge necunoscut pe telefon → email + parolă o dată.
 Sesiune expirată/revocată → parola din nou.
 
-**Unde se țin datele**
-- Pe telefon (IndexedDB): sesiunile salvate (refresh token, nu parola), pe operator.
-- În baza WMS (`admin.badge_countries`, extinsă): `badge_id → prep_profile_id,
-  email, nume`. Țara nu se mai ia de aici, ci din `profiles.country`.
-- Admin cu mai multe piețe (`allowed_markets`) alege țara la începutul turei.
+**MFA:** dacă operatorul are autentificator activat în Prep-Center, aplicația
+cere codul de 6 cifre la prima logare, exact ca site-ul.
+
+**Unde se țin datele** (implementat în etapa 1)
+- Pe telefon (IndexedDB): `prepOperators` — sesiunile salvate pe operator
+  (refresh token, nu parola) și ultimul profil citit; `prepBadgeLinks` —
+  `badge → utilizator Prep-Center`. Legătura e per telefon, ca și sesiunea:
+  pe un telefon nou, badge-ul cere parola o dată.
+- Țara se ia din `profiles.country`; admin cu mai multe piețe
+  (`allowed_markets`) alege țara la începutul turei.
+- Offline: tura pornește din profilul salvat (ca la badge-ul vechi), cu
+  excepția conturilor restrânse la rețeaua depozitului, care sunt blocate.
 
 **Ce se schimbă în aplicație**
 - Numele vine din Prep-Center (nu se mai editează în Settings).
@@ -133,7 +140,10 @@ Reproduce `applyReceivedUnits` din `src/components/admin/AdminReceiving.jsx`
 
 ## 7. Etape
 
-1. Login cu operatorii Prep-Center + badge (badge-ul vechi ca rezervă).
+1. ✅ Login cu operatorii Prep-Center + badge (badge-ul vechi ca rezervă) —
+   `src/lib/prepAuth.js`, `AppContext` (`loginWithBadge`, `prepSignIn`,
+   `prepVerifyMfa`, `prepChooseCountry`, `forgetPrepOperator`), `BadgeLogin.jsx`,
+   Settings › Operator profile.
 2. Recepție: căutare după tracking + vizualizare comandă (doar citire).
 3. Confirmare cantități (scanare + manual), stoc la fiecare confirmare, coadă offline.
 4. Raft activ.

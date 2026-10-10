@@ -147,7 +147,7 @@ function CarrierRow({ carrier, onSave }) {
 export default function Settings() {
   const {
     shift, updateOperatorName, orgSettings, updateOrgSettings, showToast, updateInfo, checkUpdateNow, downloadUpdate, carriers, saveCarrier,
-    loginEvents, pullingLoginEvents, pullLoginEventsNow,
+    loginEvents, pullingLoginEvents, pullLoginEventsNow, forgetPrepOperator,
   } = useApp();
   const [name, setName] = useState(shift?.operatorName || '');
   const [org, setOrg] = useState(orgSettings);
@@ -173,7 +173,7 @@ export default function Settings() {
   const set = (key) => (e) => { setOrg((o) => ({ ...o, [key]: e.target.value })); setSaved(false); };
 
   const save = async () => {
-    if (name.trim().length > 1) await updateOperatorName(name);
+    if (!shift?.prep && name.trim().length > 1) await updateOperatorName(name);
     updateOrgSettings(org);
     setSaved(true);
     showToast('Settings saved');
@@ -190,13 +190,35 @@ export default function Settings() {
   return (
     <div className="flex flex-col gap-3.5 px-3.5 pb-[22px] pt-3.5">
       <Section title="Operator profile" summary={shift?.operatorName} defaultOpen>
-        <Field label="Name" value={name} onChange={(e) => { setName(e.target.value); setSaved(false); }} placeholder="Full name" />
+        {shift?.prep ? (
+          // Name, country and permissions belong to the Prep-Center profile;
+          // they are changed there, not on the phone.
+          <div>
+            <div className="mb-2 text-[11px] font-bold uppercase tracking-[.06em] text-secondary">Prep-Center account</div>
+            <div className="min-h-[48px] w-full rounded-xl border border-inputborder bg-page px-4 py-3 text-sm text-secondary">
+              <div className="font-bold text-ink">{shift.operatorName}</div>
+              <div className="truncate font-mono text-[12px]">{shift.prep.email} · {shift.country}</div>
+            </div>
+          </div>
+        ) : (
+          <Field label="Name" value={name} onChange={(e) => { setName(e.target.value); setSaved(false); }} placeholder="Full name" />
+        )}
         <div>
           <div className="mb-2 text-[11px] font-bold uppercase tracking-[.06em] text-secondary">Badge</div>
           <div className="min-h-[48px] w-full rounded-xl border border-inputborder bg-page px-4 py-3 font-mono text-sm text-secondary">
             {shift?.badgeId || '—'}
           </div>
         </div>
+        {shift?.prep && (
+          <button
+            onClick={() => {
+              if (window.confirm('Remove your Prep-Center sign-in from this phone? Your badge will ask for the password again next time.')) forgetPrepOperator();
+            }}
+            className="self-start text-[12.5px] font-bold text-danger underline underline-offset-2"
+          >
+            Remove me from this phone
+          </button>
+        )}
       </Section>
 
       <Section title="Warehouse" summary={org.warehouseLocation}>
