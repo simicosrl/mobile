@@ -20,6 +20,9 @@ import History from './screens/History';
 import SessionDetail from './screens/SessionDetail';
 import ApiScreen from './screens/ApiScreen';
 import Settings from './screens/Settings';
+import ReceivingStart from './screens/ReceivingStart';
+import ReceivingOrder from './screens/ReceivingOrder';
+import { ReceivingProvider } from './state/ReceivingContext';
 
 const SCREENS = {
   home: Home,
@@ -32,6 +35,8 @@ const SCREENS = {
   session: SessionDetail,
   api: ApiScreen,
   settings: Settings,
+  recvStart: ReceivingStart,
+  recvOrder: ReceivingOrder,
 };
 
 function Shell() {
@@ -91,7 +96,9 @@ function Shell() {
 export default function App() {
   return (
     <AppProvider>
-      <Shell />
+      <ReceivingProvider>
+        <Shell />
+      </ReceivingProvider>
     </AppProvider>
   );
 }

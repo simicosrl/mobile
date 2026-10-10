@@ -35,6 +35,15 @@ const PROFILE_COLUMNS = [
   'account_type', 'is_admin', 'is_limited_admin', 'is_operator', 'is_super_admin', 'operator_permissions',
 ].join(',');
 
+/**
+ * One request to the Prep-Center's Supabase (Auth, REST or RPC), as the
+ * signed-in operator when `token` is given. Never throws: { ok, status, data },
+ * status 0 when the server could not be reached at all.
+ */
+export async function prepFetch(path, opts) {
+  return call(path, opts);
+}
+
 async function call(path, { method = 'GET', body, token, timeoutMs = 15000 } = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);

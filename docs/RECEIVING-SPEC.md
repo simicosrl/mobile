@@ -144,7 +144,11 @@ Reproduce `applyReceivedUnits` din `src/components/admin/AdminReceiving.jsx`
    `src/lib/prepAuth.js`, `AppContext` (`loginWithBadge`, `prepSignIn`,
    `prepVerifyMfa`, `prepChooseCountry`, `forgetPrepOperator`), `BadgeLogin.jsx`,
    Settings › Operator profile.
-2. Recepție: căutare după tracking + vizualizare comandă (doar citire).
+2. ✅ Recepție: căutare după tracking + vizualizare comandă (doar citire) —
+   `src/lib/prepReceiving.js` (căutarea adminului `search_admin_receiving_shipments_v2`,
+   `receiving_shipments` + `receiving_items` + `stock_items`, `receiving_shipment_notes`),
+   `src/state/ReceivingContext.jsx`, `ReceivingStart.jsx`, `ReceivingOrder.jsx`,
+   `src/hooks/useScanInput.js`. Scanarea unui produs doar evidențiază linia.
 3. Confirmare cantități (scanare + manual), stoc la fiecare confirmare, coadă offline.
 4. Raft activ.
 5. Finalizare + „Începe recepția” din Inbound.

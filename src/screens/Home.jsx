@@ -1,10 +1,10 @@
 import { useMemo } from 'react';
 import { useApp } from '../state/AppContext';
-import { ArrowDownToLine, Truck, ChevronRight, Download, X } from '../components/icons';
+import { ArrowDownToLine, Truck, ChevronRight, Download, X, PackageCheck } from '../components/icons';
 import { hhmm } from '../lib/format';
 
 export default function Home() {
-  const { shift, startSession, history, endShift, updateInfo, updateDismissed, dismissUpdate, downloadUpdate } = useApp();
+  const { shift, startSession, history, endShift, updateInfo, updateDismissed, dismissUpdate, downloadUpdate, setScreen } = useApp();
 
   const today = useMemo(() => {
     const todayStr = new Date().toLocaleDateString('en-GB');
@@ -76,6 +76,25 @@ export default function Home() {
           </div>
           <ChevronRight size={18} strokeWidth={2.2} className="ml-auto flex-none text-light" />
         </button>
+
+        {/* Receiving reads and (later) writes the Prep-Center as the operator,
+            so it needs a Prep-Center sign-in, not the legacy badge login. */}
+        {shift?.prep && (
+          <button
+            onClick={() => setScreen('recvStart')}
+            className="flex items-center gap-3.5 rounded-2xl border border-[rgba(22,163,74,.3)] text-left"
+            style={{ background: 'linear-gradient(135deg,rgba(22,163,74,.1),rgba(22,163,74,.02))', padding: '18px 16px' }}
+          >
+            <div className="flex h-[52px] w-[52px] flex-none items-center justify-center rounded-2xl bg-success text-white">
+              <PackageCheck size={26} strokeWidth={1.8} />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[18px] font-extrabold tracking-[-.02em]">Receiving</div>
+              <div className="text-xs leading-snug text-secondary">Receive a client's goods into stock</div>
+            </div>
+            <ChevronRight size={18} strokeWidth={2.2} className="ml-auto flex-none text-light" />
+          </button>
+        )}
       </div>
 
       <div>

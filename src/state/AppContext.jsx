@@ -262,7 +262,7 @@ export function AppProvider({ children }) {
   }, []);
 
   // ---- navigation ----
-  const canGoBack = ['setup', 'scan', 'sign', 'doc', 'session', 'settings'].includes(screen);
+  const canGoBack = ['setup', 'scan', 'sign', 'doc', 'session', 'settings', 'recvStart', 'recvOrder'].includes(screen);
   const goBack = useCallback(() => {
     setScreen((s) => {
       if (s === 'setup') return 'home';
@@ -270,6 +270,8 @@ export function AppProvider({ children }) {
       if (s === 'sign') return 'scan';
       if (s === 'session') return 'history';
       if (s === 'settings') return 'home';
+      if (s === 'recvOrder') return 'recvStart';
+      if (s === 'recvStart') return 'home';
       if (s === 'doc') return previousScreen === 'confirm' ? 'confirm' : 'home';
       return 'home';
     });
@@ -354,6 +356,41 @@ export function AppProvider({ children }) {
       },
     });
   }, [savePrepOperators]);
+
+  // A valid access token for the operator on shift, refreshed when it is about
+  // to expire. One refresh at a time: two concurrent ones would both spend the
+  // same refresh token, and the Prep-Center treats that as token reuse.
+  const prepRefreshingRef = useRef(null);
+  const prepAccessToken = useCallback(async (force = false) => {
+    const userId = shift?.prep?.userId;
+    if (!userId) return { ok: false, reason: 'notSignedIn' };
+    const op = prepOperatorsRef.current[userId];
+    if (!op?.refreshToken) return { ok: false, reason: 'expired' };
+    if (!force && op.accessToken && op.expiresAt - 60000 > Date.now()) return { ok: true, token: op.accessToken };
+    if (!prepRefreshingRef.current) {
+      prepRefreshingRef.current = (async () => {
+        const r = await prepAuth.refreshSession(op.refreshToken);
+        if (r.ok) await storePrepSession(userId, r.session);
+        return r;
+      })().finally(() => { prepRefreshingRef.current = null; });
+    }
+    const r = await prepRefreshingRef.current;
+    return r.ok ? { ok: true, token: r.session.accessToken } : { ok: false, reason: r.reason };
+  }, [shift?.prep?.userId, storePrepSession]);
+
+  // Runs one Prep-Center call as the operator on shift: fn(token) returns
+  // { ok, status, ... }. A 401 gets one retry with a freshly refreshed token.
+  const withPrep = useCallback(async (fn) => {
+    let t = await prepAccessToken();
+    if (!t.ok) return { ok: false, reason: t.reason };
+    let res = await fn(t.token);
+    if (res?.status === 401) {
+      t = await prepAccessToken(true);
+      if (!t.ok) return { ok: false, reason: t.reason };
+      res = await fn(t.token);
+    }
+    return res;
+  }, [prepAccessToken]);
 
   const shiftFromSavedOperator = useCallback((op, badgeId, country) => {
     startShift({ badgeId, operatorName: op.name, country, prep: { userId: op.userId, email: op.email } });
@@ -1679,7 +1716,7 @@ export function AppProvider({ children }) {
 
   const value = useMemo(() => ({
     ready, now,
-    shift, loginWithBadge, loginWithLegacyBadge, prepSignIn, prepVerifyMfa, prepChooseCountry, forgetPrepOperator, prepOperators, prepBadgeLinks, endShift, updateOperatorName,
+    shift, loginWithBadge, loginWithLegacyBadge, prepSignIn, prepVerifyMfa, prepChooseCountry, forgetPrepOperator, prepOperators, prepBadgeLinks, withPrep, endShift, updateOperatorName,
     screen, setScreen, canGoBack, goBack, goHome, goToHistoryTab, goToDocsTab, goToApiTab, goToSettings,
     direction, carrier, setCarrier, courierCompany, setCourierCompany, shipment, setShipment: setShipmentRef,
     destination, setDestination,
@@ -1703,7 +1740,7 @@ export function AppProvider({ children }) {
     toast, showToast,
     inputRef,
   }), [
-    ready, now, shift, loginWithBadge, loginWithLegacyBadge, prepSignIn, prepVerifyMfa, prepChooseCountry, forgetPrepOperator, prepOperators, prepBadgeLinks, endShift, updateOperatorName, screen, canGoBack, goBack, goHome, goToHistoryTab, goToDocsTab, goToApiTab, goToSettings,
+    ready, now, shift, loginWithBadge, loginWithLegacyBadge, prepSignIn, prepVerifyMfa, prepChooseCountry, forgetPrepOperator, prepOperators, prepBadgeLinks, withPrep, endShift, updateOperatorName, screen, canGoBack, goBack, goHome, goToHistoryTab, goToDocsTab, goToApiTab, goToSettings,
     direction, carrier, courierCompany, shipment, parcels, sessionStartedAt, startSession, toScan, docSeq,
     submitScan, accept, dupCode, dupTime, closeDup, dupAddBox, boxPlus, boxMinus, removeLast, removeParcel, flash,
     damageSheet, openDamage, closeDamage, toggleDamageType, setDamageNote, setDamagePhoto, saveDamage,
