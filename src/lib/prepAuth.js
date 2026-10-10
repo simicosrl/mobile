@@ -44,7 +44,7 @@ export async function prepFetch(path, opts) {
   return call(path, opts);
 }
 
-async function call(path, { method = 'GET', body, token, timeoutMs = 15000 } = {}) {
+async function call(path, { method = 'GET', body, token, timeoutMs = 15000, headers = {} } = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -54,6 +54,7 @@ async function call(path, { method = 'GET', body, token, timeoutMs = 15000 } = {
         apikey: PREP_ANON_KEY,
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...headers,
       },
       body: body ? JSON.stringify(body) : undefined,
       signal: controller.signal,

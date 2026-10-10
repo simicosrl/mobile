@@ -149,7 +149,12 @@ Reproduce `applyReceivedUnits` din `src/components/admin/AdminReceiving.jsx`
    `receiving_shipments` + `receiving_items` + `stock_items`, `receiving_shipment_notes`),
    `src/state/ReceivingContext.jsx`, `ReceivingStart.jsx`, `ReceivingOrder.jsx`,
    `src/hooks/useScanInput.js`. Scanarea unui produs doar evidențiază linia.
-3. Confirmare cantități (scanare + manual), stoc la fiecare confirmare, coadă offline.
+3. ✅ Confirmare cantități (scanare + manual), stoc la fiecare confirmare, coadă offline —
+   `src/lib/prepReceivingSave.js` (pașii lui `applyReceivedUnits`, în aceeași ordine),
+   coada din `ReceivingContext.jsx` (o intrare pe linie: delta scanată → țintă absolută
+   salvată înainte de scriere, deci retrimiterea nu dublează), `ReceivingOrder.jsx`
+   (scanare +1, confirmare peste cantitatea anunțată, alegere când un cod e pe mai
+   multe linii, tastatură numerică, „Undo last”, stare salvare pe fiecare card).
 4. Raft activ.
 5. Finalizare + „Începe recepția” din Inbound.
 6. Retragerea login-ului vechi pe badge.

@@ -1,10 +1,22 @@
 import { useMemo } from 'react';
 import { useApp } from '../state/AppContext';
+import { useReceiving } from '../state/ReceivingContext';
 import { ArrowDownToLine, Truck, ChevronRight, Download, X, PackageCheck } from '../components/icons';
 import { hhmm } from '../lib/format';
 
 export default function Home() {
   const { shift, startSession, history, endShift, updateInfo, updateDismissed, dismissUpdate, downloadUpdate, setScreen } = useApp();
+
+  const { pendingCount } = useReceiving();
+  // Received units not yet on the Prep-Center are sent by this operator only,
+  // the next time they sign in on this phone.
+  const confirmEndShift = () => {
+    if (pendingCount > 0 && !window.confirm(
+      `${pendingCount} product count${pendingCount === 1 ? ' is' : 's are'} not saved on the Prep-Center yet. `
+      + 'They will be sent the next time you sign in on this phone. End the shift anyway?',
+    )) return;
+    endShift();
+  };
 
   const today = useMemo(() => {
     const todayStr = new Date().toLocaleDateString('en-GB');
@@ -115,7 +127,7 @@ export default function Home() {
         </div>
       </div>
 
-      <button onClick={endShift} className="mt-1 self-center text-[11.5px] font-bold text-secondary underline underline-offset-2">
+      <button onClick={confirmEndShift} className="mt-1 self-center text-[11.5px] font-bold text-secondary underline underline-offset-2">
         End shift
       </button>
     </div>
