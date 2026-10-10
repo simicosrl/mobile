@@ -93,7 +93,7 @@ function LocationLine({ loc, onShelf, onMove, onUnassign }) {
 
 // ---------------------------------------------------------------- product view
 
-function ProductView({ data, code, country, onShelf, onMove, onUnassign }) {
+function ProductView({ data, code, country, onShelf, onMove, onUnassign, onPut }) {
   const owners = data.owners;
   if (!owners.length) {
     return (
@@ -134,6 +134,20 @@ function ProductView({ data, code, country, onShelf, onMove, onUnassign }) {
                   <div className="rounded-lg bg-segtrack py-1.5"><div className="text-[16px] font-extrabold">{o.stock}</div><div className="text-[9px] font-bold uppercase text-secondary">stock {country}</div></div>
                   <div className="rounded-lg bg-success-tint2 py-1.5"><div className="text-[16px] font-extrabold text-success-dark">{o.onShelves}</div><div className="text-[9px] font-bold uppercase text-secondary">on shelves</div></div>
                   <div className={`rounded-lg py-1.5 ${o.notOnShelf ? 'bg-[rgba(255,122,0,.1)]' : 'bg-segtrack'}`}><div className={`text-[16px] font-extrabold ${o.notOnShelf ? 'text-accent-dark' : ''}`}>{o.notOnShelf}</div><div className="text-[9px] font-bold uppercase text-secondary">not on a shelf</div></div>
+                </div>
+              )}
+              {o.notOnShelf > 0 && (
+                <div className="mt-2.5 flex items-center gap-2 rounded-lg bg-[rgba(255,122,0,.08)] px-2.5 py-2">
+                  <div className="min-w-0 flex-1 text-[12px] leading-snug text-ink">
+                    <b className="text-accent-dark">{o.notOnShelf} not on a shelf</b>
+                    {o.placeable === 0 && <span className="block text-[11px] text-secondary">They didn't come in through a reception here — place them from the website.</span>}
+                    {o.placeable > 0 && o.placeable < o.notOnShelf && <span className="block text-[11px] text-secondary">{o.placeable} can be placed from the app (received through a reception).</span>}
+                  </div>
+                  {o.placeable > 0 && (
+                    <button onClick={() => onPut({ owner: o, colour })} className="flex-none rounded-lg bg-accent px-2.5 py-1.5 text-[11.5px] font-extrabold text-white">
+                      Put on shelf
+                    </button>
+                  )}
                 </div>
               )}
               {o.locations.length > 0 ? (
@@ -377,6 +391,64 @@ function MoveSheet({ title, rows: initialRows, editableQty, country, withPrep, o
         {busy ? 'Moving…' : checked?.shelf
           ? <>Move {total} unit{total === 1 ? '' : 's'}: {[...new Set(rows.map((r) => r.loc.code))].join(', ')} → {checked.shelf.code}</>
           : 'Check the destination shelf first'}
+      </button>
+    </Sheet>
+  );
+}
+
+// Units in stock but on no shelf → a shelf, through the receptions they came in by.
+function PutSheet({ target, country, withPrep, onClose, onDone }) {
+  const { owner, colour } = target;
+  const [qty, setQty] = useState(owner.placeable);
+  const [dest, setDest] = useState('');
+  const [checked, setChecked] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const keysRef = useRef({});
+  const clientId = owner.sources[0]?.clientId || owner.clientId;
+
+  const check = async (e) => {
+    e?.preventDefault();
+    if (!dest.trim() || busy) return;
+    setBusy(true); setChecked(null); setError(null);
+    const res = await withPrep((t) => wh.checkDestination(t, { code: dest.trim(), country, clientId }));
+    setBusy(false);
+    if (res.ok) { setChecked(res.shelf); keysRef.current = {}; } else setError(errorText(res.reason, res.message));
+  };
+  const go = async () => {
+    setBusy(true); setError(null);
+    const res = await withPrep((t) => wh.putOnShelf(t, { owner, qty, shelf: checked, keys: keysRef.current }));
+    setBusy(false);
+    feedback(!res.ok);
+    if (res.ok) onDone(`${res.placed} put on ${checked.code}`);
+    else setError(`${res.placed ? `${res.placed} placed, then: ` : ''}${errorText(res.reason, res.message)}`);
+  };
+  return (
+    <Sheet onClose={busy ? undefined : onClose}>
+      <div className="text-[15px] font-extrabold">Put on a shelf</div>
+      <div className="mt-0.5 text-[11.5px] text-secondary">Units already in stock, not on any shelf. The stock does not change.</div>
+      <div className="mt-3 rounded-xl border p-2.5" style={{ borderColor: colour }}>
+        <ClientTag name={owner.client} colour={colour} />
+        <div className="mt-1 flex items-center gap-2">
+          <Photo src={owner.item?.image_url} size={36} />
+          <div className="min-w-0 flex-1 truncate text-[12.5px] font-bold">{owner.item?.name}</div>
+        </div>
+      </div>
+      <div className="mt-3"><QtyPicker value={qty} max={owner.placeable} onChange={(v) => { setQty(v); keysRef.current = {}; }} /></div>
+      <form onSubmit={check} className="mt-3">
+        <div className="mb-1 text-[10px] font-bold uppercase tracking-[.08em] text-light">Scan or type the shelf</div>
+        <div className="flex gap-2">
+          <input
+            autoFocus value={dest} onChange={(e) => { setDest(e.target.value); setChecked(null); }}
+            autoCapitalize="characters" autoCorrect="off" spellCheck={false} placeholder="e.g. E-4"
+            className="min-h-[48px] min-w-0 flex-1 rounded-xl border-2 border-primary px-3.5 font-mono text-[16px] uppercase"
+          />
+          <button type="submit" disabled={!dest.trim() || busy} className="flex-none rounded-xl border border-inputborder px-3.5 text-[13px] font-bold text-primary disabled:text-light">Check</button>
+        </div>
+      </form>
+      {error && <div className="mt-2 text-[12px] font-bold text-danger">{error}</div>}
+      <button onClick={go} disabled={!checked || busy || !qty} className="mt-3 flex min-h-[52px] w-full items-center justify-center rounded-xl bg-accent text-[14.5px] font-extrabold text-white disabled:opacity-50">
+        {busy ? 'Saving…' : checked ? `Put ${qty} on ${checked.code}` : 'Check the shelf first'}
       </button>
     </Sheet>
   );
@@ -656,6 +728,7 @@ export default function StockCheck() {
           onShelf={(code) => open({ kind: 'shelf', code })}
           onMove={(t) => setSheet({ kind: 'move', rows: [{ ...t, qty: t.loc.qty }] })}
           onUnassign={(t) => setSheet({ kind: 'unassign', target: t })}
+          onPut={(t) => setSheet({ kind: 'put', target: t })}
         />
       )}
       {view?.kind === 'shelf' && data?.shelf && (
@@ -680,6 +753,9 @@ export default function StockCheck() {
       )}
       {sheet?.kind === 'moveAll' && (
         <MoveSheet title={`Move everything from ${data.shelf.code}`} rows={sheet.rows} editableQty={false} country={country} withPrep={withPrep} onClose={() => setSheet(null)} onDone={moveDone} />
+      )}
+      {sheet?.kind === 'put' && (
+        <PutSheet target={sheet.target} country={country} withPrep={withPrep} onClose={() => setSheet(null)} onDone={moveDone} />
       )}
       {sheet?.kind === 'unassign' && (
         <UnassignSheet target={sheet.target} withPrep={withPrep} onClose={() => setSheet(null)} onDone={moveDone} />

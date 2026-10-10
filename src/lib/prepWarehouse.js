@@ -111,7 +111,7 @@ export async function lookupProduct(token, { code, stockItemId = null, country }
     const ids = items.map((i) => i.id);
     const whIds = await countryWarehouseIds(token, country);
 
-    const [locs, pendingById, pendingByCode] = await Promise.all([
+    const [locs, pendingById, pendingByCode, receivedRows] = await Promise.all([
       ids.length && whIds.length
         ? get(token, `/rest/v1/warehouse_locations?stock_item_id=in.(${ids.join(',')})&warehouse_id=in.(${whIds.join(',')})` +
           '&quantity=gt.0&select=*,storage_place:storage_places(*)&order=quantity.desc')
@@ -122,7 +122,20 @@ export async function lookupProduct(token, { code, stockItemId = null, country }
         : [],
       stockItemId ? [] : get(token, `/rest/v1/receiving_items?stock_item_id=is.null&ean_asin=in.${inList(variants)}` +
         '&select=id,product_name,quantity_received,received_units,shipment:receiving_shipments(id,status,warehouse_country,tracking_id,created_at,company_id,user_id)&limit=50'),
+      // Receptions these units came in through — the only way the website
+      // puts stock on a shelf without adding stock (AdminReceiving placement).
+      ids.length
+        ? get(token, `/rest/v1/receiving_items?stock_item_id=in.(${ids.join(',')})&received_units=gt.0` +
+          '&select=id,stock_item_id,received_units,quantity_received,is_received,product_name,sku,shipment:receiving_shipments(id,warehouse_country,user_id,created_at)&limit=200')
+        : [],
     ]);
+    const sourcesHere = receivedRows.filter((r) => r.shipment && r.shipment.warehouse_country === country);
+    const placedByOrigin = new Map();
+    if (sourcesHere.length) {
+      const placed = await get(token, `/rest/v1/warehouse_locations?origin_ref_type=eq.receiving_shipment` +
+        `&origin_ref_item_id=in.(${sourcesHere.map((r) => r.id).join(',')})&quantity=gt.0&select=origin_ref_item_id,quantity`);
+      for (const l of placed) placedByOrigin.set(l.origin_ref_item_id, (placedByOrigin.get(l.origin_ref_item_id) || 0) + Number(l.quantity || 0));
+    }
 
     const openHere = (r) => r.shipment && r.shipment.warehouse_country === country && OPEN_RECEPTION.has(String(r.shipment.status || '').toLowerCase())
       && Number(r.quantity_received || 0) > Number(r.received_units || 0);
@@ -144,8 +157,26 @@ export async function lookupProduct(token, { code, stockItemId = null, country }
       const locations = locs.filter((l) => l.stock_item_id === item.id).map(locationRow);
       const onShelves = locations.reduce((a, l) => a + l.qty, 0);
       const stock = stockForCountry(item, country);
+      // Same limit as the Prep-Center's placement check (received minus what is
+      // on shelves from that reception), oldest reception first, and never
+      // more than the units actually not on a shelf.
+      const sources = sourcesHere
+        .filter((r) => r.stock_item_id === item.id)
+        .map((r) => {
+          const received = Math.max(Number(r.received_units || 0), r.is_received ? Number(r.quantity_received || 0) : 0);
+          return {
+            itemId: r.id, shipmentId: r.shipment.id, clientId: r.shipment.user_id,
+            announced: r.shipment.created_at, room: Math.max(0, received - (placedByOrigin.get(r.id) || 0)),
+            title: r.product_name || item.name || null, sku: r.sku || item.sku || null,
+          };
+        })
+        .filter((x) => x.room > 0)
+        .sort((a, b) => String(a.announced).localeCompare(String(b.announced)));
+      const placeable = Math.min(Math.max(0, stock - onShelves), sources.reduce((a, x) => a + x.room, 0));
       return {
         key: `item:${item.id}`,
+        sources,
+        placeable,
         client: clientName(names.company.get(item.company_id), names.profile.get(item.user_id)),
         companyId: item.company_id || null,
         clientId: item.user_id || null,
@@ -169,7 +200,7 @@ export async function lookupProduct(token, { code, stockItemId = null, country }
           companyId: r.shipment.company_id || null,
           clientId: r.shipment.user_id || null,
           item: { name: r.product_name || code },
-          stock: 0, onShelves: 0, notOnShelf: 0, locations: [], expected: [],
+          stock: 0, onShelves: 0, notOnShelf: 0, locations: [], expected: [], sources: [], placeable: 0,
         });
       }
       byClient.get(k).expected.push(expectedRow(r));
@@ -298,3 +329,52 @@ export function unassign(token, { locationId, qty, key, notes = null }) {
 }
 
 export const newMoveKey = (kind) => opKey(kind === 'unassign' ? 'unassign' : 'relocate');
+
+/**
+ * Puts `qty` units that are in stock but on no shelf onto `shelf`, through the
+ * receptions they came in by — AdminReceiving's storage-place field
+ * (warehouse_set_product_placement with the reception as source), so the
+ * Prep-Center checks the units were really received and the stock is not
+ * changed. Oldest reception first. `keys` (by reception line) makes a retry of
+ * the same confirmation a no-op. Returns { ok, placed } or { ok: false, placed, ... }.
+ */
+export async function putOnShelf(token, { owner, qty, shelf, keys }) {
+  let left = Number(qty);
+  let placed = 0;
+  for (const src of owner.sources) {
+    if (left <= 0) break;
+    const n = Math.min(left, src.room);
+    let base = 0;
+    try {
+      const rows = await get(token, `/rest/v1/warehouse_locations?origin_ref_type=eq.receiving_shipment&origin_ref_item_id=eq.${encodeURIComponent(src.itemId)}` +
+        `&storage_place_id=eq.${encodeURIComponent(shelf.id)}&quantity=gt.0&select=quantity`);
+      base = rows.reduce((a, r) => a + Number(r.quantity || 0), 0);
+    } catch (err) {
+      return { ...fail(err), placed };
+    }
+    keys[src.itemId] ||= opKey('placement');
+    const res = await rpc(token, 'warehouse_set_product_placement', {
+      p_warehouse_id: shelf.warehouseId,
+      p_client_id: src.clientId,
+      p_base_quantity: base,
+      p_target_quantity: base + n,
+      p_from_storage_place_id: base > 0 ? shelf.id : null,
+      p_to_storage_place_id: shelf.id,
+      p_stock_item_id: owner.item.id,
+      p_product_title: src.title,
+      p_sku: src.sku,
+      p_asin: owner.item.asin || null,
+      p_lot_code: null,
+      p_expiration_date: null,
+      p_notes: null,
+      p_source_ref_type: 'receiving_shipment',
+      p_source_ref_id: src.shipmentId,
+      p_source_ref_item_id: src.itemId,
+      p_idempotency_key: keys[src.itemId],
+    });
+    if (!res.ok) return { ...res, placed };
+    placed += n;
+    left -= n;
+  }
+  return { ok: true, placed };
+}

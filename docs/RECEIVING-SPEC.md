@@ -199,5 +199,11 @@ orice alt cod caută **produsul**.
   „Relocate” din Warehouse pe web; stocul nu se schimbă. Destinația e verificată
   pentru fiecare client implicat; serverul verifică din nou (capacitate, depozit).
 - **↩︎ Recv.** — înapoi în zona de recepție: `warehouse_unassign_product`.
+- **Put on shelf** — bucăți în stoc, pe niciun raft: puse pe raft prin recepțiile
+  prin care au intrat (`warehouse_set_product_placement` cu recepția ca sursă, ca
+  în AdminReceiving), cea mai veche întâi; serverul verifică limita recepționată,
+  stocul nu se schimbă. Maximul = min(nepuse pe raft, loc rămas în recepții).
+  Stocul care n-a intrat printr-o recepție nu se poate pune pe raft din aplicație
+  (pe web singura cale, „place product”, adaugă stoc nou).
 - Fiecare confirmare are cheia ei de idempotență, păstrată la reîncercare.
   Mutările cer conexiune (nu intră în coada offline).
