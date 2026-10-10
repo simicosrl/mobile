@@ -161,7 +161,7 @@ function ProductCard({ line, highlighted, cardRef, onPhoto, onTap, entry, result
 function Sheet({ children, onClose }) {
   return (
     <div className="absolute inset-0 z-40 flex flex-col justify-end bg-[rgba(15,23,42,.45)]" onClick={onClose}>
-      <div className="rounded-t-[20px] bg-white p-4 pb-6 safe-bottom animate-fadeUp" onClick={(e) => e.stopPropagation()}>
+      <div className="rounded-t-[20px] bg-white p-4 pb-6 animate-fadeUp" onClick={(e) => e.stopPropagation()}>
         {children}
       </div>
     </div>

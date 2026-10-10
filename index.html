@@ -2,7 +2,17 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <!--
+      No viewport-fit=cover. With it, Capacitor 8's SystemBars plugin (on any
+      Android WebView 140+) pads the app by the keyboard height on top of the
+      resize Android already does (adjustResize), so the keyboard took its
+      height twice and left a ~90px strip of app — header and tab icons only.
+      Without it the plugin leaves the keyboard to Android below Android 15,
+      and on 15+ (edge-to-edge) pads for the bars and keyboard itself, once.
+      The app is never drawn under the status bar below 15, so cover gained
+      nothing there.
+    -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
     <meta name="theme-color" content="#1F6FEB" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
