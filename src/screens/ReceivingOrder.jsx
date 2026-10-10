@@ -7,7 +7,7 @@ import CameraScanOverlay from '../components/CameraScanOverlay';
 import { StatusChip, shortDate, dayMonth } from '../components/ReceptionBits';
 import { matchLines, normalizeTracking } from '../lib/prepReceiving';
 import { feedback } from '../lib/audio';
-import { Camera, RefreshCw, TriangleAlert, ScanLine, Keyboard as KeyboardIcon, X, Plus, MapPin } from '../components/icons';
+import { Camera, RefreshCw, TriangleAlert, ScanLine, Keyboard as KeyboardIcon, X, Plus, MapPin, Check } from '../components/icons';
 
 // Receiving, step two: the client's reception — every product with its
 // picture, codes and the client's notes — and recording what arrived:
@@ -179,6 +179,107 @@ function Sheet({ children, onClose }) {
   );
 }
 
+// The end of a receiving session: what still has to be saved, how the
+// reception compares with what the client announced, and an optional message
+// about it on the reception's thread. Nothing here changes the reception's
+// status: the Prep-Center derives it from the lines, as it does for the website
+// (all complete → Received; otherwise it stays open as Partial).
+function FinishSheet({ reception, unsaved, onSend, onClose, onDone }) {
+  const lines = reception.lines;
+  const short = lines.filter((l) => l.expected > 0 && l.shown < l.expected);
+  const over = lines.filter((l) => l.expected > 0 && l.shown > l.expected);
+  const complete = lines.length - short.length - over.length;
+  const none = short.filter((l) => l.shown === 0);
+  const blocked = unsaved.filter((e) => e.status === 'error' || e.status === 'waiting');
+  const saving = unsaved.length - blocked.length;
+
+  const draftText = () => {
+    const out = [];
+    for (const l of short) out.push(`- ${l.name}: ${l.shown} of ${l.expected} received (${l.expected - l.shown} missing)`);
+    for (const l of over) out.push(`- ${l.name}: ${l.shown} received, ${l.expected} announced (${l.shown - l.expected} more)`);
+    return out.length ? `Reception checked in the warehouse:\n${out.join('\n')}` : '';
+  };
+  const [text, setText] = useState(draftText);
+  const [state, setState] = useState({ sending: false, sent: false, error: null });
+
+  const send = async () => {
+    setState({ sending: true, sent: false, error: null });
+    const res = await onSend(text);
+    setState(res.ok ? { sending: false, sent: true, error: null } : { sending: false, sent: false, error: res.message || recvErrorText(res.reason) });
+  };
+
+  return (
+    <Sheet onClose={onClose}>
+      <div className="flex items-start gap-2">
+        <div className="min-w-0 flex-1">
+          <div className="text-[15px] font-extrabold">Finish reception</div>
+          <div className="mt-0.5 text-[11.5px] text-secondary">
+            {short.length === 0 && over.length === 0
+              ? 'Everything announced has arrived — the Prep-Center marks the reception Received.'
+              : 'It stays open as Partial on the Prep-Center until the rest arrives or the office closes it.'}
+          </div>
+        </div>
+        <button onClick={onClose} aria-label="Close" className="flex h-8 w-8 flex-none items-center justify-center rounded-full text-light"><X size={17} /></button>
+      </div>
+
+      {unsaved.length > 0 && (
+        <div className={`mt-3 rounded-lg px-3 py-2 text-[12px] font-bold ${blocked.length ? 'bg-danger-tint2 text-danger-dark' : 'bg-[rgba(31,111,235,.08)] text-primary'}`}>
+          {blocked.length
+            ? `${blocked.length} product count${blocked.length === 1 ? ' is' : 's are'} not saved yet (no connection or an error) — check the products marked in the list.`
+            : `Saving ${saving} product count${saving === 1 ? '' : 's'} to the Prep-Center…`}
+        </div>
+      )}
+
+      <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+        <div className="rounded-lg bg-success-tint2 py-2"><div className="text-[18px] font-extrabold text-success-dark">{complete}</div><div className="text-[10px] font-bold uppercase text-secondary">complete</div></div>
+        <div className="rounded-lg bg-[rgba(255,122,0,.08)] py-2"><div className="text-[18px] font-extrabold text-accent-dark">{short.length}</div><div className="text-[10px] font-bold uppercase text-secondary">short{none.length ? ` · ${none.length} none` : ''}</div></div>
+        <div className="rounded-lg bg-danger-tint2 py-2"><div className="text-[18px] font-extrabold text-danger">{over.length}</div><div className="text-[10px] font-bold uppercase text-secondary">over</div></div>
+      </div>
+
+      {(short.length > 0 || over.length > 0) && (
+        <div className="mt-3 max-h-[120px] overflow-y-auto rounded-lg border border-inputborder">
+          {[...short, ...over].map((l) => (
+            <div key={l.id} className="flex items-center gap-2 border-b border-[rgba(148,163,184,.15)] px-2.5 py-1.5 last:border-b-0">
+              <div className="min-w-0 flex-1 truncate text-[12px]">{l.name}</div>
+              <div className={`flex-none text-[12px] font-extrabold ${l.shown > l.expected ? 'text-danger' : 'text-accent-dark'}`}>{l.shown}/{l.expected}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="mt-3">
+        <div className="mb-1 text-[10px] font-bold uppercase tracking-[.08em] text-light">Message on the reception (the client sees it)</div>
+        <textarea
+          value={text}
+          onChange={(e) => { setText(e.target.value); setState((st) => ({ ...st, sent: false })); }}
+          rows={3}
+          placeholder="Optional — e.g. damaged boxes, missing units…"
+          className="w-full rounded-xl border border-inputborder px-3 py-2 text-[13px] text-ink"
+        />
+        {state.error && <div className="mt-1 text-[12px] font-bold text-danger">{state.error}</div>}
+        {state.sent && <div className="mt-1 text-[12px] font-bold text-success-dark">Message sent on the reception.</div>}
+      </div>
+
+      <div className="mt-3 flex gap-2.5">
+        <button
+          onClick={send}
+          disabled={!text.trim() || state.sending || state.sent}
+          className="flex min-h-[50px] flex-1 items-center justify-center rounded-xl border border-inputborder text-[13.5px] font-bold text-primary disabled:text-light"
+        >
+          {state.sending ? 'Sending…' : state.sent ? 'Sent' : 'Send message'}
+        </button>
+        <button
+          onClick={onDone}
+          disabled={unsaved.length > 0}
+          className="flex min-h-[50px] flex-[1.3] items-center justify-center rounded-xl bg-primary text-[14px] font-extrabold text-white disabled:opacity-50"
+        >
+          Done
+        </button>
+      </div>
+    </Sheet>
+  );
+}
+
 // Shelf by label scan (the field takes the scanner's input) or typed code.
 function ShelfSheet({ onSubmit, onClose, onUseDefault, defaultCode }) {
   const [code, setCode] = useState('');
@@ -271,10 +372,10 @@ function QtySheet({ line, onSave, onClose }) {
 }
 
 export default function ReceivingOrder() {
-  const { showToast, openPhoto } = useApp();
+  const { showToast, openPhoto, setScreen } = useApp();
   const {
     current, reloadCurrent, lineEntry, results, shownReceived, addUnits, setUnits, undoLast, undoTop, retryLine, discardLine,
-    activeShelf, defaultShelf, setShelfByCode, clearShelf,
+    activeShelf, defaultShelf, setShelfByCode, clearShelf, queue, sendNote, refreshOpen,
   } = useReceiving();
   const raw = current.reception;
   // Lines with the count to show (Prep-Center's + not yet sent).
@@ -580,6 +681,25 @@ export default function ReceivingOrder() {
           <div className="rounded-xl border border-dashed border-[rgba(148,163,184,.4)] p-4 text-center text-[12.5px] text-secondary">Nothing here.</div>
         )}
       </div>
+
+      {canReceive && r.lines.length > 0 && (
+        <button
+          onClick={() => setSheet({ kind: 'finish' })}
+          className="mt-1 flex min-h-[54px] w-full items-center justify-center gap-2 rounded-xl bg-ink text-[15px] font-extrabold text-white"
+        >
+          <Check size={18} strokeWidth={2.4} /> Finish reception
+        </button>
+      )}
+
+      {sheet?.kind === 'finish' && (
+        <FinishSheet
+          reception={r}
+          unsaved={Object.values(queue).filter((e) => e.shipmentId === r.id)}
+          onSend={sendNote}
+          onClose={() => setSheet(null)}
+          onDone={() => { setSheet(null); refreshOpen(); setScreen('recvStart'); }}
+        />
+      )}
 
       {sheet?.kind === 'qty' && (
         <QtySheet

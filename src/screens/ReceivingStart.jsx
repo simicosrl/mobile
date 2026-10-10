@@ -91,13 +91,17 @@ export default function ReceivingStart() {
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-2">
             <div className="min-w-0 flex-1 text-[10px] font-bold uppercase tracking-[.1em] text-light">
-              {results.kind === 'tracking' ? 'Tracking' : 'Search'} · <span className="font-mono normal-case tracking-normal">{results.query}</span>
+              {results.kind === 'handover'
+                ? <>From the handover · <span className="normal-case tracking-normal">{results.query}</span></>
+                : <>{results.kind === 'tracking' ? 'Tracking' : 'Search'} · <span className="font-mono normal-case tracking-normal">{results.query}</span></>}
             </div>
             <button onClick={clearLookup} aria-label="Clear" className="flex h-7 w-7 items-center justify-center rounded-full text-light">
               <X size={15} strokeWidth={2.2} />
             </button>
           </div>
-          {results.error ? (
+          {results.loading ? (
+            <div className="rounded-xl border border-[rgba(148,163,184,.25)] bg-white p-3 text-[12.5px] text-secondary">Looking up the parcels on the Prep-Center…</div>
+          ) : results.error ? (
             <div className="rounded-xl border border-danger/30 bg-danger-tint2 p-3 text-[12.5px] text-danger-dark">{recvErrorText(results.error)}</div>
           ) : results.rows.length === 0 ? (
             <div className="flex gap-2.5 rounded-xl border border-[rgba(255,122,0,.35)] bg-[rgba(255,122,0,.07)] p-3">
@@ -105,7 +109,9 @@ export default function ReceivingStart() {
               <div className="text-[12.5px] leading-snug text-ink">
                 {results.kind === 'tracking'
                   ? `No reception in the ${country} warehouse has this tracking. Search by client below, or check the open receptions.`
-                  : 'Nothing found.'}
+                  : results.kind === 'handover'
+                    ? `None of these parcels belongs to a reception in the ${country} warehouse. Search by client below, or check the open receptions.`
+                    : 'Nothing found.'}
               </div>
             </div>
           ) : (
@@ -117,11 +123,34 @@ export default function ReceivingStart() {
                     : 'No exact match — these receptions have a similar tracking:'}
                 </div>
               )}
+              {results.kind === 'handover' && (
+                <div className="text-[12px] text-secondary">
+                  {results.rows.length === 1 ? 'These parcels belong to one reception:' : `These parcels belong to ${results.rows.length} receptions — open each one:`}
+                </div>
+              )}
               {results.rows.map((row) => (
-                <ReceptionRow key={row.id} row={row} onOpen={openReception} highlight={results.kind === 'tracking' ? results.query : null} />
+                <div key={row.id}>
+                  <ReceptionRow row={row} onOpen={openReception} highlight={results.kind === 'tracking' ? results.query : row.matched?.[0] || null} />
+                  {row.matched?.length > 0 && (
+                    <div className="mt-1 px-1 text-[10.5px] text-secondary">{row.matched.length} parcel{row.matched.length === 1 ? '' : 's'} from this handover</div>
+                  )}
+                </div>
               ))}
             </>
           )}
+        </div>
+      )}
+
+      {results?.kind === 'handover' && results.unmatched?.length > 0 && (
+        <div className="rounded-xl border border-[rgba(255,122,0,.35)] bg-[rgba(255,122,0,.07)] p-3">
+          <div className="text-[12px] font-bold text-ink">
+            {results.unmatched.length} parcel{results.unmatched.length === 1 ? ' has' : 's have'} no reception on the Prep-Center
+          </div>
+          <div className="mt-1 flex flex-wrap gap-1">
+            {results.unmatched.map((t) => (
+              <span key={t} className="rounded-md bg-white px-1.5 py-[2px] font-mono text-[10.5px] text-ink">{t}</span>
+            ))}
+          </div>
         </div>
       )}
 

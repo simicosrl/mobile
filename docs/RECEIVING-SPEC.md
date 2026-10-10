@@ -164,5 +164,14 @@ Reproduce `applyReceivedUnits` din `src/components/admin/AdminReceiving.jsx`
    bucățile se scot întâi de pe raftul lor (pasul pe care web-ul îl cere manual);
    dacă stau pe alt raft, scăderea e refuzată cu mesaj. Cardul arată rafturile
    pe care stă produsul.
-5. Finalizare + „Începe recepția” din Inbound.
+5. ✅ Finalizare + „Începe recepția” din Inbound —
+   „Finish reception”: așteaptă salvarea cozii, arată complet / lipsă / în plus și
+   propune un mesaj despre diferențe, trimis în firul recepției exact ca din web
+   (`receiving_shipment_notes`, `sender_type: 'admin'`; clientul îl vede). Starea
+   recepției n-o schimbă aplicația: Prep-Center o derivă din linii (totul complet →
+   Received; altfel rămâne Partial). Bulk „Mark as received” din web NU e folosit —
+   ar trece în stoc cantitatea anunțată, nu cea primită.
+   După predarea de la curier (Inbound): „Receive these parcels into stock” caută
+   recepțiile tuturor coletelor (potrivire exactă); una se deschide direct, mai
+   multe sunt listate, coletele fără recepție sunt numite.
 6. Retragerea login-ului vechi pe badge.

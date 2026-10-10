@@ -79,6 +79,28 @@ export async function findByTracking(token, country, code) {
   return { ok: true, status: res.status, rows: exact.length ? exact : res.rows, exact: exact.length > 0 || !res.rows.length };
 }
 
+/**
+ * The receptions behind a whole courier handover: every scanned parcel looked
+ * up exactly (no near matches here — a list of guesses for 30 parcels helps
+ * nobody). { ok, rows: [{ ...reception, matched: [tracking] }], unmatched: [tracking] }.
+ */
+export async function findByTrackings(token, country, codes) {
+  const wanted = [...new Set((codes || []).map(normalizeTracking).filter(Boolean))];
+  const byId = new Map();
+  const unmatched = [];
+  for (const code of wanted) {
+    const res = await findByTracking(token, country, code);
+    if (!res.ok) return res;
+    const exact = res.exact ? res.rows.filter((r) => receptionTrackings(r).includes(code)) : [];
+    if (!exact.length) { unmatched.push(code); continue; }
+    for (const r of exact) {
+      const prev = byId.get(r.id);
+      byId.set(r.id, { ...r, matched: [...(prev?.matched || []), code] });
+    }
+  }
+  return { ok: true, rows: [...byId.values()], unmatched };
+}
+
 const ASIN_RE = /^[A-Z0-9]{10}$/;
 const looksLikeAsin = (v) => ASIN_RE.test(v) && /[A-Z]/.test(v);
 

@@ -479,3 +479,21 @@ async function syncShipmentStatus(token, shipmentId) {
   if (!Object.keys(patch).length) return;
   await rest(token, `/rest/v1/receiving_shipments?id=eq.${encodeURIComponent(shipmentId)}`, { method: 'PATCH', body: patch });
 }
+
+/**
+ * A message on the reception's thread, exactly as the website's thread
+ * (ReceivingNoteThread) sends it as staff: the client sees it too.
+ * author_id is filled by the Prep-Center from the session.
+ */
+export async function postReceptionNote(token, shipmentId, body) {
+  try {
+    const rows = await rest(token, '/rest/v1/receiving_shipment_notes?select=id,sender_type,body,created_at', {
+      method: 'POST',
+      headers: { Prefer: 'return=representation' },
+      body: { receiving_shipment_id: shipmentId, sender_type: 'admin', body: String(body || '').trim() },
+    });
+    return { ok: true, note: Array.isArray(rows) ? rows[0] : rows };
+  } catch (err) {
+    return { ok: false, reason: err.reason || 'failed', message: err.message, status: err.status };
+  }
+}

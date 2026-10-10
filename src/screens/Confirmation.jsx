@@ -1,9 +1,13 @@
 import { useApp } from '../state/AppContext';
-import { Check, Printer, FileText, Mail } from '../components/icons';
+import { useReceiving } from '../state/ReceivingContext';
+import { Check, Printer, FileText, Mail, PackageCheck } from '../components/icons';
 
 export default function Confirmation() {
-  const { confirmedDoc, printDocument, printDdt, emailDocument, goToDocsTab } = useApp();
+  const { confirmedDoc, printDocument, printDdt, emailDocument, goToDocsTab, shift } = useApp();
+  const { lookupHandover } = useReceiving();
   if (!confirmedDoc) return null;
+  // Parcels a courier just delivered: the next job is receiving their goods.
+  const canReceive = confirmedDoc.direction !== 'out' && !!shift?.prep && confirmedDoc.parcels.some((p) => p.code);
   const dmgCount = confirmedDoc.parcels.filter((p) => p.damage).length;
   const boxes = confirmedDoc.parcels.reduce((a, p) => a + p.boxes, 0);
 
@@ -126,6 +130,14 @@ export default function Confirmation() {
       )}
 
       <div className="flex flex-col gap-2.5">
+        {canReceive && (
+          <button
+            onClick={() => lookupHandover(confirmedDoc.parcels.map((p) => p.code), `${confirmedDoc.parcels.length} parcel${confirmedDoc.parcels.length === 1 ? '' : 's'} · ${confirmedDoc.doc}`)}
+            className="flex min-h-[54px] w-full items-center justify-center gap-2.5 rounded-xl bg-success text-[15px] font-extrabold text-white"
+          >
+            <PackageCheck size={19} strokeWidth={2} /> Receive these parcels into stock
+          </button>
+        )}
         <button onClick={() => printDocument(confirmedDoc)} className="flex min-h-[54px] w-full items-center justify-center gap-2.5 rounded-xl bg-primary text-[15px] font-extrabold text-white">
           <Printer size={18} strokeWidth={2} /> Print A4 document
         </button>

@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useApp } from './AppContext';
 import * as rx from '../lib/prepReceiving';
-import { readReceivedUnits, setReceivedUnits, findShelf, loadClientDefaultShelf } from '../lib/prepReceivingSave';
+import { readReceivedUnits, setReceivedUnits, findShelf, loadClientDefaultShelf, postReceptionNote } from '../lib/prepReceivingSave';
 import { kvGet, kvSet } from '../lib/db';
 
 // Receiving ("Recepție marfă") state, kept apart from AppContext, which already
@@ -169,6 +169,36 @@ export function ReceivingProvider({ children }) {
   }, [country, withPrep]);
 
   const clearLookup = useCallback(() => setLookup(null), []);
+
+  // From a confirmed courier handover: the receptions its parcels belong to.
+  // One reception opens directly; several are listed; parcels with no
+  // reception are named so the office can chase them.
+  const lookupHandover = useCallback(async (codes, label) => {
+    if (!country) return;
+    setScreen('recvStart');
+    setLooking(true);
+    setLookup({ kind: 'handover', query: label, rows: [], unmatched: [], exact: true, error: null, loading: true });
+    const res = await withPrep((t) => rx.findByTrackings(t, country, codes));
+    setLooking(false);
+    if (!res.ok) {
+      setLookup({ kind: 'handover', query: label, rows: [], unmatched: [], exact: true, error: res.reason });
+      return;
+    }
+    setLookup({ kind: 'handover', query: label, rows: res.rows, unmatched: res.unmatched, exact: true, error: null });
+    if (res.rows.length === 1) openReception(res.rows[0].id);
+  }, [country, withPrep, setScreen, openReception]);
+
+  /** A message on the open reception's thread (the client sees it), then reload. */
+  const sendNote = useCallback(async (body) => {
+    const id = currentIdRef.current;
+    if (!id || !String(body || '').trim()) return { ok: false, reason: 'empty' };
+    const res = await withPrep((t) => postReceptionNote(t, id, body));
+    if (res.ok) {
+      const again = await withPrep((t) => rx.loadReception(t, id));
+      if (again.ok && currentIdRef.current === id) setCurrent((c) => ({ ...c, reception: again.reception }));
+    }
+    return res;
+  }, [withPrep]);
 
   // One line at a time, in the order they were touched. Only the operator who
   // scanned them sends them: the write is recorded as theirs.
@@ -382,11 +412,11 @@ export function ReceivingProvider({ children }) {
   }, [queue]);
 
   const value = useMemo(() => ({
-    country, open, refreshOpen, lookup, looking, lookupTracking, searchReceptions, clearLookup,
+    country, open, refreshOpen, lookup, looking, lookupTracking, searchReceptions, clearLookup, lookupHandover, sendNote,
     current, openReception, reloadCurrent,
     queue, lineEntry, results, shownReceived, addUnits, setUnits, undoLast, undoTop, retryLine, discardLine, pendingCount,
     activeShelf, defaultShelf, setShelfByCode, clearShelf,
-  }), [country, open, refreshOpen, lookup, looking, lookupTracking, searchReceptions, clearLookup, current, openReception, reloadCurrent,
+  }), [country, open, refreshOpen, lookup, looking, lookupTracking, searchReceptions, clearLookup, lookupHandover, sendNote, current, openReception, reloadCurrent,
     queue, lineEntry, results, shownReceived, addUnits, setUnits, undoLast, undoTop, retryLine, discardLine, pendingCount,
     activeShelf, defaultShelf, setShelfByCode, clearShelf]);
 
