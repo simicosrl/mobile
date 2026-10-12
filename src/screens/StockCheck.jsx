@@ -145,8 +145,6 @@ function ProductView({ data, code, country, onShelf, onMove, onUnassign, onPut }
                 <div className="mt-2.5 flex items-center gap-2 rounded-lg bg-[rgba(255,122,0,.08)] px-2.5 py-2">
                   <div className="min-w-0 flex-1 text-[12px] leading-snug text-ink">
                     <b className="text-accent-dark">{o.notOnShelf} not on a shelf</b>
-                    {o.placeable === 0 && <span className="block text-[11px] text-secondary">No reception in this warehouse has units of this listing left to place (they came in another way) — place them from the website.</span>}
-                    {o.placeable > 0 && o.placeable < o.notOnShelf && <span className="block text-[11px] text-secondary">{o.placeable} can be placed from the app (received through a reception).</span>}
                   </div>
                   {o.placeable > 0 && (
                     <button onClick={() => onPut({ owner: o, colour })} className="flex-none rounded-lg bg-accent px-2.5 py-1.5 text-[11.5px] font-extrabold text-white">
@@ -401,7 +399,8 @@ function MoveSheet({ title, rows: initialRows, editableQty, country, withPrep, o
   );
 }
 
-// Units in stock but on no shelf → a shelf, through the receptions they came in by.
+// Units in stock but on no shelf → a shelf: through the receptions they came in
+// by, the rest (added in the portal, imported…) as a manual placement.
 function PutSheet({ target, country, withPrep, onClose, onDone }) {
   const { owner, colour } = target;
   const [qty, setQty] = useState(owner.placeable);

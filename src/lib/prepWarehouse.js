@@ -198,7 +198,10 @@ export async function lookupProduct(token, { code, stockItemId = null, country }
         })
         .filter((x) => x.room > 0)
         .sort((a, b) => String(a.announced).localeCompare(String(b.announced)));
-      const placeable = Math.min(Math.max(0, stock - onShelves), sources.reduce((a, x) => a + x.room, 0));
+      // Every unit in stock that is on no shelf can be placed, however it got
+      // into stock: through its receptions first, the rest as a manual move
+      // from the receiving area (see putOnShelf).
+      const placeable = Math.max(0, stock - onShelves);
       return {
         key: `item:${item.id}`,
         sources,
@@ -361,7 +364,8 @@ export const newMoveKey = (kind) => opKey(kind === 'unassign' ? 'unassign' : 're
  * receptions they came in by — AdminReceiving's storage-place field
  * (warehouse_set_product_placement with the reception as source), so the
  * Prep-Center checks the units were really received and the stock is not
- * changed. Oldest reception first. `keys` (by reception line) makes a retry of
+ * changed. Oldest reception first; whatever is left (units that did not come
+ * through a reception) is placed manually. `keys` (by reception line) makes a retry of
  * the same confirmation a no-op. Returns { ok, placed } or { ok: false, placed, ... }.
  */
 export async function putOnShelf(token, { owner, qty, shelf, keys }) {
@@ -401,6 +405,34 @@ export async function putOnShelf(token, { owner, qty, shelf, keys }) {
     if (!res.ok) return { ...res, placed };
     placed += n;
     left -= n;
+  }
+  // Units that came in another way (added in the portal, imported, adjusted):
+  // the Prep-Center's own manual shelf placement — a transfer from the
+  // receiving area to the shelf (warehouse_place_product, source 'manual',
+  // movement 'relocate'). It records the location only; stock is not changed.
+  if (left > 0) {
+    keys.manual ||= opKey('place');
+    const res = await rpc(token, 'warehouse_place_product', {
+      p_storage_place_id: shelf.id,
+      p_warehouse_id: shelf.warehouseId,
+      p_quantity: left,
+      p_client_id: owner.clientId || owner.sources[0]?.clientId || null,
+      p_stock_item_id: owner.item.id,
+      p_product_title: owner.item.name || null,
+      p_sku: owner.item.sku || null,
+      p_asin: owner.item.asin || null,
+      p_lot_code: null,
+      p_expiration_date: null,
+      p_notes: null,
+      p_source_ref_type: 'manual',
+      p_source_ref_id: null,
+      p_source_ref_item_id: null,
+      p_movement_type: 'relocate',
+      p_idempotency_key: keys.manual,
+    });
+    if (!res.ok) return { ...res, placed };
+    placed += left;
+    left = 0;
   }
   return { ok: true, placed };
 }

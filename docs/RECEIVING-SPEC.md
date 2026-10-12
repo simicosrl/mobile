@@ -202,8 +202,11 @@ orice alt cod caută **produsul**.
 - **Put on shelf** — bucăți în stoc, pe niciun raft: puse pe raft prin recepțiile
   prin care au intrat (`warehouse_set_product_placement` cu recepția ca sursă, ca
   în AdminReceiving), cea mai veche întâi; serverul verifică limita recepționată,
-  stocul nu se schimbă. Maximul = min(nepuse pe raft, loc rămas în recepții).
-  Stocul care n-a intrat printr-o recepție nu se poate pune pe raft din aplicație
-  (pe web singura cale, „place product”, adaugă stoc nou).
+  stocul nu se schimbă. Restul (bucăți adăugate din portal, importate, ajustate)
+  se pune ca plasare manuală, la fel ca helper-ul `placeProductInStorage` din
+  Prep-Center: `warehouse_place_product` cu sursa `manual` și mișcarea `relocate`
+  (transfer din zona de recepție pe raft) — scrie doar locația, nu atinge
+  `stock_items`. Maximul = bucățile din stoc care nu sunt pe niciun raft, oricum
+  ar fi intrat în stoc.
 - Fiecare confirmare are cheia ei de idempotență, păstrată la reîncercare.
   Mutările cer conexiune (nu intră în coada offline).
