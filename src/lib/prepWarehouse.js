@@ -32,14 +32,21 @@ async function get(token, path) {
 const fail = (err) => ({ ok: false, reason: err.reason || 'failed', message: err.message, status: err.status });
 const inList = (vals) => `(${[...new Set(vals)].map((v) => `"${String(v).replace(/"/g, '\\"')}"`).join(',')})`;
 
-/** utils/marketStock.js + AdminReturns: the country's stock, or qty when the item has no per-country split. */
+/**
+ * The country's stock exactly as the client's stock page shows it
+ * (utils/marketStock.js getPrepQtyForMarket): prep_qty_by_country[country],
+ * 0 when the item has nothing recorded for that country. Not `qty`: that is
+ * the total over all countries, and a client often has one listing per
+ * marketplace (AMZFR_…, AMZIT_…) for the same product — counting a French
+ * listing's total as Italian stock showed the same units twice.
+ */
 export function stockForCountry(item, country) {
   const map = item?.prep_qty_by_country;
   if (map && typeof map === 'object' && !Array.isArray(map) && Object.prototype.hasOwnProperty.call(map, country)) {
     const n = Number(map[country] || 0);
     return Number.isFinite(n) ? n : 0;
   }
-  return Number(item?.qty || 0) || 0;
+  return 0;
 }
 
 export function clientName(company, profile) {
@@ -111,7 +118,10 @@ export async function lookupProduct(token, { code, stockItemId = null, country }
     const ids = items.map((i) => i.id);
     const whIds = await countryWarehouseIds(token, country);
 
-    const [locs, pendingById, pendingByCode, receivedRows] = await Promise.all([
+    // Reception lines with no stock item link, matched by code instead (older
+    // receptions, or lines the Prep-Center never linked).
+    const itemCodes = [...new Set(items.flatMap((i) => [i.sku, i.fnsku, i.ean, i.asin]).filter(Boolean).map(String))];
+    const [locs, pendingById, pendingByCode, receivedRows, unlinkedRows] = await Promise.all([
       ids.length && whIds.length
         ? get(token, `/rest/v1/warehouse_locations?stock_item_id=in.(${ids.join(',')})&warehouse_id=in.(${whIds.join(',')})` +
           '&quantity=gt.0&select=*,storage_place:storage_places(*)&order=quantity.desc')
@@ -126,9 +136,25 @@ export async function lookupProduct(token, { code, stockItemId = null, country }
       // puts stock on a shelf without adding stock (AdminReceiving placement).
       ids.length
         ? get(token, `/rest/v1/receiving_items?stock_item_id=in.(${ids.join(',')})&received_units=gt.0` +
-          '&select=id,stock_item_id,received_units,quantity_received,is_received,product_name,sku,shipment:receiving_shipments(id,warehouse_country,user_id,created_at)&limit=200')
+          '&select=id,stock_item_id,received_units,quantity_received,is_received,product_name,sku,shipment:receiving_shipments(id,warehouse_country,user_id,company_id,created_at)&limit=200')
+        : [],
+      itemCodes.length
+        ? get(token, `/rest/v1/receiving_items?stock_item_id=is.null&received_units=gt.0` +
+          `&or=(sku.in.${inList(itemCodes)},fnsku.in.${inList(itemCodes)},ean_asin.in.${inList(itemCodes)})` +
+          '&select=id,stock_item_id,received_units,quantity_received,is_received,product_name,sku,fnsku,ean_asin,shipment:receiving_shipments(id,warehouse_country,user_id,company_id,created_at)&limit=200')
         : [],
     ]);
+    // An unlinked line belongs to an item of the same client with a matching
+    // code (SKU / FNSKU first: they are per listing; EAN/ASIN only when the
+    // client has a single listing for it).
+    const norm = (v) => String(v || '').trim().toUpperCase();
+    for (const r of unlinkedRows) {
+      const mine = items.filter((i) => i.company_id && i.company_id === r.shipment?.company_id);
+      const byListing = mine.filter((i) => (r.sku && norm(i.sku) === norm(r.sku)) || (r.fnsku && norm(i.fnsku) === norm(r.fnsku)));
+      const byProduct = mine.filter((i) => r.ean_asin && (norm(i.ean) === norm(r.ean_asin) || norm(i.asin) === norm(r.ean_asin)));
+      const owner = byListing.length === 1 ? byListing[0] : byListing.length === 0 && byProduct.length === 1 ? byProduct[0] : null;
+      if (owner) receivedRows.push({ ...r, stock_item_id: owner.id });
+    }
     const sourcesHere = receivedRows.filter((r) => r.shipment && r.shipment.warehouse_country === country);
     const placedByOrigin = new Map();
     if (sourcesHere.length) {
