@@ -3,6 +3,7 @@ import { useApp } from '../state/AppContext';
 import { useReceiving } from '../state/ReceivingContext';
 import { ArrowDownToLine, Truck, ChevronRight, Download, X, PackageCheck, Search } from '../components/icons';
 import { hhmm } from '../lib/format';
+import { RECEIVING_ENABLED } from '../lib/features';
 
 export default function Home() {
   const { shift, startSession, history, endShift, updateInfo, updateDismissed, dismissUpdate, downloadUpdate, setScreen } = useApp();
@@ -89,8 +90,9 @@ export default function Home() {
           <ChevronRight size={18} strokeWidth={2.2} className="ml-auto flex-none text-light" />
         </button>
 
-        {/* Receiving reads and writes the Prep-Center as the operator on shift. */}
-        {shift?.prep && (
+        {/* Receiving reads and writes the Prep-Center as the operator on shift.
+            Hidden while switched off, unless counts from before are still unsaved. */}
+        {shift?.prep && (RECEIVING_ENABLED || pendingCount > 0) && (
           <button
             onClick={() => setScreen('recvStart')}
             className="flex items-center gap-3.5 rounded-2xl border border-[rgba(22,163,74,.3)] text-left"

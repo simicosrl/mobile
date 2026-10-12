@@ -1,5 +1,6 @@
 import { useApp } from '../state/AppContext';
 import { useReceiving } from '../state/ReceivingContext';
+import { RECEIVING_ENABLED } from '../lib/features';
 import { Check, Printer, FileText, Mail, PackageCheck } from '../components/icons';
 
 export default function Confirmation() {
@@ -7,7 +8,7 @@ export default function Confirmation() {
   const { lookupHandover } = useReceiving();
   if (!confirmedDoc) return null;
   // Parcels a courier just delivered: the next job is receiving their goods.
-  const canReceive = confirmedDoc.direction !== 'out' && !!shift?.prep && confirmedDoc.parcels.some((p) => p.code);
+  const canReceive = RECEIVING_ENABLED && confirmedDoc.direction !== 'out' && !!shift?.prep && confirmedDoc.parcels.some((p) => p.code);
   const dmgCount = confirmedDoc.parcels.filter((p) => p.damage).length;
   const boxes = confirmedDoc.parcels.reduce((a, p) => a + p.boxes, 0);
 
