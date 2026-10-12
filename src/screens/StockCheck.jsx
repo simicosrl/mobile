@@ -94,11 +94,16 @@ function LocationLine({ loc, onShelf, onMove, onUnassign }) {
 // ---------------------------------------------------------------- product view
 
 function ProductView({ data, code, country, onShelf, onMove, onUnassign, onPut }) {
-  const owners = data.owners;
+  // Only clients who have the product here: stock in this country, or units
+  // physically on a shelf. Owners with no stock (and announced-only products)
+  // are left out.
+  const owners = data.owners.filter((o) => o.stock > 0 || o.onShelves > 0);
   if (!owners.length) {
     return (
       <div className="rounded-xl border border-[rgba(255,122,0,.35)] bg-[rgba(255,122,0,.07)] p-3 text-[12.5px] text-ink">
-        No client has a product with code <span className="font-mono font-bold">{code}</span> on the Prep-Center.
+        {data.owners.length
+          ? <>No client has <span className="font-mono font-bold">{code || 'this product'}</span> in stock in {country}.</>
+          : <>No client has a product with code <span className="font-mono font-bold">{code}</span> on the Prep-Center.</>}
       </div>
     );
   }
@@ -635,7 +640,7 @@ export default function StockCheck() {
     if (req !== reqRef.current) return null;
     setLoading(false);
     if (!res.ok) { setError(errorText(res.reason, res.message)); feedback(true); return null; }
-    feedback(v.kind === 'product' && !res.owners.length);
+    feedback(v.kind === 'product' && !res.owners.some((o) => o.stock > 0 || o.onShelves > 0));
     setData(res);
     return v;
   }, [withPrep, country]);

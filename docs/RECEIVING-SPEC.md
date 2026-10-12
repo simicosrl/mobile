@@ -186,7 +186,7 @@ Home → **Stock check** (`src/screens/StockCheck.jsx`, date în `src/lib/prepWa
 Un singur câmp de scanare: un cod de raft din depozitul țării deschide **raftul**,
 orice alt cod caută **produsul**.
 
-- **Produs** — câte un card pe client (același EAN poate fi al mai multor clienți;
+- **Produs** — doar clienții care au stoc în țară sau bucăți pe raft (stoc 0 → ascuns); câte un card pe client (același EAN poate fi al mai multor clienți;
   fiecare `stock_items` e al unui singur client). Avertisment sus când codul e la
   mai mulți clienți; fiecare client are culoarea lui. Pe card: stoc în țară
   (`prep_qty_by_country[țară]`, altfel `qty` — ca pe web), pe rafturi, nepus pe raft,
