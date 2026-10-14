@@ -276,6 +276,27 @@ function QtyPicker({ value, max, onChange }) {
   );
 }
 
+// Camera button next to a shelf/product field: opens the camera scanner and
+// hands back the code it read. Phones only (Zebra scans with its own engine).
+function CameraButton({ onCode, disabled }) {
+  const { scan, scanning, cancel } = useBarcodeScanner();
+  if (!isCameraScanSupported()) return null;
+  return (
+    <>
+      {scanning && <CameraScanOverlay onCancel={cancel} />}
+      <button
+        type="button"
+        onClick={async () => { const c = await scan(); if (c) onCode(c); }}
+        disabled={disabled || scanning}
+        aria-label="Scan with camera"
+        className="flex min-h-[48px] w-[48px] flex-none items-center justify-center rounded-xl bg-primary text-white disabled:opacity-60"
+      >
+        <Camera size={19} strokeWidth={2} />
+      </button>
+    </>
+  );
+}
+
 /**
  * Moves one or more shelf rows to one destination. `rows`: [{ loc, qty, name,
  * client, clientId, colour }]. The destination is checked for every client
@@ -289,9 +310,9 @@ function MoveSheet({ title, rows: initialRows, editableQty, country, withPrep, o
   const [results, setResults] = useState({}); // loc.id -> 'done' | message
   const keysRef = useRef({});
 
-  const check = async (e) => {
+  const check = async (e, scanned) => {
     e?.preventDefault();
-    const code = dest.trim();
+    const code = (scanned ?? dest).trim();
     if (!code || busy) return;
     setBusy(true);
     setChecked(null);
@@ -381,6 +402,7 @@ function MoveSheet({ title, rows: initialRows, editableQty, country, withPrep, o
             placeholder="e.g. E-4"
             className="min-h-[48px] min-w-0 flex-1 rounded-xl border-2 border-primary px-3.5 font-mono text-[16px] uppercase"
           />
+          <CameraButton disabled={busy} onCode={(c) => { setDest(c); check(null, c); }} />
           <button type="submit" disabled={!dest.trim() || busy} className="flex-none rounded-xl border border-inputborder px-3.5 text-[13px] font-bold text-primary disabled:text-light">Check</button>
         </div>
         {checked?.error && <div className="mt-1.5 text-[12px] font-bold text-danger">{checked.error}</div>}
@@ -411,11 +433,12 @@ function PutSheet({ target, country, withPrep, onClose, onDone }) {
   const keysRef = useRef({});
   const clientId = owner.sources[0]?.clientId || owner.clientId;
 
-  const check = async (e) => {
+  const check = async (e, scanned) => {
     e?.preventDefault();
-    if (!dest.trim() || busy) return;
+    const code = (scanned ?? dest).trim();
+    if (!code || busy) return;
     setBusy(true); setChecked(null); setError(null);
-    const res = await withPrep((t) => wh.checkDestination(t, { code: dest.trim(), country, clientId }));
+    const res = await withPrep((t) => wh.checkDestination(t, { code, country, clientId }));
     setBusy(false);
     if (res.ok) { setChecked(res.shelf); keysRef.current = {}; } else setError(errorText(res.reason, res.message));
   };
@@ -447,6 +470,7 @@ function PutSheet({ target, country, withPrep, onClose, onDone }) {
             autoCapitalize="characters" autoCorrect="off" spellCheck={false} placeholder="e.g. E-4"
             className="min-h-[48px] min-w-0 flex-1 rounded-xl border-2 border-primary px-3.5 font-mono text-[16px] uppercase"
           />
+          <CameraButton disabled={busy} onCode={(c) => { setDest(c); check(null, c); }} />
           <button type="submit" disabled={!dest.trim() || busy} className="flex-none rounded-xl border border-inputborder px-3.5 text-[13px] font-bold text-primary disabled:text-light">Check</button>
         </div>
       </form>
@@ -541,7 +565,11 @@ function QuickMove({ shelfData, country, withPrep, showToast, onClose, onDone })
         </div>
       </div>
       <div className="flex-1 overflow-y-auto px-3.5 py-3">
-        <input {...scanner.inputProps} placeholder="Product barcode…" className={scanner.showInput ? 'mb-3 min-h-[46px] w-full rounded-xl border-2 border-primary px-3 font-mono text-[14px]' : 'absolute h-px w-px opacity-0'} />
+        <div className={scanner.showInput || isCameraScanSupported() ? 'mb-3 flex gap-2' : ''}>
+          <input {...scanner.inputProps} placeholder="Product barcode…" className={scanner.showInput ? 'min-h-[46px] min-w-0 flex-1 rounded-xl border-2 border-primary px-3 font-mono text-[14px]' : 'absolute h-px w-px opacity-0'} />
+          {!scanner.showInput && isCameraScanSupported() && <div className="flex-1 self-center text-[11.5px] text-secondary">Scan each unit, then the destination shelf</div>}
+          <CameraButton disabled={!!choose || !!moving} onCode={onCode} />
+        </div>
         {!scanner.showInput && (
           <button onClick={scanner.openManual} className="mb-2 flex items-center gap-1 text-[10.5px] font-bold text-secondary"><KeyboardIcon size={12} strokeWidth={2} /> Type a code instead</button>
         )}

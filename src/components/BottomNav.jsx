@@ -1,4 +1,5 @@
 import { useApp } from '../state/AppContext';
+import { useKeyboardOpen } from '../hooks/useKeyboardOpen';
 import { House, ArrowDownToLine, Truck, FileText } from './icons';
 
 function Tab({ active, label, Icon, onClick }) {
@@ -18,8 +19,11 @@ function Tab({ active, label, Icon, onClick }) {
 
 // Home · Inbound · Outbound · DDT. A handover opened from a list keeps that
 // list's tab lit; API & integrations lives in Settings.
+// Hidden while the keyboard is open: it only takes room from what is being typed.
 export default function BottomNav() {
+  const keyboardOpen = useKeyboardOpen();
   const { screen, goHome, goToInboundTab, goToOutboundTab, goToDdtTab, history, selectedDocNo } = useApp();
+  if (keyboardOpen) return null;
   const openDir = screen === 'session' ? history.find((h) => h.doc === selectedDocNo)?.direction : null;
   return (
     <div className="flex border-t border-[rgba(148,163,184,.25)] bg-white safe-bottom">
