@@ -52,7 +52,7 @@ export default function Home() {
             <div className="text-[10px] font-bold uppercase tracking-[.1em] text-light">On shift</div>
             <div className="mt-0.5 text-[16px] font-extrabold tracking-[-.015em]">{shift?.operatorName}</div>
             <div className="font-mono text-[11px] text-secondary">
-              {shift?.badgeId} · since {shift ? hhmm(new Date(shift.startedAt)) : ''}
+              {shift?.prep?.email || shift?.badgeId} · since {shift ? hhmm(new Date(shift.startedAt)) : ''}
             </div>
           </div>
           <div className="h-[9px] w-[9px] rounded-full bg-success" style={{ boxShadow: '0 0 0 4px rgba(22,163,74,.15)' }} />

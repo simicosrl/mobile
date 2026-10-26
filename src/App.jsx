@@ -9,7 +9,7 @@ import DuplicateSheet from './components/DuplicateSheet';
 import DamageSheet from './components/DamageSheet';
 import NoCodeSheet from './components/NoCodeSheet';
 import PhotoViewer from './components/PhotoViewer';
-import BadgeLogin from './screens/BadgeLogin';
+import Login from './screens/Login';
 import Home from './screens/Home';
 import SessionSetup from './screens/SessionSetup';
 import Scan from './screens/Scan';
@@ -76,7 +76,7 @@ function Shell() {
     );
   }
 
-  if (screen === 'login') return <BadgeLogin />;
+  if (screen === 'login') return <Login />;
 
   const Screen = SCREENS[screen] || Home;
 

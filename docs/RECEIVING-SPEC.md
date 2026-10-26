@@ -35,28 +35,24 @@ permisiunile de admin se aplică exact ca pe web.
 4. Verificarea de rețea a depozitului (`verify-staff-warehouse-network`) se
    apelează prin HTTP nativ (CORS-ul ei acceptă doar originile portalului).
    Dacă răspunde „nu” → accesul e refuzat. Nu ocolim regula, doar CORS-ul.
-5. „Scanează badge-ul tău” → badge-ul se leagă de cont.
-
-**Logările următoare:** scanezi badge-ul → se reia sesiunea salvată pe telefon
-a acelui operator. Badge necunoscut pe telefon → email + parolă o dată.
-Sesiune expirată/revocată → parola din nou.
+5. Tura pornește. Badge-urile au fost scoase: fiecare tură începe cu email +
+   parolă Prep-Center (emailul folosit ultima dată pe telefon e precompletat).
 
 **MFA:** dacă operatorul are autentificator activat în Prep-Center, aplicația
 cere codul de 6 cifre la prima logare, exact ca site-ul.
 
 **Unde se țin datele** (implementat în etapa 1)
 - Pe telefon (IndexedDB): `prepOperators` — sesiunile salvate pe operator
-  (refresh token, nu parola) și ultimul profil citit; `prepBadgeLinks` —
-  `badge → utilizator Prep-Center`. Legătura e per telefon, ca și sesiunea:
-  pe un telefon nou, badge-ul cere parola o dată.
+  (refresh token, nu parola) și ultimul profil citit. `prepBadgeLinks` nu se
+  mai folosește (se șterge la pornire).
 - Țara se ia din `profiles.country`; admin cu mai multe piețe
   (`allowed_markets`) alege țara la începutul turei.
-- Offline: tura pornește din profilul salvat (ca la badge-ul vechi), cu
-  excepția conturilor restrânse la rețeaua depozitului, care sunt blocate.
+- Login-ul cere conexiune (parola se verifică în Prep-Center). O tură deja
+  pornită se reia după repornirea aplicației.
 
 **Ce se schimbă în aplicație**
 - Numele vine din Prep-Center (nu se mai editează în Settings).
-- Documentele: `operator` = numele din Prep-Center; badge-ul rămâne ca referință.
+- Documentele: `operator` = numele din Prep-Center; ca referință se trimite emailul Prep-Center.
 - Conexiunea WMS (`DEFAULT_SCANNER_KEYS[country]`) se alege după țara din profil.
 - Jurnalul de login înregistrează și contul Prep-Center.
 - Tranziție: login-ul vechi pe badge rămâne câteva săptămâni ca rezervă.

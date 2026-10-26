@@ -85,9 +85,6 @@ export function AppProvider({ children }) {
   // Supabase rotates refresh tokens, so a stale copy is a dead session.
   const [prepOperators, setPrepOperators] = useState({});
   const prepOperatorsRef = useRef({});
-  // Badge scanned on this phone -> the Prep-Center user id it signs in.
-  const [prepBadgeLinks, setPrepBadgeLinks] = useState({});
-  const prepBadgeLinksRef = useRef({});
   const [loginEvents, setLoginEvents] = useState([]); // [{ badgeId, operatorName, country, ip, loggedInAtIso }]
   const [pullingLoginEvents, setPullingLoginEvents] = useState(false);
   const [viewingPhoto, setViewingPhoto] = useState(null);
@@ -120,14 +117,11 @@ export function AppProvider({ children }) {
         kvGet('driverProfilesCountryTaggedV1', false),
         kvGet('carriers', []),
       ]);
-      const [savedPrepOperators, savedPrepBadgeLinks] = await Promise.all([
-        kvGet('prepOperators', {}),
-        kvGet('prepBadgeLinks', {}),
-      ]);
+      const savedPrepOperators = await kvGet('prepOperators', {});
       prepOperatorsRef.current = savedPrepOperators || {};
-      prepBadgeLinksRef.current = savedPrepBadgeLinks || {};
       setPrepOperators(prepOperatorsRef.current);
-      setPrepBadgeLinks(prepBadgeLinksRef.current);
+      // Badges are gone: their links on this phone are no longer used.
+      kvSet('prepBadgeLinks', null);
       // One-time reset of the document counter to start numbering at 1
       // (WH-IN-000001 / WH-OUT-000001) — installs from before this change
       // had it at 0 or the old 240/241 seed; new installs already default
@@ -208,7 +202,7 @@ export function AppProvider({ children }) {
       if (savedInternalConfig && savedShift?.country) pullCarriersNowRef.current(savedInternalConfig, savedShift.country);
       if (savedInternalConfig && savedShift?.country) pullHistoryNowRef.current(savedInternalConfig, savedShift.country);
       // Only Prep-Center sign-ins resume. A shift left open by the old
-      // badge-only login (removed) asks for the badge again.
+      // badge-only login (removed) asks for a sign-in.
       if (savedShift?.prep) {
         setShift(savedShift);
         setScreen('home');
@@ -279,7 +273,7 @@ export function AppProvider({ children }) {
   const goToApiTab = useCallback(() => setScreen('api'), []);
   const goToSettings = useCallback(() => setScreen('settings'), []);
 
-  // ---- shift / badge login ----
+  // ---- shift / login ----
   // Wires the app up to its own database for this country, with no setup
   // from the operator — the visible API screen is a separate, optional
   // Prep-Center connection and is never touched here.
@@ -314,11 +308,6 @@ export function AppProvider({ children }) {
     prepOperatorsRef.current = next;
     setPrepOperators(next);
     return kvSet('prepOperators', next);
-  }, []);
-  const savePrepBadgeLinks = useCallback((next) => {
-    prepBadgeLinksRef.current = next;
-    setPrepBadgeLinks(next);
-    return kvSet('prepBadgeLinks', next);
   }, []);
   // Stores the latest tokens the moment they arrive, before anything else can
   // fail: the refresh token just used is no longer valid.
@@ -372,17 +361,19 @@ export function AppProvider({ children }) {
     return res;
   }, [prepAccessToken]);
 
-  const shiftFromSavedOperator = useCallback((op, badgeId, country) => {
-    startShift({ badgeId, operatorName: op.name, country, prep: { userId: op.userId, email: op.email } });
+  // `badgeId` is kept as the shift's operator id (documents, login log); since
+  // badges were removed it holds the Prep-Center email.
+  const shiftFromSavedOperator = useCallback((op, country) => {
+    startShift({ badgeId: op.email, operatorName: op.name, country, prep: { userId: op.userId, email: op.email } });
     return { ok: true };
   }, [startShift]);
 
   // A Prep-Center session, fresh from a password, an MFA code or a saved
   // refresh token, through the same checks the Prep-Center's portal applies:
   // MFA, staff + Warehouse permission, warehouse network, then the country.
-  const completePrepLogin = useCallback(async ({ session, badgeId, country = null }) => {
+  const completePrepLogin = useCallback(async ({ session, country = null }) => {
     const factorId = prepAuth.pendingMfaFactor(session);
-    if (factorId) return { ok: false, reason: 'mfa', pending: { session, badgeId, factorId } };
+    if (factorId) return { ok: false, reason: 'mfa', pending: { session, factorId } };
 
     const prof = await prepAuth.fetchProfile(session);
     if (!prof.ok) return { ok: false, reason: prof.reason };
@@ -403,50 +394,21 @@ export function AppProvider({ children }) {
       profile,
       linkedAt: prepOperatorsRef.current[userId]?.linkedAt || new Date().toISOString(),
     });
-    if (prepBadgeLinksRef.current[badgeId] !== userId) {
-      await savePrepBadgeLinks({ ...prepBadgeLinksRef.current, [badgeId]: userId });
-    }
-    if (!chosen) return { ok: false, reason: 'chooseCountry', countries, pending: { userId, badgeId } };
-    return shiftFromSavedOperator(prepOperatorsRef.current[userId], badgeId, chosen);
-  }, [storePrepSession, savePrepBadgeLinks, shiftFromSavedOperator]);
+    if (!chosen) return { ok: false, reason: 'chooseCountry', countries, pending: { userId } };
+    return shiftFromSavedOperator(prepOperatorsRef.current[userId], chosen);
+  }, [storePrepSession, shiftFromSavedOperator]);
 
-  // Badge scan. A badge linked on this phone resumes that operator's saved
-  // Prep-Center session; any other badge asks for the Prep-Center sign-in once.
-  const loginWithBadge = useCallback(async (badgeId) => {
-    const id = badgeId || 'BADGE-0000';
-    const userId = prepBadgeLinksRef.current[id];
-    const op = userId && prepOperatorsRef.current[userId];
-    if (!op?.refreshToken) return { ok: false, reason: 'needsPrepLogin', badgeId: id };
-
-    const r = await prepAuth.refreshSession(op.refreshToken);
-    if (r.ok) {
-      await storePrepSession(op.userId, r.session);
-      return completePrepLogin({ session: r.session, badgeId: id });
-    }
-    if (r.reason === 'expired') return { ok: false, reason: 'needsPrepLogin', badgeId: id, email: op.email, expired: true };
-
-    // Offline: the shift starts from what this phone last confirmed, as badge
-    // login always has — except for accounts the Prep-Center keeps to the
-    // warehouse network, which it cannot verify without a connection.
-    if (prepAuth.isNetworkRestricted(op.userId)) return { ok: false, reason: 'warehouseNetworkUnverified' };
-    const access = prepAuth.evaluateAccess(op.profile);
-    if (!access.allowed) return { ok: false, reason: access.reason };
-    const countries = prepAuth.shiftCountries(op.profile);
-    if (!countries.length) return { ok: false, reason: 'noCountry' };
-    if (countries.length > 1) return { ok: false, reason: 'chooseCountry', countries, pending: { userId: op.userId, badgeId: id } };
-    return shiftFromSavedOperator(op, id, countries[0]);
-  }, [storePrepSession, completePrepLogin, shiftFromSavedOperator]);
-
-  const prepSignIn = useCallback(async ({ badgeId, email, password }) => {
+  // Every shift starts with the Prep-Center email and password.
+  const prepSignIn = useCallback(async ({ email, password }) => {
     const r = await prepAuth.signInWithPassword(email, password);
     if (!r.ok) return r;
-    return completePrepLogin({ session: r.session, badgeId });
+    return completePrepLogin({ session: r.session });
   }, [completePrepLogin]);
 
   const prepVerifyMfa = useCallback(async (pending, code) => {
     const r = await prepAuth.verifyMfa(pending.session, pending.factorId, code);
     if (!r.ok) return r;
-    return completePrepLogin({ session: r.session, badgeId: pending.badgeId });
+    return completePrepLogin({ session: r.session });
   }, [completePrepLogin]);
 
   // Only offered countries reach here; the operator was fully checked just
@@ -454,11 +416,11 @@ export function AppProvider({ children }) {
   const prepChooseCountry = useCallback((pending, country) => {
     const op = prepOperatorsRef.current[pending.userId];
     if (!op || !prepAuth.shiftCountries(op.profile).includes(country)) return { ok: false, reason: 'noCountry' };
-    return shiftFromSavedOperator(op, pending.badgeId, country);
+    return shiftFromSavedOperator(op, country);
   }, [shiftFromSavedOperator]);
 
-  // Settings › "Remove from this phone": forgets the saved session and every
-  // badge linked to it here, then ends the shift. The session is also signed
+  // Settings › "Remove from this phone": forgets the saved session, then ends
+  // the shift. The session is also signed
   // out on the Prep-Center when there is a connection.
   const forgetPrepOperator = useCallback(async () => {
     const userId = shift?.prep?.userId;
@@ -466,13 +428,11 @@ export function AppProvider({ children }) {
     const op = prepOperatorsRef.current[userId];
     const { [userId]: _removed, ...rest } = prepOperatorsRef.current;
     await savePrepOperators(rest);
-    const links = Object.fromEntries(Object.entries(prepBadgeLinksRef.current).filter(([, u]) => u !== userId));
-    await savePrepBadgeLinks(links);
     if (op?.refreshToken) prepAuth.signOut(op.refreshToken).catch(() => {});
     setShift(null);
     kvSet('shift', null);
     setScreen('login');
-  }, [shift?.prep?.userId, savePrepOperators, savePrepBadgeLinks]);
+  }, [shift?.prep?.userId, savePrepOperators]);
 
   const endShift = useCallback(() => {
     setShift(null);
@@ -1183,7 +1143,7 @@ export function AppProvider({ children }) {
       destination,
       driverName: courierName,
       plate,
-      operator: `${shift?.operatorName || 'Operator'} · ${shift?.badgeId || ''}`,
+      operator: shift?.operatorName || 'Operator',
       operatorBadge: shift?.badgeId || '',
       country: shift?.country || null,
       parcels,
@@ -1425,7 +1385,7 @@ export function AppProvider({ children }) {
       showToast('Manifest pull failed: ' + res.error);
     }
   }, [apiConfig, showToast]);
-  // Lets loginWithBadge (defined earlier in this file) trigger a pull
+  // Lets the login (defined earlier in this file) trigger a pull
   // without a stale closure over apiConfig/showToast.
   const pullManifestNowRef = useRef(() => {});
   useEffect(() => { pullManifestNowRef.current = pullManifestNow; }, [pullManifestNow]);
@@ -1657,7 +1617,7 @@ export function AppProvider({ children }) {
 
   const value = useMemo(() => ({
     ready, now,
-    shift, loginWithBadge, prepSignIn, prepVerifyMfa, prepChooseCountry, forgetPrepOperator, prepOperators, prepBadgeLinks, withPrep, endShift,
+    shift, prepSignIn, prepVerifyMfa, prepChooseCountry, forgetPrepOperator, prepOperators, withPrep, endShift,
     screen, setScreen, canGoBack, goBack, goHome, goToInboundTab, goToOutboundTab, goToDdtTab, goToApiTab, goToSettings,
     direction, carrier, setCarrier, courierCompany, setCourierCompany, shipment, setShipment: setShipmentRef,
     destination, setDestination,
@@ -1681,7 +1641,7 @@ export function AppProvider({ children }) {
     toast, showToast,
     inputRef,
   }), [
-    ready, now, shift, loginWithBadge, prepSignIn, prepVerifyMfa, prepChooseCountry, forgetPrepOperator, prepOperators, prepBadgeLinks, withPrep, endShift, screen, canGoBack, goBack, goHome, goToInboundTab, goToOutboundTab, goToDdtTab, goToApiTab, goToSettings,
+    ready, now, shift, prepSignIn, prepVerifyMfa, prepChooseCountry, forgetPrepOperator, prepOperators, withPrep, endShift, screen, canGoBack, goBack, goHome, goToInboundTab, goToOutboundTab, goToDdtTab, goToApiTab, goToSettings,
     direction, carrier, courierCompany, shipment, parcels, sessionStartedAt, startSession, toScan, docSeq,
     submitScan, accept, dupCode, dupTime, closeDup, dupAddBox, boxPlus, boxMinus, removeLast, removeParcel, flash,
     damageSheet, openDamage, closeDamage, toggleDamageType, setDamageNote, setDamagePhoto, saveDamage,

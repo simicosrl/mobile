@@ -197,16 +197,10 @@ export default function Settings() {
             <div className="truncate font-mono text-[12px]">{shift?.prep?.email} · {shift?.country}</div>
           </div>
         </div>
-        <div>
-          <div className="mb-2 text-[11px] font-bold uppercase tracking-[.06em] text-secondary">Badge</div>
-          <div className="min-h-[48px] w-full rounded-xl border border-inputborder bg-page px-4 py-3 font-mono text-sm text-secondary">
-            {shift?.badgeId || '—'}
-          </div>
-        </div>
         {shift?.prep && (
           <button
             onClick={() => {
-              if (window.confirm('Remove your Prep-Center sign-in from this phone? Your badge will ask for the password again next time.')) forgetPrepOperator();
+              if (window.confirm('Sign out of the Prep-Center on this phone and end the shift?')) forgetPrepOperator();
             }}
             className="self-start text-[12.5px] font-bold text-danger underline underline-offset-2"
           >
@@ -298,7 +292,7 @@ export default function Settings() {
       <Section title="Login history" summary={loginEvents.length ? `${loginEvents.length} recent logins` : 'Who logged in, from where, and when'}>
         <div className="flex items-center gap-2.5">
           <div className="min-w-0 flex-1 text-[11px] leading-snug text-secondary">
-            Every badge login for this country, with the IP it came from — recorded server-side, not
+            Every login for this country, with the IP it came from — recorded server-side, not
             something the phone reports about itself.
           </div>
           <button
