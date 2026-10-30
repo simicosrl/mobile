@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { Keyboard } from '@capacitor/keyboard';
 import { isCameraScanSupported } from './useBarcodeScanner';
+import { useKeepKeyboardDown } from './useKeepKeyboardDown';
 
 // The hardware-scanner field the Scan screen uses, as a hook for the receiving
 // screens: an always-focused input a Zebra / ring scanner types into, with the
@@ -28,12 +29,12 @@ export function useScanInput(onCode, { paused = false } = {}) {
       if (ref.current && active !== ref.current) {
         try { ref.current.focus({ preventScroll: true }); } catch { /* ignore */ }
       }
-      if (!manual && Capacitor.isNativePlatform()) Keyboard.hide().catch(() => {});
     };
     refocus();
     const t = setInterval(refocus, 400);
     return () => clearInterval(t);
   }, [paused, manual]);
+  useKeepKeyboardDown(ref, { enabled: !paused && !manual });
 
   const submit = (value) => {
     const code = String(value || '').trim();

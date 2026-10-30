@@ -6,6 +6,7 @@ import { docNumber, elapsedLabel } from '../lib/format';
 import { Check, TriangleAlert, ScanLine, Trash2, PenLine, Camera, X, Keyboard as KeyboardIcon } from '../components/icons';
 import { useBarcodeScanner, isCameraScanSupported } from '../hooks/useBarcodeScanner';
 import CameraScanOverlay from '../components/CameraScanOverlay';
+import { useKeepKeyboardDown } from '../hooks/useKeepKeyboardDown';
 
 export default function Scan() {
   const app = useApp();
@@ -25,9 +26,9 @@ export default function Scan() {
   // InputConnection regardless of whether the on-screen keyboard is
   // visible), but the on-screen keyboard should only ever appear because
   // the operator explicitly asked for it via the Keyboard button below —
-  // Keyboard.hide() is a native call that dismisses just the visual IME,
-  // it doesn't blur the field or touch any input attribute, so it has no
-  // effect on real scanner input (unlike inputMode/readOnly, which do).
+  // useKeepKeyboardDown closes the visual IME only when it opens, without
+  // blurring the field or touching any input attribute (inputMode/readOnly
+  // would break scanner input).
   const [manualKeyboard, setManualKeyboard] = useState(false);
 
   useEffect(() => {
@@ -52,15 +53,12 @@ export default function Scan() {
       if (!scanning && !typingElsewhere && inputRef.current && active !== inputRef.current) {
         try { inputRef.current.focus({ preventScroll: true }); } catch { /* ignore */ }
       }
-      if (typingElsewhere) return;
-      if (!manualKeyboard && Capacitor.isNativePlatform()) {
-        Keyboard.hide().catch(() => {});
-      }
     };
     refocus();
     const t = setInterval(refocus, 400);
     return () => clearInterval(t);
   }, [scanning, parcels.length, manualKeyboard, damageSheet.open, noCodeSheet.open]);
+  useKeepKeyboardDown(inputRef, { enabled: !manualKeyboard && !damageSheet.open && !noCodeSheet.open });
 
   const openManualKeyboard = () => {
     setManualKeyboard(true);
