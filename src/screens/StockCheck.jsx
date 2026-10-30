@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useApp } from '../state/AppContext';
 import { useScanInput } from '../hooks/useScanInput';
+import { useHardwareScan } from '../hooks/useHardwareScan';
 import { useBarcodeScanner, isCameraScanSupported } from '../hooks/useBarcodeScanner';
 import CameraScanOverlay from '../components/CameraScanOverlay';
 import * as wh from '../lib/prepWarehouse';
@@ -309,6 +310,9 @@ function MoveSheet({ title, rows: initialRows, editableQty, country, withPrep, o
   const [busy, setBusy] = useState(false);
   const [results, setResults] = useState({}); // loc.id -> 'done' | message
   const keysRef = useRef({});
+  const scanned = (c) => { setDest(c); check(null, c); };
+  // Broadcast laser scans fill the shelf, like a typed one.
+  useHardwareScan((c) => scanned(c), !busy);
 
   const check = async (e, scanned) => {
     e?.preventDefault();
@@ -402,7 +406,7 @@ function MoveSheet({ title, rows: initialRows, editableQty, country, withPrep, o
             placeholder="e.g. E-4"
             className="min-h-[48px] min-w-0 flex-1 rounded-xl border-2 border-primary px-3.5 font-mono text-[16px] uppercase"
           />
-          <CameraButton disabled={busy} onCode={(c) => { setDest(c); check(null, c); }} />
+          <CameraButton disabled={busy} onCode={scanned} />
           <button type="submit" disabled={!dest.trim() || busy} className="flex-none rounded-xl border border-inputborder px-3.5 text-[13px] font-bold text-primary disabled:text-light">Check</button>
         </div>
         {checked?.error && <div className="mt-1.5 text-[12px] font-bold text-danger">{checked.error}</div>}
@@ -431,6 +435,9 @@ function PutSheet({ target, country, withPrep, onClose, onDone }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const keysRef = useRef({});
+  const scanned = (c) => { setDest(c); check(null, c); };
+  // Broadcast laser scans fill the shelf, like a typed one.
+  useHardwareScan((c) => scanned(c), !busy);
   const clientId = owner.sources[0]?.clientId || owner.clientId;
 
   const check = async (e, scanned) => {
@@ -470,7 +477,7 @@ function PutSheet({ target, country, withPrep, onClose, onDone }) {
             autoCapitalize="characters" autoCorrect="off" spellCheck={false} placeholder="e.g. E-4"
             className="min-h-[48px] min-w-0 flex-1 rounded-xl border-2 border-primary px-3.5 font-mono text-[16px] uppercase"
           />
-          <CameraButton disabled={busy} onCode={(c) => { setDest(c); check(null, c); }} />
+          <CameraButton disabled={busy} onCode={scanned} />
           <button type="submit" disabled={!dest.trim() || busy} className="flex-none rounded-xl border border-inputborder px-3.5 text-[13px] font-bold text-primary disabled:text-light">Check</button>
         </div>
       </form>

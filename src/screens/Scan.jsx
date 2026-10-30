@@ -7,6 +7,8 @@ import { Check, TriangleAlert, ScanLine, Trash2, PenLine, Camera, X, Keyboard as
 import { useBarcodeScanner, isCameraScanSupported } from '../hooks/useBarcodeScanner';
 import CameraScanOverlay from '../components/CameraScanOverlay';
 import { useKeepKeyboardDown } from '../hooks/useKeepKeyboardDown';
+import { useHardwareScan } from '../hooks/useHardwareScan';
+import { deliveredRecently, markDelivered } from '../lib/hardwareScanner';
 
 export default function Scan() {
   const app = useApp();
@@ -59,6 +61,15 @@ export default function Scan() {
     return () => clearInterval(t);
   }, [scanning, parcels.length, manualKeyboard, damageSheet.open, noCodeSheet.open]);
   useKeepKeyboardDown(inputRef, { enabled: !manualKeyboard && !damageSheet.open && !noCodeSheet.open });
+  // Scanners that broadcast instead of typing (lib/hardwareScanner.js). A
+  // code that also arrived typed is taken once.
+  const takeTyped = (raw) => {
+    const code = String(raw || '').trim();
+    if (!code || deliveredRecently(code)) return;
+    markDelivered(code);
+    submitScan(code);
+  };
+  useHardwareScan((code) => submitScan(code), !scanning && !damageSheet.open && !noCodeSheet.open);
 
   const openManualKeyboard = () => {
     setManualKeyboard(true);
@@ -81,7 +92,7 @@ export default function Scan() {
   useEffect(() => {
     if (!buffer || manualKeyboard) return undefined;
     const t = setTimeout(() => {
-      submitScan(buffer);
+      takeTyped(buffer);
       setBuffer('');
     }, 400);
     return () => clearTimeout(t);
@@ -95,7 +106,7 @@ export default function Scan() {
   const onKey = (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      submitScan(buffer);
+      takeTyped(buffer);
       setBuffer('');
     }
   };

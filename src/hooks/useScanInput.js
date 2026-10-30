@@ -3,6 +3,8 @@ import { Capacitor } from '@capacitor/core';
 import { Keyboard } from '@capacitor/keyboard';
 import { isCameraScanSupported } from './useBarcodeScanner';
 import { useKeepKeyboardDown } from './useKeepKeyboardDown';
+import { useHardwareScan } from './useHardwareScan';
+import { deliveredRecently, markDelivered } from '../lib/hardwareScanner';
 
 // The hardware-scanner field the Scan screen uses, as a hook for the receiving
 // screens: an always-focused input a Zebra / ring scanner types into, with the
@@ -39,8 +41,12 @@ export function useScanInput(onCode, { paused = false } = {}) {
   const submit = (value) => {
     const code = String(value || '').trim();
     setBuffer('');
-    if (code) onCodeRef.current(code);
+    if (!code || deliveredRecently(code)) return;
+    markDelivered(code);
+    onCodeRef.current(code);
   };
+  // Scanners that broadcast instead of typing.
+  useHardwareScan((code) => onCodeRef.current(code), !paused);
 
   useEffect(() => {
     if (!buffer || manual) return undefined;

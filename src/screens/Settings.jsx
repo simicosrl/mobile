@@ -4,6 +4,7 @@ import { Capacitor } from '@capacitor/core';
 import { useApp } from '../state/AppContext';
 import { Check, Download, ChevronDown, ChevronRight, Plus, RefreshCw, Globe } from '../components/icons';
 import KeyboardDiagnostics from '../components/KeyboardDiagnostics';
+import ScannerTest from '../components/ScannerTest';
 
 // e.g. "25/08/2026 14:47" in the operator's own timezone, from the
 // server's UTC timestamp — mirrors the format already used for documents.
@@ -252,6 +253,10 @@ export default function Settings() {
             <Field label="Email" type="email" value={org.companyEmail} onChange={set('companyEmail')} placeholder="warehouse@company.com" />
           </div>
         </div>
+      </Section>
+
+      <Section title="Laser scanner test" summary="check what the scanner sends">
+        <ScannerTest />
       </Section>
 
       <Section title="Carriers" summary={`${carriers.length} carrier${carriers.length === 1 ? '' : 's'}`}>
