@@ -257,12 +257,14 @@ export default function Settings() {
       <Section title="Carriers" summary={`${carriers.length} carrier${carriers.length === 1 ? '' : 's'}`}>
         <div className="text-[11px] leading-snug text-secondary">
           Add a required tracking-code prefix to catch a wrong scan before it's added — e.g. UPS codes always
-          start with <span className="font-mono font-bold text-ink">1Z</span>. Leave blank for no restriction.
+          start with <span className="font-mono font-bold text-ink">1Z</span>. Several prefixes for one carrier:
+          separate them with commas, e.g. <span className="font-mono font-bold text-ink">1Z, 1Y</span>. Leave blank
+          for no restriction.
           Shared with every device logged into this country.
         </div>
         <div className="flex flex-col gap-1.5">
           {carriers.map((c) => (
-            <CarrierRow key={c.name} carrier={c} onSave={saveCarrier} />
+            <CarrierRow key={`${c.name}:${c.pattern || ""}`} carrier={c} onSave={saveCarrier} />
           ))}
         </div>
         <div className="flex items-center gap-2 border-t border-[rgba(148,163,184,.2)] pt-3">
@@ -275,8 +277,8 @@ export default function Settings() {
           <input
             value={newCarrierPattern}
             onChange={(e) => setNewCarrierPattern(e.target.value)}
-            placeholder="Prefix (optional)"
-            className="min-h-[40px] w-[110px] flex-none rounded-lg border border-inputborder bg-page px-2.5 font-mono text-[12px] uppercase text-ink"
+            placeholder="Prefixes (optional)"
+            className="min-h-[40px] w-[130px] flex-none rounded-lg border border-inputborder bg-page px-2.5 font-mono text-[12px] uppercase text-ink"
           />
           <button
             onClick={addCarrier}

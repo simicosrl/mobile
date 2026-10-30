@@ -13,7 +13,6 @@ export default function Scan() {
     direction, carrier, parcels, sessionStartedAt, flash,
     submitScan, removeLast, removeParcel, openDamage, toSign, docSeq, openPhoto,
     openNoCodeSheet, rejectedScan, damageSheet, noCodeSheet,
-    shipment, setShipment, destination, setDestination,
   } = app;
   const isOut = direction === 'out';
   const nextDoc = docNumber(direction, docSeq[direction]);
@@ -104,20 +103,6 @@ export default function Scan() {
   };
 
   const boxes = parcels.reduce((a, p) => a + p.boxes, 0);
-  // A box the Prep-Center could not place has no shipping, so it can go on no
-  // delivery note unless the operator supplies one.
-  const unplacedCount = parcels.filter(
-    (p) => p.shipmentStatus && p.shipmentStatus !== 'ok' && p.shipmentStatus !== 'manual',
-  ).length;
-  const needsShippingRef = unplacedCount > 0 || Boolean(shipment);
-  // A box with no delivery address to print. That is either one the
-  // Prep-Center placed but whose shipping came back with an empty address, or
-  // any box it could not place at all — an unplaced box has no record behind
-  // it, so it has no destination either, and asking only about the first kind
-  // left the note blank exactly when the Prep-Center was unreachable.
-  const needsDestination = parcels.some(
-    (p) => p.shipmentStatus && (p.shipmentStatus !== 'ok' || !p.shipmentHasDestination),
-  ) || Boolean(destination);
   const codeSize = last && last.code.length > 18 ? 'text-[17px]' : 'text-[21px]';
   // The tracking field is only ever shown once the operator explicitly asks
   // to type (manualKeyboard) — otherwise it's a 1px invisible focus target
@@ -245,78 +230,24 @@ export default function Scan() {
 
       <div className="flex flex-col gap-3 px-3.5">
       <div className="flex gap-2.5">
-        <button onClick={openDamage} className="flex min-h-[48px] flex-1 items-center justify-center gap-1.5 rounded-xl border border-[rgba(220,38,38,.3)] bg-white text-[13px] font-bold text-danger">
-          <TriangleAlert size={16} strokeWidth={2} /> Damage
-        </button>
-        <button onClick={removeLast} className="flex min-h-[48px] w-[52px] flex-none items-center justify-center rounded-xl border border-[rgba(148,163,184,.35)] bg-white text-secondary">
-          <Trash2 size={17} strokeWidth={2} />
+        {/* Outbound parcels leave in perfect condition: damage is an inbound thing. */}
+        {!isOut && (
+          <button onClick={openDamage} className="flex min-h-[48px] flex-1 items-center justify-center gap-1.5 rounded-xl border border-[rgba(220,38,38,.3)] bg-white text-[13px] font-bold text-danger">
+            <TriangleAlert size={16} strokeWidth={2} /> Damage
+          </button>
+        )}
+        <button
+          onClick={removeLast}
+          aria-label="Remove last parcel"
+          className={'flex min-h-[48px] items-center justify-center gap-1.5 rounded-xl border border-[rgba(148,163,184,.35)] bg-white text-[13px] font-bold text-secondary ' + (isOut ? 'flex-1' : 'w-[52px] flex-none')}
+        >
+          <Trash2 size={17} strokeWidth={2} />{isOut && ' Remove last'}
         </button>
       </div>
 
-      {/* Neither of these belongs on the screen in the normal flow: the
-          Prep-Center places a box and names its destination the moment it is
-          scanned, and asking the operator to type what the system already knows
-          is how mistakes get in. So each appears only when its own answer is
-          actually missing, naming why, and disappears again once it is not.
-
-          Removing them outright was the other option, and it is the wrong one
-          while the Prep-Center can still fail to answer: a delivery note with
-          no shipping cannot be issued at all, and one with no destination
-          cannot say where the goods are going. Either would stop a lorry. */}
-      {isOut && needsShippingRef && (
-        <div data-testid="shipping-fallback" className="overflow-hidden rounded-[14px] border border-[rgba(255,122,0,.4)] bg-white">
-          <div className="flex items-center gap-2 border-b border-[rgba(148,163,184,.25)] bg-[rgba(255,122,0,.08)] px-3 py-2.5">
-            <div className="text-[10px] font-bold uppercase tracking-[.08em] text-[#C2410C]">Shipping / FBA reference</div>
-            <div className="ml-auto text-[11px] font-bold text-[#C2410C]">
-              {shipment ? 'DDT will be issued' : 'needed for the unplaced boxes'}
-            </div>
-          </div>
-          <div className="flex items-center gap-2 px-3 py-2.5">
-            <input
-              value={shipment}
-              onChange={(e) => setShipment(e.target.value.toUpperCase())}
-              placeholder="Scan or type, e.g. FBA15MGNXYBV"
-              className="min-h-[46px] w-full flex-1 rounded-xl border border-inputborder bg-page px-3 font-mono text-[13px] font-semibold text-ink"
-            />
-            {shipment && (
-              <button
-                onClick={() => setShipment('')}
-                aria-label="Clear the shipping reference"
-                className="flex h-9 w-9 flex-none items-center justify-center rounded-full text-light"
-              >
-                <X size={16} strokeWidth={2.2} />
-              </button>
-            )}
-          </div>
-          <div className="px-3 pb-2.5 text-[10.5px] leading-[1.45] text-secondary">
-            The Prep-Center could not place {unplacedCount === 1 ? 'a box' : `${unplacedCount} boxes`} in this
-            session. Boxes scanned from now on go on this reference's delivery note; change it for the next shipping.
-          </div>
-        </div>
-      )}
-
-      {isOut && needsDestination && (
-        <div data-testid="destination-fallback" className="overflow-hidden rounded-[14px] border border-[rgba(255,122,0,.4)] bg-white">
-          <div className="flex items-center gap-2 border-b border-[rgba(148,163,184,.25)] bg-[rgba(255,122,0,.08)] px-3 py-2.5">
-            <div className="text-[10px] font-bold uppercase tracking-[.08em] text-[#C2410C]">Merchandise destination</div>
-            <div className="ml-auto text-[11px] font-bold text-[#C2410C]">
-              {destination.trim() ? 'will be printed' : 'blank on the note'}
-            </div>
-          </div>
-          <div className="px-3 py-2.5">
-            <input
-              value={destination}
-              onChange={(e) => setDestination(e.target.value)}
-              placeholder="Destination, e.g. Amazon FCO8, Fiano Romano, IT"
-              className="min-h-[46px] w-full rounded-xl border border-inputborder bg-page px-3 text-[12.5px] text-ink"
-            />
-          </div>
-          <div className="px-3 pb-2.5 text-[10.5px] leading-[1.45] text-secondary">
-            The Prep-Center sent no delivery address for this shipping. A delivery note has to say where
-            the goods are going, so type it here — commas start a new line on the document.
-          </div>
-        </div>
-      )}
+      {/* Outbound has no manual shipping / destination fields: they can't be
+          filled from the scanner. A box the Prep-Center can't place is still
+          handed over, marked "no DDT" in the list below. */}
 
       <div className="overflow-hidden rounded-[14px] border border-[rgba(148,163,184,.25)] bg-white">
         <div className="flex items-center gap-2 border-b border-[rgba(148,163,184,.25)] bg-page px-3 py-2.5">

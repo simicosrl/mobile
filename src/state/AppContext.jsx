@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { docsGetAll, docPut, docsClearAll, kvGet, kvSet } from '../lib/db';
 import { DEFAULT_ORG_SETTINGS } from '../lib/seed';
-import { DAMAGE_TYPES, carriersForCountry } from '../lib/carriers';
+import { DAMAGE_TYPES, carriersForCountry, parsePrefixes, normalizePrefixes } from '../lib/carriers';
 import { hhmm, stamp, docNumber } from '../lib/format';
 import { feedback } from '../lib/audio';
 import * as api from '../lib/api';
@@ -672,10 +672,11 @@ export function AppProvider({ children }) {
     // for a genuinely legitimate case — wrong carrier selected, damaged
     // label — without making the override an effortless one-tap bypass.
     const carrierRule = carriers.find((c) => c.name.toLowerCase() === carrier.toLowerCase());
-    if (carrierRule?.pattern && !code.startsWith(carrierRule.pattern)) {
+    const prefixes = parsePrefixes(carrierRule?.pattern);
+    if (prefixes.length && !prefixes.some((pre) => code.startsWith(pre))) {
       feedback(true);
       setFlash('bad');
-      const reason = `must start with "${carrierRule.pattern}"`;
+      const reason = `must start with ${prefixes.map((pre) => `"${pre}"`).join(' or ')}`;
       showToast(`Invalid code for ${carrier} — ${reason}`);
       setRejectedScan({ code, reason });
       return;
@@ -877,7 +878,7 @@ export function AppProvider({ children }) {
     const trimmedName = (name || '').trim();
     if (!trimmedName) return;
     const key = trimmedName.toLowerCase();
-    const normalizedPattern = (pattern || '').trim().toUpperCase() || null;
+    const normalizedPattern = normalizePrefixes(pattern);
     const updated = { name: trimmedName, pattern: normalizedPattern, country: shift?.country || null };
     setCarriers((list) => {
       const others = list.filter((c) => c.name.toLowerCase() !== key);

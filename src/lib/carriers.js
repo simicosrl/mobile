@@ -23,3 +23,13 @@ export function carriersForCountry(countryCode) {
 }
 
 export const DAMAGE_TYPES = ['Box damaged', 'Seal broken', 'Parcel opened'];
+
+// A carrier's prefix rule may list several prefixes, separated by commas
+// (e.g. "1Z, 1Y"): a code is valid if it starts with any of them. Stored as
+// one text field, normalised to "1Z, 1Y".
+export function parsePrefixes(pattern) {
+  return [...new Set(String(pattern || '').toUpperCase().split(/[,;\s]+/).map((p) => p.trim()).filter(Boolean))];
+}
+export function normalizePrefixes(pattern) {
+  return parsePrefixes(pattern).join(', ') || null;
+}
