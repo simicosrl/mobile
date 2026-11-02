@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import { useApp } from '../state/AppContext';
-import { Check, Download, ChevronDown, ChevronRight, Plus, RefreshCw, Globe } from '../components/icons';
+import { Check, Download, ChevronDown, ChevronRight, Plus, RefreshCw, Globe, X } from '../components/icons';
+import { parsePrefixes } from '../lib/carriers';
 import KeyboardDiagnostics from '../components/KeyboardDiagnostics';
 import ScannerTest from '../components/ScannerTest';
 
@@ -127,20 +128,64 @@ function Section({ title, summary, defaultOpen = false, children }) {
   );
 }
 
+// One carrier and its tracking prefixes: each prefix is a chip with a ×, and
+// a new one is added one at a time with OK, so a long list stays readable.
+// Stored as before, as one "8J, 6C, …" field (see lib/carriers.js).
 function CarrierRow({ carrier, onSave }) {
-  const [pattern, setPattern] = useState(carrier.pattern || '');
-  const [saved, setSaved] = useState(true);
+  const prefixes = parsePrefixes(carrier.pattern);
+  const [draft, setDraft] = useState('');
+  const [error, setError] = useState(null);
+  const save = (list) => onSave(carrier.name, list.join(', '));
+
+  const add = (e) => {
+    e?.preventDefault();
+    const value = draft.trim().toUpperCase();
+    if (!value) return;
+    if (!/^[0-9A-Z]+$/.test(value)) { setError('Letters and digits only, one prefix at a time.'); return; }
+    if (value.length > 10) { setError('A prefix is at most 10 characters.'); return; }
+    if (prefixes.includes(value)) { setError(`${value} is already there.`); return; }
+    save([...prefixes, value]);
+    setDraft('');
+    setError(null);
+  };
+
   return (
-    <div className="flex items-center gap-2 rounded-xl border border-[rgba(148,163,184,.25)] bg-page px-3 py-2">
-      <div className="min-w-0 flex-1 truncate text-[13px] font-bold text-ink">{carrier.name}</div>
-      <input
-        value={pattern}
-        onChange={(e) => { setPattern(e.target.value); setSaved(false); }}
-        onBlur={() => { if (!saved) { onSave(carrier.name, pattern); setSaved(true); } }}
-        placeholder="no restriction"
-        aria-label={`Pattern for ${carrier.name}`}
-        className="min-h-[38px] w-[130px] flex-none rounded-lg border border-inputborder bg-white px-2.5 font-mono text-[12px] uppercase text-ink"
-      />
+    <div className="rounded-xl border border-[rgba(148,163,184,.25)] bg-page px-3 py-2.5">
+      <div className="flex items-center gap-2">
+        <div className="min-w-0 flex-1 truncate text-[13px] font-bold text-ink">{carrier.name}</div>
+        <div className="flex-none text-[11px] text-secondary">
+          {prefixes.length ? `${prefixes.length} prefix${prefixes.length === 1 ? '' : 'es'}` : 'no restriction'}
+        </div>
+      </div>
+      {prefixes.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {prefixes.map((p) => (
+            <span key={p} className="flex items-center gap-1 rounded-full border border-inputborder bg-white py-1 pl-2.5 pr-1 font-mono text-[12px] font-bold text-ink">
+              {p}
+              <button
+                type="button"
+                onClick={() => save(prefixes.filter((x) => x !== p))}
+                aria-label={`Remove prefix ${p} from ${carrier.name}`}
+                className="flex h-5 w-5 items-center justify-center rounded-full text-light"
+              >
+                <X size={12} strokeWidth={2.6} />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+      <form onSubmit={add} className="mt-2 flex gap-2">
+        <input
+          value={draft}
+          onChange={(e) => { setDraft(e.target.value); setError(null); }}
+          placeholder="Add prefix…"
+          aria-label={`Add a prefix to ${carrier.name}`}
+          autoCapitalize="characters" autoCorrect="off" spellCheck={false}
+          className="min-h-[38px] min-w-0 flex-1 rounded-lg border border-inputborder bg-white px-2.5 font-mono text-[12.5px] uppercase text-ink"
+        />
+        <button type="submit" disabled={!draft.trim()} className="flex-none rounded-lg bg-primary px-3.5 text-[12.5px] font-bold text-white disabled:opacity-50">OK</button>
+      </form>
+      {error && <div className="mt-1 text-[11.5px] font-bold text-danger">{error}</div>}
     </div>
   );
 }
@@ -155,7 +200,6 @@ export default function Settings() {
   const [appVersion, setAppVersion] = useState(null);
   const [checking, setChecking] = useState(false);
   const [newCarrierName, setNewCarrierName] = useState('');
-  const [newCarrierPattern, setNewCarrierPattern] = useState('');
 
   useEffect(() => {
     if (Capacitor.isNativePlatform()) {
@@ -179,11 +223,13 @@ export default function Settings() {
   };
 
   const addCarrier = () => {
-    if (!newCarrierName.trim()) return;
-    saveCarrier(newCarrierName, newCarrierPattern);
-    showToast(`${newCarrierName.trim().toUpperCase()} added`);
+    const name = newCarrierName.trim();
+    if (!name) return;
+    // Prefixes are added on the carrier's own row; an existing carrier keeps its own.
+    const existing = carriers.find((c) => c.name.toLowerCase() === name.toLowerCase());
+    saveCarrier(existing?.name || name, existing?.pattern || null);
+    showToast(`${name.toUpperCase()} ${existing ? 'is already in the list' : 'added'}`);
     setNewCarrierName('');
-    setNewCarrierPattern('');
   };
 
   return (
@@ -262,14 +308,13 @@ export default function Settings() {
       <Section title="Carriers" summary={`${carriers.length} carrier${carriers.length === 1 ? '' : 's'}`}>
         <div className="text-[11px] leading-snug text-secondary">
           Add a required tracking-code prefix to catch a wrong scan before it's added — e.g. UPS codes always
-          start with <span className="font-mono font-bold text-ink">1Z</span>. Several prefixes for one carrier:
-          separate them with commas, e.g. <span className="font-mono font-bold text-ink">1Z, 1Y</span>. Leave blank
-          for no restriction.
+          start with <span className="font-mono font-bold text-ink">1Z</span>. Add one prefix at a time with OK; a carrier
+          can have several. No prefixes means no restriction.
           Shared with every device logged into this country.
         </div>
         <div className="flex flex-col gap-1.5">
           {carriers.map((c) => (
-            <CarrierRow key={`${c.name}:${c.pattern || ""}`} carrier={c} onSave={saveCarrier} />
+            <CarrierRow key={c.name} carrier={c} onSave={saveCarrier} />
           ))}
         </div>
         <div className="flex items-center gap-2 border-t border-[rgba(148,163,184,.2)] pt-3">
@@ -278,12 +323,6 @@ export default function Settings() {
             onChange={(e) => setNewCarrierName(e.target.value)}
             placeholder="New carrier name"
             className="min-h-[40px] min-w-0 flex-1 rounded-lg border border-inputborder bg-page px-2.5 text-[12.5px] uppercase text-ink"
-          />
-          <input
-            value={newCarrierPattern}
-            onChange={(e) => setNewCarrierPattern(e.target.value)}
-            placeholder="Prefixes (optional)"
-            className="min-h-[40px] w-[130px] flex-none rounded-lg border border-inputborder bg-page px-2.5 font-mono text-[12px] uppercase text-ink"
           />
           <button
             onClick={addCarrier}
