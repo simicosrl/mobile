@@ -7,12 +7,13 @@
 // live next to these, mirroring AdminReceiving.jsx's applyReceivedUnits.
 
 import { prepFetch } from './prepAuth';
+import { trackingFromBarcode } from './trackingCodes';
 
 const STOCK_ITEM_COLUMNS = 'id,asin,name,sku,fnsku,ean,internal_code,image_url';
 
 /** Uppercase, no spaces — how the Prep-Center compares tracking IDs. */
 export function normalizeTracking(code) {
-  return String(code || '').replace(/\s+/g, '').toUpperCase();
+  return trackingFromBarcode(String(code || '').replace(/\s+/g, ''));
 }
 
 /** Every tracking ID a reception carries, normalized, without duplicates. */

@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { docsGetAll, docPut, docsClearAll, kvGet, kvSet } from '../lib/db';
 import { DEFAULT_ORG_SETTINGS } from '../lib/seed';
 import { DAMAGE_TYPES, carriersForCountry, parsePrefixes, normalizePrefixes } from '../lib/carriers';
+import { trackingFromBarcode } from '../lib/trackingCodes';
 import { hhmm, stamp, docNumber } from '../lib/format';
 import { feedback } from '../lib/audio';
 import * as api from '../lib/api';
@@ -658,7 +659,10 @@ export function AppProvider({ children }) {
   }, [apiConfig.autoPull, manifest.codes, carrier, direction, shipment, resolveShipmentForCode, checkAlreadyNoted]);
 
   const submitScan = useCallback((raw) => {
-    const code = String(raw || '').trim().toUpperCase();
+    // A carrier barcode that isn't the tracking itself (Colissimo) becomes the
+    // tracking before any check, so prefixes, duplicates and the Prep-Center
+    // lookup all see the number on the label.
+    const code = trackingFromBarcode(raw);
     if (!code) return;
     // Cleared on every attempt — a mismatch banner from a previous scan
     // shouldn't linger once the operator has moved on to a new one.
