@@ -14,6 +14,15 @@
 // allowed some slack, as scanners differ in what they pass on.
 const COLISSIMO_SORTING = /^\d{9}(\d[A-Z])(\d{10})\d{3}[0-9A-Z]{0,6}$/;
 
+// Chronopost: the same kind of sorting code, 7 characters ("00" + postcode)
+// before the tracking.
+//   0035350NX010231293336866901P
+//   └ 7 ┘└── NX + 12 digits ─┘└ service "866" + rest
+// The label prints the tracking with a final check letter
+// ("NX01 0231 2933 36 N") that is not in the barcode and whose rule isn't
+// known, so the tracking is taken without it: NX010231293336.
+const CHRONOPOST_SORTING = /^\d{7}([A-Z]{2}\d{12})\d{3}[0-9A-Z]{0,6}$/;
+
 function colissimoCheckDigit(digits) {
   let sum = 0;
   for (let i = 0; i < digits.length; i += 1) {
@@ -26,7 +35,10 @@ function colissimoCheckDigit(digits) {
 export function trackingFromBarcode(raw) {
   const code = String(raw || '').trim().toUpperCase();
   const compact = code.replace(/[\s\x00-\x1f]+/g, '').replace(/^[^0-9A-Z]+/, '');
-  const m = compact.length >= 25 && compact.length <= 31 ? COLISSIMO_SORTING.exec(compact) : null;
+  if (compact.length < 24 || compact.length > 31) return code;
+  const m = COLISSIMO_SORTING.exec(compact);
   if (m) return `${m[1]}${m[2]}${colissimoCheckDigit(m[2])}`;
+  const c = CHRONOPOST_SORTING.exec(compact);
+  if (c) return c[1];
   return code;
 }
