@@ -1,4 +1,5 @@
 import { Component } from 'react';
+import { t } from '../i18n';
 
 // A blank white screen with no visible error is the worst failure mode for
 // an app operators rely on all shift — this boundary turns any render-time
@@ -33,10 +34,10 @@ export default class ErrorBoundary extends Component {
         }}
       >
         <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 16, fontWeight: 800, marginBottom: 10 }}>
-          Something went wrong
+          {t('Something went wrong')}
         </div>
         <div style={{ fontFamily: 'Manrope, sans-serif', fontSize: 12.5, color: '#94A3B8', marginBottom: 14, lineHeight: 1.5 }}>
-          Please screenshot this screen and send it back — it tells us exactly what broke.
+          {t('Please screenshot this screen and send it back — it tells us exactly what broke.')}
         </div>
         <div style={{ background: '#1F242D', borderRadius: 10, padding: 12, marginBottom: 10, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
           {String(error?.stack || error?.message || error)}
@@ -61,7 +62,7 @@ export default class ErrorBoundary extends Component {
             fontSize: 14,
           }}
         >
-          Reload
+          {t('Reload')}
         </button>
       </div>
     );

@@ -1,6 +1,7 @@
 import { useApp } from '../state/AppContext';
 import { COUNTRIES } from '../lib/carriers';
 import { docNumber } from '../lib/format';
+import { t } from '../i18n';
 
 export default function SessionSetup() {
   const app = useApp();
@@ -17,14 +18,14 @@ export default function SessionSetup() {
           className="rounded-full px-2 py-[3px] text-[10px] font-extrabold uppercase tracking-[.1em] text-white"
           style={{ background: isOut ? '#FF7A00' : '#1F6FEB' }}
         >
-          {isOut ? 'Outbound' : 'Inbound'}
+          {isOut ? t('Outbound') : t('Inbound')}
         </div>
-        <div className="text-xs text-secondary">New session · {nextDoc}</div>
+        <div className="text-xs text-secondary">{t('New session')} · {nextDoc}</div>
       </div>
 
       <div>
         <div className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[.06em] text-secondary">
-          Courier {countryName && <span className="normal-case text-light">· {countryName}</span>}
+          {t('Courier')} {countryName && <span className="normal-case text-light">· {t(countryName)}</span>}
         </div>
         <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill,minmax(96px,1fr))' }}>
           {carriers.map((c) => (

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { scanSquare } from '../lib/scanRegion';
+import { t } from '../i18n';
 
 // The viewfinder drawn over the live camera. The square here is the same one
 // useBarcodeScanner judges hits against — both come from scanSquare() — so the
@@ -40,20 +41,20 @@ export default function CameraScanOverlay({ onCancel }) {
         style={{ position: 'absolute', left: 0, right: 0, top: Math.max(8, sq.top - 46) }}
         className="px-6 text-center text-[13px] font-bold text-white drop-shadow"
       >
-        Hold the code inside the square
+        {t('Hold the code inside the square')}
       </div>
       <div
         style={{ position: 'absolute', left: 0, right: 0, top: sq.top + sq.height + 14 }}
         className="px-8 text-center text-[11.5px] leading-[1.5] text-white/75"
       >
-        Only a code inside the square is read — others nearby are ignored.
+        {t('Only a code inside the square is read — others nearby are ignored.')}
       </div>
 
       <button
         onClick={onCancel}
         className="absolute bottom-10 left-1/2 min-h-[52px] w-[170px] -translate-x-1/2 rounded-xl bg-white text-[15px] font-extrabold text-ink"
       >
-        Cancel
+        {t('Cancel')}
       </button>
     </div>,
     document.body

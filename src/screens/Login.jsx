@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useApp } from '../state/AppContext';
+import { t } from '../i18n';
 
 // Operators are Prep-Center staff accounts and sign in with their Prep-Center
 // email and password at the start of every shift (plus their authenticator
@@ -79,7 +80,7 @@ export default function Login() {
   };
 
   const cancel = () => { setStep(null); setError(null); setPassword(''); };
-  const errorLine = error && <div className="text-[13px] font-bold text-white">{REASONS[error] || REASONS.authFailed}</div>;
+  const errorLine = error && <div className="text-[13px] font-bold text-white">{t(REASONS[error] || REASONS.authFailed)}</div>;
 
   return (
     <div
@@ -90,15 +91,15 @@ export default function Login() {
         <div className="flex h-[34px] w-[34px] items-center justify-center rounded-[9px] bg-white text-[15px] font-extrabold text-primary">W</div>
         <div>
           <div className="text-[15px] font-extrabold tracking-[-.01em]">WMS App</div>
-          <div className="text-[9px] uppercase tracking-[.14em] text-white/70">Warehouse scan</div>
+          <div className="text-[9px] uppercase tracking-[.14em] text-white/70">{t('Warehouse scan')}</div>
         </div>
       </div>
 
       {step?.kind === 'mfa' ? (
         <form onSubmit={submitMfa} className="flex flex-col gap-3">
           <div>
-            <div className="text-[20px] font-extrabold leading-[1.25] tracking-[-.02em]">Authenticator code</div>
-            <div className="mt-2 text-[13px] text-white/75">Enter the 6-digit code from your authenticator app, as on the Prep-Center website.</div>
+            <div className="text-[20px] font-extrabold leading-[1.25] tracking-[-.02em]">{t('Authenticator code')}</div>
+            <div className="mt-2 text-[13px] text-white/75">{t('Enter the 6-digit code from your authenticator app, as on the Prep-Center website.')}</div>
           </div>
           <input
             autoFocus inputMode="numeric" autoComplete="one-time-code" maxLength={8}
@@ -107,40 +108,40 @@ export default function Login() {
           />
           {errorLine}
           <button type="submit" disabled={busy || code.length < 6} className={primaryBtn}>
-            {busy ? 'Checking…' : 'Confirm'}
+            {busy ? t('Checking…') : t('Confirm')}
           </button>
-          <button type="button" onClick={cancel} disabled={busy} className={linkBtn}>Cancel</button>
+          <button type="button" onClick={cancel} disabled={busy} className={linkBtn}>{t('Cancel')}</button>
         </form>
       ) : step?.kind === 'country' ? (
         <div className="flex flex-col gap-3">
           <div>
-            <div className="text-[20px] font-extrabold leading-[1.25] tracking-[-.02em]">Which warehouse?</div>
-            <div className="mt-2 text-[13px] text-white/75">Your account covers more than one country. Choose where this shift is.</div>
+            <div className="text-[20px] font-extrabold leading-[1.25] tracking-[-.02em]">{t('Which warehouse?')}</div>
+            <div className="mt-2 text-[13px] text-white/75">{t('Your account covers more than one country. Choose where this shift is.')}</div>
           </div>
           {step.countries.map((c) => (
             <button key={c} onClick={() => follow(prepChooseCountry(step.pending, c))} className={primaryBtn}>
-              {COUNTRY_NAMES[c] || c} · {c}
+              {COUNTRY_NAMES[c] ? t(COUNTRY_NAMES[c]) : c} · {c}
             </button>
           ))}
-          <button type="button" onClick={cancel} className={linkBtn}>Cancel</button>
+          <button type="button" onClick={cancel} className={linkBtn}>{t('Cancel')}</button>
         </div>
       ) : (
         <form onSubmit={submitSignIn} className="flex flex-col gap-3">
           <div>
-            <div className="text-[22px] font-extrabold leading-[1.25] tracking-[-.02em]">Sign in to start the shift</div>
-            <div className="mt-2 text-[13px] text-white/75">Use your Prep-Center email and password.</div>
+            <div className="text-[22px] font-extrabold leading-[1.25] tracking-[-.02em]">{t('Sign in to start the shift')}</div>
+            <div className="mt-2 text-[13px] text-white/75">{t('Use your Prep-Center email and password.')}</div>
           </div>
           <input
             type="email" autoComplete="username" inputMode="email" autoCapitalize="none" spellCheck={false}
-            value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Prep-Center email" className={inputCls}
+            value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t('Prep-Center email')} className={inputCls}
           />
           <input
             type="password" autoComplete="current-password" autoFocus={!!lastEmail}
-            value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" className={inputCls}
+            value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t('Password')} className={inputCls}
           />
           {errorLine}
           <button type="submit" disabled={busy || !email.trim() || !password} className={primaryBtn}>
-            {busy ? 'Signing in…' : 'Sign in'}
+            {busy ? t('Signing in…') : t('Sign in')}
           </button>
         </form>
       )}

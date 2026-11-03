@@ -4,6 +4,7 @@ import { useReceiving } from '../state/ReceivingContext';
 import { ArrowDownToLine, Truck, ChevronRight, Download, X, PackageCheck, Search } from '../components/icons';
 import { hhmm } from '../lib/format';
 import { RECEIVING_ENABLED } from '../lib/features';
+import { t } from '../i18n';
 
 export default function Home() {
   const { shift, startSession, history, endShift, updateInfo, updateDismissed, dismissUpdate, downloadUpdate, setScreen } = useApp();
@@ -13,8 +14,10 @@ export default function Home() {
   // the next time they sign in on this phone.
   const confirmEndShift = () => {
     if (pendingCount > 0 && !window.confirm(
-      `${pendingCount} product count${pendingCount === 1 ? ' is' : 's are'} not saved on the Prep-Center yet. `
-      + 'They will be sent the next time you sign in on this phone. End the shift anyway?',
+      (pendingCount === 1
+        ? t('{n} product count is not saved on the Prep-Center yet.', { n: pendingCount })
+        : t('{n} product counts are not saved on the Prep-Center yet.', { n: pendingCount }))
+      + ' ' + t('They will be sent the next time you sign in on this phone. End the shift anyway?'),
     )) return;
     endShift();
   };
@@ -35,13 +38,13 @@ export default function Home() {
       {updateInfo?.available && !updateDismissed && (
         <div className="flex items-center gap-2.5 rounded-2xl border border-[rgba(31,111,235,.3)] bg-[rgba(31,111,235,.07)] p-3.5">
           <div className="min-w-0 flex-1">
-            <div className="text-[13px] font-extrabold text-primary">Update available — v{updateInfo.versionName}</div>
-            <div className="mt-0.5 text-[11px] leading-snug text-secondary">Downloads via your browser; open the file afterwards to install.</div>
+            <div className="text-[13px] font-extrabold text-primary">{t('Update available — v{version}', { version: updateInfo.versionName })}</div>
+            <div className="mt-0.5 text-[11px] leading-snug text-secondary">{t('Downloads via your browser; open the file afterwards to install.')}</div>
           </div>
           <button onClick={downloadUpdate} className="flex h-9 flex-none items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-bold text-white">
-            <Download size={14} strokeWidth={2.2} /> Get it
+            <Download size={14} strokeWidth={2.2} /> {t('Get it')}
           </button>
-          <button onClick={dismissUpdate} aria-label="Dismiss" className="flex h-9 w-9 flex-none items-center justify-center rounded-lg text-secondary">
+          <button onClick={dismissUpdate} aria-label={t('Dismiss')} className="flex h-9 w-9 flex-none items-center justify-center rounded-lg text-secondary">
             <X size={15} strokeWidth={2.2} />
           </button>
         </div>
@@ -49,10 +52,10 @@ export default function Home() {
       <div className="rounded-2xl border border-[rgba(148,163,184,.25)] bg-white p-3.5 shadow-card">
         <div className="flex items-center justify-between gap-2.5">
           <div>
-            <div className="text-[10px] font-bold uppercase tracking-[.1em] text-light">On shift</div>
+            <div className="text-[10px] font-bold uppercase tracking-[.1em] text-light">{t('On shift')}</div>
             <div className="mt-0.5 text-[16px] font-extrabold tracking-[-.015em]">{shift?.operatorName}</div>
             <div className="font-mono text-[11px] text-secondary">
-              {shift?.prep?.email || shift?.badgeId} · since {shift ? hhmm(new Date(shift.startedAt)) : ''}
+              {shift?.prep?.email || shift?.badgeId} · {t('since')} {shift ? hhmm(new Date(shift.startedAt)) : ''}
             </div>
           </div>
           <div className="h-[9px] w-[9px] rounded-full bg-success" style={{ boxShadow: '0 0 0 4px rgba(22,163,74,.15)' }} />
@@ -69,8 +72,8 @@ export default function Home() {
             <ArrowDownToLine size={26} strokeWidth={1.8} />
           </div>
           <div className="min-w-0">
-            <div className="text-[18px] font-extrabold tracking-[-.02em]">Inbound</div>
-            <div className="text-xs leading-snug text-secondary">Receive parcels from a courier</div>
+            <div className="text-[18px] font-extrabold tracking-[-.02em]">{t('Inbound')}</div>
+            <div className="text-xs leading-snug text-secondary">{t('Receive parcels from a courier')}</div>
           </div>
           <ChevronRight size={18} strokeWidth={2.2} className="ml-auto flex-none text-light" />
         </button>
@@ -84,8 +87,8 @@ export default function Home() {
             <Truck size={26} strokeWidth={1.8} />
           </div>
           <div className="min-w-0">
-            <div className="text-[18px] font-extrabold tracking-[-.02em]">Outbound</div>
-            <div className="text-xs leading-snug text-secondary">Hand parcels over for pickup</div>
+            <div className="text-[18px] font-extrabold tracking-[-.02em]">{t('Outbound')}</div>
+            <div className="text-xs leading-snug text-secondary">{t('Hand parcels over for pickup')}</div>
           </div>
           <ChevronRight size={18} strokeWidth={2.2} className="ml-auto flex-none text-light" />
         </button>
@@ -102,8 +105,8 @@ export default function Home() {
               <PackageCheck size={26} strokeWidth={1.8} />
             </div>
             <div className="min-w-0">
-              <div className="text-[18px] font-extrabold tracking-[-.02em]">Receiving</div>
-              <div className="text-xs leading-snug text-secondary">Receive a client's goods into stock</div>
+              <div className="text-[18px] font-extrabold tracking-[-.02em]">{t('Receiving')}</div>
+              <div className="text-xs leading-snug text-secondary">{t("Receive a client's goods into stock")}</div>
             </div>
             <ChevronRight size={18} strokeWidth={2.2} className="ml-auto flex-none text-light" />
           </button>
@@ -118,8 +121,8 @@ export default function Home() {
               <Search size={25} strokeWidth={1.9} />
             </div>
             <div className="min-w-0">
-              <div className="text-[18px] font-extrabold tracking-[-.02em]">Stock check</div>
-              <div className="text-xs leading-snug text-secondary">Whose a product is, what is on a shelf, moves</div>
+              <div className="text-[18px] font-extrabold tracking-[-.02em]">{t('Stock check')}</div>
+              <div className="text-xs leading-snug text-secondary">{t('Whose a product is, what is on a shelf, moves')}</div>
             </div>
             <ChevronRight size={18} strokeWidth={2.2} className="ml-auto flex-none text-light" />
           </button>
@@ -127,25 +130,25 @@ export default function Home() {
       </div>
 
       <div>
-        <div className="mb-2 text-[10px] font-bold uppercase tracking-[.1em] text-light">Today</div>
+        <div className="mb-2 text-[10px] font-bold uppercase tracking-[.1em] text-light">{t('Today')}</div>
         <div className="grid grid-cols-3 gap-2.5">
           <div className="rounded-xl border border-[rgba(148,163,184,.25)] bg-white p-[11px_10px]">
             <div className="text-[22px] font-extrabold tracking-[-.03em] text-primary">{today.in}</div>
-            <div className="text-[10px] leading-tight text-secondary">boxes in</div>
+            <div className="text-[10px] leading-tight text-secondary">{t('boxes in')}</div>
           </div>
           <div className="rounded-xl border border-[rgba(148,163,184,.25)] bg-white p-[11px_10px]">
             <div className="text-[22px] font-extrabold tracking-[-.03em] text-accent">{today.out}</div>
-            <div className="text-[10px] leading-tight text-secondary">boxes out</div>
+            <div className="text-[10px] leading-tight text-secondary">{t('boxes out')}</div>
           </div>
           <div className="rounded-xl border border-[rgba(148,163,184,.25)] bg-white p-[11px_10px]">
             <div className="text-[22px] font-extrabold tracking-[-.03em] text-danger">{today.damaged}</div>
-            <div className="text-[10px] leading-tight text-secondary">damaged</div>
+            <div className="text-[10px] leading-tight text-secondary">{t('damaged')}</div>
           </div>
         </div>
       </div>
 
       <button onClick={confirmEndShift} className="mt-1 self-center text-[11.5px] font-bold text-secondary underline underline-offset-2">
-        End shift
+        {t('End shift')}
       </button>
     </div>
   );

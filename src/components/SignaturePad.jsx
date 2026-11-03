@@ -1,4 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
+import { t } from '../i18n';
 
 const HEIGHT = 180;
 
@@ -108,7 +109,7 @@ const SignaturePad = forwardRef(function SignaturePad({ onChange, hasInk }, ref)
       />
       {!hasInk && (
         <div className="pointer-events-none absolute inset-x-0 bottom-4 text-center text-[11px] text-light">
-          sign inside the box
+          {t('sign inside the box')}
         </div>
       )}
     </div>

@@ -3,6 +3,7 @@ import { useApp } from '../state/AppContext';
 import { docNumber } from '../lib/format';
 import SignaturePad from '../components/SignaturePad';
 import { ArrowRight } from '../components/icons';
+import { t } from '../i18n';
 
 export default function Signature() {
   const app = useApp();
@@ -33,21 +34,21 @@ export default function Signature() {
       <div className="rounded-[14px] border border-[rgba(148,163,184,.25)] bg-white p-[12px_13px]">
         <div className="flex items-center gap-2">
           <div className="rounded-full px-2 py-[3px] text-[10px] font-extrabold uppercase tracking-[.1em] text-white" style={{ background: isOut ? '#FF7A00' : '#1F6FEB' }}>
-            {isOut ? 'Outbound' : 'Inbound'}
+            {isOut ? t('Outbound') : t('Inbound')}
           </div>
           <div className="font-mono text-[11px] text-secondary">{nextDoc}</div>
         </div>
-        <div className="mt-2 text-sm font-bold">{parcels.length} parcels / {boxes} boxes · {carrier}</div>
+        <div className="mt-2 text-sm font-bold">{t('{parcels} parcels / {boxes} boxes', { parcels: parcels.length, boxes })} · {carrier}</div>
       </div>
 
       <div className="relative">
-        <div className="mb-[7px] text-[11px] font-bold uppercase tracking-[.06em] text-secondary">Driver name</div>
+        <div className="mb-[7px] text-[11px] font-bold uppercase tracking-[.06em] text-secondary">{t('Driver name')}</div>
         <input
           value={courierName}
           onChange={(e) => setCourierName(e.target.value)}
           onFocus={() => setShowSuggestions(true)}
           onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
-          placeholder="Full name, printed"
+          placeholder={t('Full name, printed')}
           className="min-h-[50px] w-full rounded-xl border border-inputborder bg-page px-4 text-[15px] text-ink"
         />
         {showSuggestions && nameMatches.length > 0 && (
@@ -69,16 +70,16 @@ export default function Signature() {
       </div>
       <div className="flex gap-2.5">
         <div className="flex-1">
-          <div className="mb-[7px] text-[11px] font-bold uppercase tracking-[.06em] text-secondary">Company</div>
+          <div className="mb-[7px] text-[11px] font-bold uppercase tracking-[.06em] text-secondary">{t('Company')}</div>
           <input
             value={courierCompany}
             onChange={(e) => setCourierCompany(e.target.value)}
-            placeholder="Carrier company"
+            placeholder={t('Carrier company')}
             className="min-h-[50px] w-full rounded-xl border border-inputborder bg-page px-3 text-[13px] text-ink"
           />
         </div>
         <div className="w-[118px] flex-none">
-          <div className="mb-[7px] text-[11px] font-bold uppercase tracking-[.06em] text-secondary">Plate</div>
+          <div className="mb-[7px] text-[11px] font-bold uppercase tracking-[.06em] text-secondary">{t('Plate')}</div>
           <input
             value={plate}
             onChange={(e) => setPlate(e.target.value)}
@@ -90,9 +91,9 @@ export default function Signature() {
 
       <div>
         <div className="mb-[7px] flex items-center gap-2">
-          <div className="text-[11px] font-bold uppercase tracking-[.06em] text-secondary">Signature</div>
+          <div className="text-[11px] font-bold uppercase tracking-[.06em] text-secondary">{t('Signature')}</div>
           <button onClick={() => { padRef.current?.clear(); clearSignature(); }} className="ml-auto p-1 text-[11px] font-bold text-primary">
-            Clear
+            {t('Clear')}
           </button>
         </div>
         <SignaturePad ref={padRef} onChange={onSigChange} hasInk={sigInk} />
@@ -108,7 +109,7 @@ export default function Signature() {
         data-testid="confirm-handover"
         className={'flex min-h-[56px] w-full items-center justify-center gap-2.5 rounded-xl text-[15px] font-extrabold text-white ' + (signReady && !finishing ? 'cursor-pointer bg-primary' : 'cursor-not-allowed bg-disabled')}
       >
-        {finishing ? 'Closing…' : <>Confirm handover <ArrowRight size={17} strokeWidth={2.2} /></>}
+        {finishing ? t('Closing…') : <>{t('Confirm handover')} <ArrowRight size={17} strokeWidth={2.2} /></>}
       </button>
     </div>
   );

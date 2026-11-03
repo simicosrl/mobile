@@ -2,6 +2,7 @@ import { useApp } from '../state/AppContext';
 import { useReceiving } from '../state/ReceivingContext';
 import { RECEIVING_ENABLED } from '../lib/features';
 import { Check, Printer, FileText, Mail, PackageCheck } from '../components/icons';
+import { t } from '../i18n';
 
 export default function Confirmation() {
   const { confirmedDoc, printDocument, printDdt, emailDocument, openSession, shift } = useApp();
@@ -19,17 +20,17 @@ export default function Confirmation() {
           <Check size={32} strokeWidth={2.6} className="text-success" />
         </div>
         <div>
-          <div className="text-[20px] font-extrabold tracking-[-.02em]">Handover recorded</div>
+          <div className="text-[20px] font-extrabold tracking-[-.02em]">{t('Handover recorded')}</div>
           <div className="mt-1 font-mono text-[13px] font-bold text-primary">{confirmedDoc.doc}</div>
           <div className="mt-0.5 text-xs text-secondary">{confirmedDoc.docTime}</div>
         </div>
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-[rgba(148,163,184,.25)] bg-white">
-        <Row label="Direction" value={confirmedDoc.direction === 'out' ? 'Outbound' : 'Inbound'} />
-        <Row label="Parcels / boxes" value={`${confirmedDoc.parcels.length} parcels / ${boxes} boxes`} />
-        <Row label="Driver" value={confirmedDoc.driverName} />
-        <Row label="Damaged" value={dmgCount === 0 ? 'none' : `${dmgCount} parcel${dmgCount > 1 ? 's' : ''}`} valueColor={dmgCount ? '#DC2626' : '#16A34A'} last />
+        <Row label={t('Direction')} value={confirmedDoc.direction === 'out' ? t('Outbound') : t('Inbound')} />
+        <Row label={t('Parcels / boxes')} value={t('{parcels} parcels / {boxes} boxes', { parcels: confirmedDoc.parcels.length, boxes })} />
+        <Row label={t('Driver')} value={confirmedDoc.driverName} />
+        <Row label={t('Damaged')} value={dmgCount === 0 ? t('none') : dmgCount > 1 ? t('{n} parcels', { n: dmgCount }) : t('{n} parcel', { n: dmgCount })} valueColor={dmgCount ? '#DC2626' : '#16A34A'} last />
       </div>
 
       {/* Two different reasons a parcel is on no DDT, and they call for opposite
@@ -48,7 +49,9 @@ export default function Confirmation() {
         return (
           <div className="rounded-2xl border border-[rgba(220,38,38,.35)] bg-[rgba(220,38,38,.06)] px-[13px] py-3">
             <div className="text-[12px] font-bold text-danger">
-              {detail.length} parcel{detail.length > 1 ? 's' : ''} on no delivery note
+              {detail.length > 1
+                ? t('{n} parcels on no delivery note', { n: detail.length })
+                : t('{n} parcel on no delivery note', { n: detail.length })}
             </div>
             {/* Already on someone else's note. Not an error to chase — the
                 document exists and the goods left; what matters is that the
@@ -57,8 +60,9 @@ export default function Confirmation() {
             {noted.length > 0 && (
               <>
                 <div className="mt-1.5 text-[11px] leading-[1.5] text-secondary">
-                  {noted.length > 1 ? 'These parcels have' : 'This parcel has'} already shipped on an earlier
-                  delivery note, so {noted.length > 1 ? 'they were' : 'it was'} not put on a second one:
+                  {noted.length > 1
+                    ? t('These parcels have already shipped on an earlier delivery note, so they were not put on a second one:')
+                    : t('This parcel has already shipped on an earlier delivery note, so it was not put on a second one:')}
                 </div>
                 {noted.map((d) => (
                   <div key={d.code} className="mt-1 font-mono text-[11px] text-ink">
@@ -70,7 +74,9 @@ export default function Confirmation() {
             {unknown.length > 0 && (
               <>
                 <div className="mt-1.5 text-[11px] leading-[1.5] text-secondary">
-                  The Prep-Center answered, and does not recognise {unknown.length > 1 ? 'these tracking IDs' : 'this tracking ID'}:
+                  {unknown.length > 1
+                    ? t('The Prep-Center answered, and does not recognise these tracking IDs:')
+                    : t('The Prep-Center answered, and does not recognise this tracking ID:')}
                 </div>
                 <div className="mt-1 font-mono text-[11px] text-ink">{unknown.map((d) => d.code).join(', ')}</div>
                 {/* One unrecognised label is a label to go and check. Every
@@ -81,9 +87,7 @@ export default function Confirmation() {
                     would waste the time the driver is standing there. */}
                 {unknown.length === detail.length && unknown.length > 2 && (
                   <div className="mt-1.5 text-[10.5px] leading-[1.45] text-light">
-                    Not one parcel in this session was recognised, so this is far more likely
-                    to be the Prep-Center than the labels. Type the shipping reference on the
-                    scan screen and the delivery notes are issued from that.
+                    {t('Not one parcel in this session was recognised, so this is far more likely to be the Prep-Center than the labels. Type the shipping reference on the scan screen and the delivery notes are issued from that.')}
                   </div>
                 )}
               </>
@@ -91,9 +95,9 @@ export default function Confirmation() {
             {unchecked.length > 0 && (
               <>
                 <div className="mt-2 text-[11px] leading-[1.5] text-secondary">
-                  {unchecked.length > 1 ? 'These could not be checked' : 'This one could not be checked'} at
-                  all — nothing is wrong with the {unchecked.length > 1 ? 'parcels' : 'parcel'}. Sync now will
-                  issue the {unchecked.length > 1 ? 'documents' : 'document'} once the Prep-Center answers:
+                  {unchecked.length > 1
+                    ? t('These could not be checked at all — nothing is wrong with the parcels. Sync now will issue the documents once the Prep-Center answers:')
+                    : t('This one could not be checked at all — nothing is wrong with the parcel. Sync now will issue the document once the Prep-Center answers:')}
                 </div>
                 <div className="mt-1 font-mono text-[11px] text-ink">{unchecked.map((d) => d.code).join(', ')}</div>
                 {reason && <div className="mt-1.5 text-[10.5px] leading-[1.45] text-light">{reason}</div>}
@@ -110,7 +114,7 @@ export default function Confirmation() {
       {(confirmedDoc.ddts || []).length > 0 && (
         <div className="overflow-hidden rounded-2xl border border-[rgba(148,163,184,.25)] bg-white">
           <div className="border-b border-[rgba(148,163,184,.25)] bg-page px-[13px] py-2.5 text-[10px] font-bold uppercase tracking-[.08em] text-secondary">
-            Delivery notes ({confirmedDoc.ddts.length})
+            {t('Delivery notes ({n})', { n: confirmedDoc.ddts.length })}
           </div>
           {confirmedDoc.ddts.map((d) => (
             <button
@@ -122,7 +126,7 @@ export default function Confirmation() {
               <div className="min-w-0 flex-1">
                 <div className="truncate font-mono text-[12px] font-bold text-ink">{d.number}</div>
                 <div className="truncate text-[11px] text-secondary">
-                  {d.fbaId || d.shipmentId} · {d.parcels.length} box{d.parcels.length > 1 ? 'es' : ''}
+                  {d.fbaId || d.shipmentId} · {d.parcels.length > 1 ? t('{n} boxes', { n: d.parcels.length }) : t('{n} box', { n: d.parcels.length })}
                 </div>
               </div>
             </button>
@@ -133,20 +137,20 @@ export default function Confirmation() {
       <div className="flex flex-col gap-2.5">
         {canReceive && (
           <button
-            onClick={() => lookupHandover(confirmedDoc.parcels.map((p) => p.code), `${confirmedDoc.parcels.length} parcel${confirmedDoc.parcels.length === 1 ? '' : 's'} · ${confirmedDoc.doc}`)}
+            onClick={() => lookupHandover(confirmedDoc.parcels.map((p) => p.code), `${confirmedDoc.parcels.length === 1 ? t('{n} parcel', { n: 1 }) : t('{n} parcels', { n: confirmedDoc.parcels.length })} · ${confirmedDoc.doc}`)}
             className="flex min-h-[54px] w-full items-center justify-center gap-2.5 rounded-xl bg-success text-[15px] font-extrabold text-white"
           >
-            <PackageCheck size={19} strokeWidth={2} /> Receive these parcels into stock
+            <PackageCheck size={19} strokeWidth={2} /> {t('Receive these parcels into stock')}
           </button>
         )}
         <button onClick={() => printDocument(confirmedDoc)} className="flex min-h-[54px] w-full items-center justify-center gap-2.5 rounded-xl bg-primary text-[15px] font-extrabold text-white">
-          <Printer size={18} strokeWidth={2} /> Print A4 document
+          <Printer size={18} strokeWidth={2} /> {t('Print A4 document')}
         </button>
         <button onClick={() => openSession(confirmedDoc.doc)} className="flex min-h-[52px] w-full items-center justify-center gap-2.5 rounded-xl border border-[rgba(148,163,184,.4)] bg-white text-sm font-bold text-ink">
-          <FileText size={17} strokeWidth={2} /> View document
+          <FileText size={17} strokeWidth={2} /> {t('View document')}
         </button>
         <button onClick={() => emailDocument(confirmedDoc)} className="flex min-h-[52px] w-full items-center justify-center gap-2.5 rounded-xl border border-[rgba(148,163,184,.4)] bg-white text-sm font-bold text-ink">
-          <Mail size={17} strokeWidth={2} /> Email PDF
+          <Mail size={17} strokeWidth={2} /> {t('Email PDF')}
         </button>
       </div>
     </div>

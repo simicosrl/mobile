@@ -1,6 +1,7 @@
 import { useApp } from '../state/AppContext';
 import { useKeyboardOpen } from '../hooks/useKeyboardOpen';
 import { House, ArrowDownToLine, Truck, FileText } from './icons';
+import { t } from '../i18n';
 
 function Tab({ active, label, Icon, onClick }) {
   return (
@@ -27,9 +28,9 @@ export default function BottomNav() {
   const openDir = screen === 'session' ? history.find((h) => h.doc === selectedDocNo)?.direction : null;
   return (
     <div className="flex border-t border-[rgba(148,163,184,.25)] bg-white safe-bottom">
-      <Tab active={['home', 'setup', 'scan', 'sign', 'confirm', 'recvStart', 'recvOrder', 'stockCheck'].includes(screen)} label="Home" Icon={House} onClick={goHome} />
-      <Tab active={screen === 'inbound' || openDir === 'in'} label="Inbound" Icon={ArrowDownToLine} onClick={goToInboundTab} />
-      <Tab active={screen === 'outbound' || openDir === 'out'} label="Outbound" Icon={Truck} onClick={goToOutboundTab} />
+      <Tab active={['home', 'setup', 'scan', 'sign', 'confirm', 'recvStart', 'recvOrder', 'stockCheck'].includes(screen)} label={t('Home')} Icon={House} onClick={goHome} />
+      <Tab active={screen === 'inbound' || openDir === 'in'} label={t('Inbound')} Icon={ArrowDownToLine} onClick={goToInboundTab} />
+      <Tab active={screen === 'outbound' || openDir === 'out'} label={t('Outbound')} Icon={Truck} onClick={goToOutboundTab} />
       <Tab active={screen === 'ddts'} label="DDT" Icon={FileText} onClick={goToDdtTab} />
     </div>
   );
