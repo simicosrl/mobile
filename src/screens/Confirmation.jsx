@@ -27,7 +27,7 @@ export default function Confirmation() {
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-[rgba(148,163,184,.25)] bg-white">
-        <Row label={t('Direction')} value={confirmedDoc.direction === 'out' ? t('Outbound') : t('Inbound')} />
+        <Row label={t('Direction')} value={confirmedDoc.direction === 'out' ? t('Outbound|direction') : t('Inbound|direction')} />
         <Row label={t('Parcels / boxes')} value={t('{parcels} parcels / {boxes} boxes', { parcels: confirmedDoc.parcels.length, boxes })} />
         <Row label={t('Driver')} value={confirmedDoc.driverName} />
         <Row label={t('Damaged')} value={dmgCount === 0 ? t('none') : dmgCount > 1 ? t('{n} parcels', { n: dmgCount }) : t('{n} parcel', { n: dmgCount })} valueColor={dmgCount ? '#DC2626' : '#16A34A'} last />

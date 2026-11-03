@@ -3,7 +3,7 @@ import { docsGetAll, docPut, docsClearAll, kvGet, kvSet } from '../lib/db';
 import { DEFAULT_ORG_SETTINGS } from '../lib/seed';
 import { DAMAGE_TYPES, carriersForCountry, parsePrefixes, normalizePrefixes } from '../lib/carriers';
 import { trackingFromBarcode } from '../lib/trackingCodes';
-import { setLanguage as setI18nLanguage, defaultLanguage } from '../i18n';
+import { setLanguage as setI18nLanguage, defaultLanguage, t } from '../i18n';
 import { hhmm, stamp, docNumber } from '../lib/format';
 import { feedback } from '../lib/audio';
 import * as api from '../lib/api';
@@ -470,7 +470,7 @@ export function AppProvider({ children }) {
       return;
     }
     if (sessionOpen && direction !== dir) {
-      showToast(`Finish the open ${direction === 'in' ? 'inbound' : 'outbound'} session first`);
+      showToast(direction === 'in' ? t('Finish the open inbound session first') : t('Finish the open outbound session first'));
       return;
     }
     setDirection(dir);
@@ -684,9 +684,12 @@ export function AppProvider({ children }) {
     if (prefixes.length && !prefixes.some((pre) => code.startsWith(pre))) {
       feedback(true);
       setFlash('bad');
+      // `reason` stays English: it is prefilled into the stored no-code note.
+      // `prefixes` lets the screen say the same thing in the operator's language.
       const reason = `must start with ${prefixes.map((pre) => `"${pre}"`).join(' or ')}`;
-      showToast(`Invalid code for ${carrier} — ${reason}`);
-      setRejectedScan({ code, reason });
+      const shown = prefixes.map((pre) => `"${pre}"`).join(` ${t('or')} `);
+      showToast(t('Invalid code for {carrier} — must start with {prefixes}', { carrier, prefixes: shown }));
+      setRejectedScan({ code, reason, prefixes });
       return;
     }
     const dup = parcels.find((p) => p.code === code);
@@ -725,7 +728,7 @@ export function AppProvider({ children }) {
   }, []);
   const removeLast = useCallback(() => {
     if (!parcels.length) return;
-    showToast('Last scan removed');
+    showToast(t('Last scan removed'));
     setParcels((arr) => arr.slice(0, -1));
   }, [parcels.length, showToast]);
   // Removes any single parcel from the session list, not just the last
@@ -733,12 +736,12 @@ export function AppProvider({ children }) {
   // merged into "+1 box" elsewhere), so the code is a safe key to delete by.
   const removeParcel = useCallback((code) => {
     setParcels((arr) => arr.filter((p) => p.code !== code));
-    showToast(`${code} removed`);
+    showToast(t('{code} removed', { code }));
   }, [showToast]);
 
   // ---- damage sheet ----
   const openDamage = useCallback(() => {
-    if (!parcels.length) { showToast('Scan a parcel first'); return; }
+    if (!parcels.length) { showToast(t('Scan a parcel first')); return; }
     setDamageSheet({ open: true, picks: [], note: '', photoDataUrl: null });
   }, [parcels.length, showToast]);
   const closeDamage = useCallback(() => setDamageSheet((d) => ({ ...d, open: false })), []);
@@ -749,7 +752,7 @@ export function AppProvider({ children }) {
   const setDamagePhoto = useCallback((dataUrl) => setDamageSheet((d) => ({ ...d, photoDataUrl: dataUrl })), []);
   const saveDamage = useCallback(() => {
     if (!damageSheet.picks.length || !damageSheet.photoDataUrl) {
-      showToast('Pick a damage type and take a photo');
+      showToast(t('Pick a damage type and take a photo'));
       return;
     }
     const label = damageSheet.picks.join(', ') + (damageSheet.note ? ' — ' + damageSheet.note : '');
@@ -770,7 +773,7 @@ export function AppProvider({ children }) {
         photo: damageSheet.photoDataUrl,
         recorded_at: new Date().toISOString(),
       }).then((res) => {
-        if (!res.ok) showToast(`Damage push failed for ${trackingCode} — will still go out with the session`);
+        if (!res.ok) showToast(t('Damage push failed for {code} — will still go out with the session', { code: trackingCode }));
       });
     }
   }, [damageSheet, docSeq, direction, parcels, internalConfig, showToast]);
@@ -792,7 +795,7 @@ export function AppProvider({ children }) {
   const setNoCodeNote = useCallback((note) => setNoCodeSheet((s) => ({ ...s, note })), []);
   const setNoCodePhoto = useCallback((dataUrl) => setNoCodeSheet((s) => ({ ...s, photoDataUrl: dataUrl })), []);
   const saveNoCode = useCallback(() => {
-    if (!noCodeSheet.photoDataUrl) { showToast('Take a photo first'); return; }
+    if (!noCodeSheet.photoDataUrl) { showToast(t('Take a photo first')); return; }
     // A placeholder unique within this session — NOCODE-1, NOCODE-2, … —
     // so it still has a "code" to key off everywhere the rest of the app
     // (dedup, the parcel list, the printed document) expects one.
@@ -807,12 +810,12 @@ export function AppProvider({ children }) {
     setTimeout(() => setFlash((f) => (f === 'ok' ? null : f)), 700);
     setRejectedScan(null);
     setNoCodeSheet({ open: false, note: '', photoDataUrl: null });
-    showToast(`${code} logged with photo — flag it for the office`);
+    showToast(t('{code} logged with photo — flag it for the office', { code }));
   }, [noCodeSheet, parcels, carrier, docSeq, direction, showToast]);
 
   // ---- signature ----
   const toSign = useCallback(() => {
-    if (!parcels.length) { showToast('Nothing scanned yet'); return; }
+    if (!parcels.length) { showToast(t('Nothing scanned yet')); return; }
     setScreen('sign');
   }, [parcels.length, showToast]);
   const clearSignature = useCallback(() => { setSignatureDataUrl(null); setSigInk(false); }, []);
@@ -1210,15 +1213,15 @@ export function AppProvider({ children }) {
       const res = await api.pushSession(internalConfig, { ...updated, pdfDataUrl });
       const syncError = res.ok ? null : api.describeError(res);
       updated = { ...updated, syncStatus: res.ok ? 'ok' : 'failed', syncError };
-      toastParts.push(res.ok ? `${doc} saved` : `${doc} failed to save — ${syncError}`);
+      toastParts.push(res.ok ? t('{doc} saved', { doc }) : t('{doc} failed to save — {error}', { doc, error: syncError }));
       // The DDTs hang off the saved session, so they can only go after it.
       if (res.ok && ddts.length) {
         const ddtRes = await api.pushDdts(internalConfig, doc, ddts);
         updated = { ...updated, ddtSyncStatus: ddtRes.ok ? 'ok' : 'failed', ddtSyncError: ddtRes.ok ? null : ddtRes.error };
         toastParts.push(
           ddtRes.ok
-            ? `${ddts.length} DDT${ddts.length > 1 ? 's' : ''} saved`
-            : `DDT save failed — ${ddtRes.error}`,
+            ? (ddts.length > 1 ? t('{n} DDTs saved', { n: ddts.length }) : t('{n} DDT saved', { n: ddts.length }))
+            : t('DDT save failed — {error}', { error: ddtRes.error }),
         );
       } else if (ddts.length) {
         updated = { ...updated, ddtSyncStatus: 'pending', ddtSyncError: null };
@@ -1228,7 +1231,9 @@ export function AppProvider({ children }) {
     // legally never left, and the operator is the only one who can still fix it
     // while the driver is at the bay.
     if (excluded.length) {
-      toastParts.push(`${excluded.length} parcel${excluded.length > 1 ? 's' : ''} not on any DDT — no shipment found`);
+      toastParts.push(excluded.length > 1
+        ? t('{n} parcels not on any DDT — no shipment found', { n: excluded.length })
+        : t('{n} parcel not on any DDT — no shipment found', { n: excluded.length }));
     }
     // Separate, optional: also push to the Prep-Center connection from the
     // API screen, if one is configured and enabled. If it isn't, this
@@ -1238,7 +1243,7 @@ export function AppProvider({ children }) {
       const res = await api.pushSession(apiConfig, { ...updated, pdfDataUrl });
       const prepSyncError = res.ok ? null : api.describeError(res);
       updated = { ...updated, prepSyncStatus: res.ok ? 'ok' : 'failed', prepSyncError };
-      toastParts.push(res.ok ? 'sent to Prep-Center' : `Prep-Center failed — ${prepSyncError}`);
+      toastParts.push(res.ok ? t('sent to Prep-Center') : t('Prep-Center failed — {error}', { error: prepSyncError }));
     }
     await docPut(updated);
     setHistory((h) => h.map((d) => (d.doc === doc && d.country === document.country ? { ...d, ...updated } : d)));
@@ -1248,7 +1253,7 @@ export function AppProvider({ children }) {
 
   // The guarded entry point. Every caller uses this one, never `closeSession`.
   const finish = useCallback(async () => {
-    if (!signReady) { showToast('Name and signature are required'); return; }
+    if (!signReady) { showToast(t('Name and signature are required')); return; }
     // Checked and set in the same synchronous step, before the first `await`,
     // so there is no window for a second tap to slip through.
     if (finishingRef.current) return;
@@ -1294,12 +1299,12 @@ export function AppProvider({ children }) {
       if (!dataUrl && internalConfig) {
         const res = await api.fetchArchivedPdf(internalConfig, ddt.number, 'ddt');
         if (res.ok) dataUrl = res.dataUrl;
-        else throw new Error(res.error || 'not stored');
+        else throw new Error(res.error || t('not stored'));
       }
-      if (!dataUrl) throw new Error('no connection to fetch it from');
+      if (!dataUrl) throw new Error(t('no connection to fetch it from'));
       await mod.exportPdfDataUrl(dataUrl, { doc: ddt.number });
     } catch (err) {
-      showToast(`Could not open ${ddt.number} — ${String(err?.message || err)}`);
+      showToast(t('Could not open {doc} — {error}', { doc: ddt.number, error: String(err?.message || err) }));
     }
   }, [orgSettings, showToast, internalConfig]);
 
@@ -1319,11 +1324,11 @@ export function AppProvider({ children }) {
       }
       await mod.exportHandoverPdf(document, orgSettings);
     } catch (err) {
-      showToast('Could not generate the PDF: ' + (err?.message || err));
+      showToast(t('Could not generate the PDF: {error}', { error: err?.message || err }));
     }
   }, [showToast, orgSettings, apiConfig]);
   const emailDocument = useCallback(async (document) => {
-    showToast('Choose your mail app from the share sheet');
+    showToast(t('Choose your mail app from the share sheet'));
     await printDocument(document);
   }, [printDocument, showToast]);
 
@@ -1357,7 +1362,7 @@ export function AppProvider({ children }) {
     const key = `whs_${hex}`;
     setApiConfig((c) => ({ ...c, apiKey: key, keySecured: false }));
     setApiShowKey(true);
-    showToast('New key generated — copy it now, then it will be hidden for security');
+    showToast(t('New key generated — copy it now, then it will be hidden for security'));
     return key;
   }, [showToast]);
   // One-time reveal: once the freshly generated (or currently shown) key
@@ -1367,9 +1372,9 @@ export function AppProvider({ children }) {
   const copyApiKey = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(apiConfig.apiKey);
-      showToast('Copied — key is now hidden for security');
+      showToast(t('Copied — key is now hidden for security'));
     } catch {
-      showToast('Could not copy automatically — select and copy manually');
+      showToast(t('Could not copy automatically — select and copy manually'));
     }
     setApiShowKey(false);
     setApiConfig((c) => ({ ...c, keySecured: true }));
@@ -1381,7 +1386,7 @@ export function AppProvider({ children }) {
   // the full explanation either way.
   const pullManifestNow = useCallback(async ({ silent = false } = {}) => {
     if (!apiConfig.autoPull || !apiConfig.baseUrl) {
-      if (!silent) showToast('Enable "Receive expected manifest" first');
+      if (!silent) showToast(t('Enable "Receive expected manifest" first'));
       return;
     }
     setPulling(true);
@@ -1389,9 +1394,9 @@ export function AppProvider({ children }) {
     setPulling(false);
     if (res.ok) {
       setManifest({ codes: res.codes, lastPulledAt: hhmm() });
-      showToast(`${res.codes.length} tracking IDs received`);
+      showToast(res.codes.length === 1 ? t('{n} tracking ID received', { n: 1 }) : t('{n} tracking IDs received', { n: res.codes.length }));
     } else {
-      showToast('Manifest pull failed: ' + res.error);
+      showToast(t('Manifest pull failed: {error}', { error: res.error }));
     }
   }, [apiConfig, showToast]);
   // Lets the login (defined earlier in this file) trigger a pull
@@ -1417,7 +1422,7 @@ export function AppProvider({ children }) {
     const res = await api.fetchLoginEvents(internalConfig);
     setPullingLoginEvents(false);
     if (res.ok) setLoginEvents(res.events);
-    else showToast('Could not load login history: ' + res.error);
+    else showToast(t('Could not load login history: {error}', { error: res.error }));
   }, [internalConfig, showToast]);
 
   // Pushes every not-yet-sent document (for the currently connected
@@ -1441,9 +1446,9 @@ export function AppProvider({ children }) {
     }
     if (!silent) {
       showToast(
-        !pending.length ? 'Prep-Center: up to date'
-          : fail ? `Prep-Center: ${ok} sent, ${fail} failed — ${lastError}`
-          : `Prep-Center: ${ok} sent`
+        !pending.length ? t('Prep-Center: up to date')
+          : fail ? t('Prep-Center: {ok} sent, {fail} failed — {error}', { ok, fail, error: lastError })
+          : t('Prep-Center: {ok} sent', { ok })
       );
     }
     return { attempted: pending.length, ok, fail, lastError };
@@ -1463,7 +1468,7 @@ export function AppProvider({ children }) {
   }, [ready, shift?.country]);
 
   const syncNow = useCallback(async () => {
-    if (!internalConfig) { showToast('No connection for this country yet'); return; }
+    if (!internalConfig) { showToast(t('No connection for this country yet')); return; }
     setSyncing(true);
     // Only ever push documents that belong to the country currently
     // connected — `history` here is the raw, unfiltered state (this
@@ -1538,17 +1543,17 @@ export function AppProvider({ children }) {
     const prepResult = await syncPrepPending({ silent: true });
     setSyncing(false);
     const parts = [
-      !pending.length ? 'DB: nothing pending' : failCount ? `DB: ${okCount} sent, ${failCount} failed — ${lastError}` : `DB: ${okCount} sent`,
+      !pending.length ? t('DB: nothing pending') : failCount ? t('DB: {ok} sent, {fail} failed — {error}', { ok: okCount, fail: failCount, error: lastError }) : t('DB: {ok} sent', { ok: okCount }),
     ];
     if (ddtOk || ddtFail) {
-      const built = ddtBuilt ? ` (${ddtBuilt} newly issued)` : '';
-      parts.push(ddtFail ? `DDT: ${ddtOk} sent, ${ddtFail} failed${built}` : `DDT: ${ddtOk} sent${built}`);
+      const built = ddtBuilt ? ' ' + t('({n} newly issued)', { n: ddtBuilt }) : '';
+      parts.push((ddtFail ? t('DDT: {ok} sent, {fail} failed', { ok: ddtOk, fail: ddtFail }) : t('DDT: {ok} sent', { ok: ddtOk })) + built);
     }
     if (apiConfig.baseUrl) {
       parts.push(
-        !prepResult.attempted ? 'Prep-Center: up to date'
-          : prepResult.fail ? `Prep-Center: ${prepResult.ok} sent, ${prepResult.fail} failed — ${prepResult.lastError}`
-          : `Prep-Center: ${prepResult.ok} sent`
+        !prepResult.attempted ? t('Prep-Center: up to date')
+          : prepResult.fail ? t('Prep-Center: {ok} sent, {fail} failed — {error}', { ok: prepResult.ok, fail: prepResult.fail, error: prepResult.lastError })
+          : t('Prep-Center: {ok} sent', { ok: prepResult.ok })
       );
     }
     showToast(parts.join(' · '));
@@ -1564,7 +1569,7 @@ export function AppProvider({ children }) {
       const res = await api.pushSession(internalConfig, { ...current, pdfDataUrl });
       const syncError = res.ok ? null : api.describeError(res);
       current = await patchDocument(doc, d.country, { syncStatus: res.ok ? 'ok' : 'failed', syncError });
-      parts.push(res.ok ? 'DB sent' : `DB failed — ${syncError}`);
+      parts.push(res.ok ? t('DB sent') : t('DB failed — {error}', { error: syncError }));
     }
     // Retrying one row has to cover its delivery notes too, or a session whose
     // DDT push was the part that failed would report "sent" and still owe them.
@@ -1574,15 +1579,15 @@ export function AppProvider({ children }) {
         ddtSyncStatus: res.ok ? 'ok' : 'failed',
         ddtSyncError: res.ok ? null : res.error,
       });
-      parts.push(res.ok ? `${current.ddts.length} DDT sent` : `DDT failed — ${res.error}`);
+      parts.push(res.ok ? t('{n} DDT sent', { n: current.ddts.length }) : t('DDT failed — {error}', { error: res.error }));
     }
     if (apiConfig.baseUrl && apiConfig.autoPush && d.prepSyncStatus !== 'ok') {
       const res = await api.pushSession(apiConfig, { ...current, pdfDataUrl });
       const prepSyncError = res.ok ? null : api.describeError(res);
       current = await patchDocument(doc, d.country, { prepSyncStatus: res.ok ? 'ok' : 'failed', prepSyncError });
-      parts.push(res.ok ? 'Prep-Center sent' : `Prep-Center failed — ${prepSyncError}`);
+      parts.push(res.ok ? t('Prep-Center sent') : t('Prep-Center failed — {error}', { error: prepSyncError }));
     }
-    showToast(parts.length ? `${doc}: ${parts.join(' · ')}` : `${doc} already up to date`);
+    showToast(parts.length ? `${doc}: ${parts.join(' · ')}` : t('{doc} already up to date', { doc }));
   }, [internalConfig, apiConfig, history, shift, showToast, renderPdfDataUrl, patchDocument]);
 
   // Every screen reads `history`/`driverProfiles` through this context —
@@ -1624,7 +1629,14 @@ export function AppProvider({ children }) {
     return Array.from(byName.values()).sort((a, b) => a.name.localeCompare(b.name));
   }, [carriers, shift]);
 
-  const language = languageChoice || defaultLanguage(shift?.country);
+  // Before anyone signs in, the warehouse of whoever signed in last on this
+  // phone decides, so a French phone's login screen is in French too.
+  const lastCountry = useMemo(() => {
+    const last = Object.values(prepOperators || {})
+      .sort((a, b) => String(b.linkedAt || '').localeCompare(String(a.linkedAt || '')))[0];
+    return String(last?.profile?.country || '').toUpperCase() || null;
+  }, [prepOperators]);
+  const language = languageChoice || defaultLanguage(shift?.country || lastCountry);
   // Set before the screens render so every t() call this render uses it.
   setI18nLanguage(language);
   const chooseLanguage = useCallback((code) => {

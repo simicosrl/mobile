@@ -34,7 +34,7 @@ export default function Signature() {
       <div className="rounded-[14px] border border-[rgba(148,163,184,.25)] bg-white p-[12px_13px]">
         <div className="flex items-center gap-2">
           <div className="rounded-full px-2 py-[3px] text-[10px] font-extrabold uppercase tracking-[.1em] text-white" style={{ background: isOut ? '#FF7A00' : '#1F6FEB' }}>
-            {isOut ? t('Outbound') : t('Inbound')}
+            {isOut ? t('Outbound|direction') : t('Inbound|direction')}
           </div>
           <div className="font-mono text-[11px] text-secondary">{nextDoc}</div>
         </div>

@@ -38,7 +38,7 @@ export default function SessionDetail() {
       <div className="rounded-2xl border border-[rgba(148,163,184,.25)] bg-white p-[13px]">
         <div className="flex items-center gap-2">
           <div className="rounded-full px-2 py-[3px] text-[10px] font-extrabold uppercase tracking-[.1em] text-white" style={{ background: sel.direction === 'out' ? '#FF7A00' : '#1F6FEB' }}>
-            {sel.direction === 'out' ? t('Outbound') : t('Inbound')}
+            {sel.direction === 'out' ? t('Outbound|direction') : t('Inbound|direction')}
           </div>
           <div className="ml-auto text-[10px] font-bold" style={{ color: signed ? '#16A34A' : '#DC2626' }}>{signed ? t('signed') : t('unsigned')}</div>
         </div>

@@ -1,6 +1,7 @@
 import { Camera as CapCamera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { useApp } from '../state/AppContext';
 import { Camera } from './icons';
+import { t } from '../i18n';
 
 export default function NoCodeSheet() {
   const { noCodeSheet, closeNoCodeSheet, setNoCodeNote, setNoCodePhoto, saveNoCode, showToast } = useApp();
@@ -20,21 +21,20 @@ export default function NoCodeSheet() {
       setNoCodePhoto(`data:image/${photo.format || 'jpeg'};base64,${photo.base64String}`);
     } catch (err) {
       if (String(err?.message || '').toLowerCase().includes('cancel')) return;
-      showToast('Could not capture a photo — check camera permission');
+      showToast(t('Could not capture a photo — check camera permission'));
     }
   };
 
   return (
     <div className="absolute inset-0 z-20 flex items-end overflow-y-auto bg-[rgba(15,20,28,.55)] p-4">
       <div className="w-full animate-fadeUp rounded-[18px] bg-white p-[18px]">
-        <div className="text-[17px] font-extrabold tracking-[-.015em]">Log without a valid code</div>
+        <div className="text-[17px] font-extrabold tracking-[-.015em]">{t('Log without a valid code')}</div>
         <div className="mt-1 text-[12px] leading-snug text-secondary">
-          For a torn or unreadable label, or a code that doesn't match this carrier. A photo stands in for the
-          code so the office can reconcile it — this parcel is flagged clearly in the session.
+          {t("For a torn or unreadable label, or a code that doesn't match this carrier. A photo stands in for the code so the office can reconcile it — this parcel is flagged clearly in the session.")}
         </div>
 
         <div className="mt-3.5">
-          <div className="mb-1.5 text-[11px] font-bold uppercase tracking-[.06em] text-secondary">Photo · required</div>
+          <div className="mb-1.5 text-[11px] font-bold uppercase tracking-[.06em] text-secondary">{t('Photo · required')}</div>
           <button
             onClick={takePhoto}
             className={
@@ -43,12 +43,12 @@ export default function NoCodeSheet() {
             }
           >
             {noCodeSheet.photoDataUrl ? (
-              <img src={noCodeSheet.photoDataUrl} alt="Captured parcel" className="h-14 rounded-md object-cover" />
+              <img src={noCodeSheet.photoDataUrl} alt={t('Captured parcel')} className="h-14 rounded-md object-cover" />
             ) : (
               <Camera size={24} strokeWidth={1.8} />
             )}
             <div className="text-[12.5px] font-bold">
-              {noCodeSheet.photoDataUrl ? 'Photo captured' : 'Take photo'}
+              {noCodeSheet.photoDataUrl ? t('Photo captured') : t('Take photo')}
             </div>
           </button>
         </div>
@@ -57,20 +57,20 @@ export default function NoCodeSheet() {
           <input
             value={noCodeSheet.note}
             onChange={(e) => setNoCodeNote(e.target.value)}
-            placeholder="Note (optional) — e.g. label torn, wrong carrier printed"
+            placeholder={t('Note (optional) — e.g. label torn, wrong carrier printed')}
             className="min-h-[48px] w-full rounded-xl border border-inputborder bg-page px-4 text-[13px] text-ink"
           />
         </div>
 
         <div className="mt-4 flex gap-2.5">
           <button onClick={closeNoCodeSheet} className="min-h-[50px] w-24 flex-none rounded-[11px] border border-[rgba(148,163,184,.4)] bg-white text-[13px] font-bold text-ink">
-            Cancel
+            {t('Cancel')}
           </button>
           <button
             onClick={saveNoCode}
             className={'min-h-[50px] flex-1 rounded-[11px] text-[14px] font-extrabold text-white ' + (ready ? 'cursor-pointer bg-[#FF7A00]' : 'cursor-not-allowed bg-disabled')}
           >
-            Log parcel
+            {t('Log parcel')}
           </button>
         </div>
       </div>

@@ -1,6 +1,7 @@
 import { Camera as CapCamera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { useApp } from '../state/AppContext';
 import { Camera } from './icons';
+import { t } from '../i18n';
 
 export default function DamageSheet() {
   const { damageSheet, closeDamage, toggleDamageType, setDamageNote, setDamagePhoto, saveDamage, damageTypes, parcels, showToast } = useApp();
@@ -27,14 +28,14 @@ export default function DamageSheet() {
       setDamagePhoto(`data:image/${photo.format || 'jpeg'};base64,${photo.base64String}`);
     } catch (err) {
       if (String(err?.message || '').toLowerCase().includes('cancel')) return;
-      showToast('Could not capture a photo — check camera permission');
+      showToast(t('Could not capture a photo — check camera permission'));
     }
   };
 
   return (
     <div className="absolute inset-0 z-20 flex items-end overflow-y-auto bg-[rgba(15,20,28,.55)] p-4">
       <div className="w-full animate-fadeUp rounded-[18px] bg-white p-[18px]">
-        <div className="text-[17px] font-extrabold tracking-[-.015em]">Report damage</div>
+        <div className="text-[17px] font-extrabold tracking-[-.015em]">{t('Report damage')}</div>
         <div className="mt-1 break-all font-mono text-xs text-secondary">{lastCode}</div>
 
         <div className="mt-3.5 flex flex-col gap-2">
@@ -49,14 +50,14 @@ export default function DamageSheet() {
                   (on ? 'border-danger bg-danger-tint2 text-danger-dark' : 'border-[rgba(148,163,184,.35)] bg-white text-ink')
                 }
               >
-                {d}
+                {t(d)}
               </button>
             );
           })}
         </div>
 
         <div className="mt-3.5">
-          <div className="mb-1.5 text-[11px] font-bold uppercase tracking-[.06em] text-secondary">Photo · required</div>
+          <div className="mb-1.5 text-[11px] font-bold uppercase tracking-[.06em] text-secondary">{t('Photo · required')}</div>
           <button
             onClick={takePhoto}
             className={
@@ -65,12 +66,12 @@ export default function DamageSheet() {
             }
           >
             {damageSheet.photoDataUrl ? (
-              <img src={damageSheet.photoDataUrl} alt="Captured damage" className="h-14 rounded-md object-cover" />
+              <img src={damageSheet.photoDataUrl} alt={t('Captured damage')} className="h-14 rounded-md object-cover" />
             ) : (
               <Camera size={24} strokeWidth={1.8} />
             )}
             <div className="text-[12.5px] font-bold">
-              {damageSheet.photoDataUrl ? 'Photo captured' : 'Take photo'}
+              {damageSheet.photoDataUrl ? t('Photo captured') : t('Take photo')}
             </div>
           </button>
         </div>
@@ -79,20 +80,20 @@ export default function DamageSheet() {
           <input
             value={damageSheet.note}
             onChange={(e) => setDamageNote(e.target.value)}
-            placeholder="Note (optional)"
+            placeholder={t('Note (optional)')}
             className="min-h-[48px] w-full rounded-xl border border-inputborder bg-page px-4 text-[13px] text-ink"
           />
         </div>
 
         <div className="mt-4 flex gap-2.5">
           <button onClick={closeDamage} className="min-h-[50px] w-24 flex-none rounded-[11px] border border-[rgba(148,163,184,.4)] bg-white text-[13px] font-bold text-ink">
-            Cancel
+            {t('Cancel')}
           </button>
           <button
             onClick={saveDamage}
             className={'min-h-[50px] flex-1 rounded-[11px] text-[14px] font-extrabold text-white ' + (ready ? 'cursor-pointer bg-danger' : 'cursor-not-allowed bg-disabled')}
           >
-            Save damage
+            {t('Save damage')}
           </button>
         </div>
       </div>

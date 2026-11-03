@@ -18,7 +18,7 @@ export default function SessionSetup() {
           className="rounded-full px-2 py-[3px] text-[10px] font-extrabold uppercase tracking-[.1em] text-white"
           style={{ background: isOut ? '#FF7A00' : '#1F6FEB' }}
         >
-          {isOut ? t('Outbound') : t('Inbound')}
+          {isOut ? t('Outbound|direction') : t('Inbound|direction')}
         </div>
         <div className="text-xs text-secondary">{t('New session')} · {nextDoc}</div>
       </div>

@@ -9,6 +9,24 @@ import CameraScanOverlay from '../components/CameraScanOverlay';
 import { useKeepKeyboardDown } from '../hooks/useKeepKeyboardDown';
 import { useHardwareScan } from '../hooks/useHardwareScan';
 import { deliveredRecently, markDelivered } from '../lib/hardwareScanner';
+import { t } from '../i18n';
+
+// A parcel's damage is stored in English ("Box damaged, Seal broken — note")
+// because it goes into documents and the API; only the types are translated
+// for display, the operator's own note is shown as typed.
+function damageLabel(label) {
+  const s = String(label || '');
+  const i = s.indexOf(' — ');
+  const types = i >= 0 ? s.slice(0, i) : s;
+  const note = i >= 0 ? s.slice(i) : '';
+  return types.split(', ').map((x) => t(x)).join(', ') + note;
+}
+
+// The prefix rule of a rejected scan, in the operator's language.
+function rejectionReason(r) {
+  if (!r.prefixes) return r.reason;
+  return t('must start with {prefixes}', { prefixes: r.prefixes.map((pre) => `"${pre}"`).join(` ${t('or')} `) });
+}
 
 export default function Scan() {
   const app = useApp();
@@ -130,7 +148,7 @@ export default function Scan() {
       <div className="sticky top-0 z-10 flex flex-col gap-3 bg-page px-3.5 pb-1 pt-3">
       <div className="flex items-center gap-2">
         <div className="rounded-full px-2 py-[3px] text-[10px] font-extrabold uppercase tracking-[.1em] text-white" style={{ background: isOut ? '#FF7A00' : '#1F6FEB' }}>
-          {isOut ? 'Outbound' : 'Inbound'}
+          {isOut ? t('Outbound|direction') : t('Inbound|direction')}
         </div>
         <div className="font-mono text-[11px] text-secondary">{carrier} · {nextDoc}</div>
         <div className="ml-auto text-[11px] text-light">{sessionStartedAt ? elapsedLabel(sessionStartedAt) : ''}</div>
@@ -158,7 +176,7 @@ export default function Scan() {
                   (last.noCode ? 'text-[#C2410C]' : last.damage ? 'text-danger' : 'text-success')
                 }
               >
-                {last.noCode ? 'No valid code — logged with photo' : last.damage ? 'Recorded with damage' : 'Scan accepted'}
+                {last.noCode ? t('No valid code — logged with photo') : last.damage ? t('Recorded with damage') : t('Scan accepted')}
               </div>
               <div className="ml-auto font-mono text-[11px] text-light">{last.time}</div>
             </div>
@@ -167,7 +185,7 @@ export default function Scan() {
               <div className="text-[13px] font-bold text-ink">{last.carrier}</div>
               {last.boxes > 1 && (
                 <div className="rounded-full bg-[rgba(15,23,42,.06)] px-2 py-[3px] text-[10px] font-extrabold uppercase tracking-[.06em] text-ink">
-                  {last.boxes} boxes
+                  {t('{n} boxes', { n: last.boxes })}
                 </div>
               )}
               {last.expected !== null && last.expected !== undefined && (
@@ -177,7 +195,7 @@ export default function Scan() {
                   className="rounded-full px-2 py-[3px] text-[10px] font-extrabold uppercase tracking-[.06em]"
                   style={{ background: last.expected ? 'rgba(22,163,74,.12)' : 'rgba(255,122,0,.14)', color: last.expected ? '#15803D' : '#C2410C' }}
                 >
-                  {last.expected ? 'Expected' : 'Not on manifest'}
+                  {last.expected ? t('Expected') : t('Not on manifest')}
                 </div>
               )}
             </div>
@@ -192,9 +210,9 @@ export default function Scan() {
               >
                 <TriangleAlert size={16} strokeWidth={2} className="mt-px flex-none text-danger" />
                 <div className="min-w-0 flex-1">
-                  <div className="text-xs font-bold text-danger-dark">Already shipped on {last.notedOn}</div>
+                  <div className="text-xs font-bold text-danger-dark">{t('Already shipped on {doc}', { doc: last.notedOn })}</div>
                   <div className="mt-0.5 text-[10.5px] leading-snug text-danger">
-                    This parcel will not go on another delivery note. Put it back unless you are sure it is a different box.
+                    {t('This parcel will not go on another delivery note. Put it back unless you are sure it is a different box.')}
                   </div>
                 </div>
               </div>
@@ -203,12 +221,12 @@ export default function Scan() {
               <div className="mt-3 flex items-start gap-2 rounded-[11px] border border-[rgba(220,38,38,.25)] bg-danger-tint2 p-2.5">
                 <TriangleAlert size={16} strokeWidth={2} className="mt-px flex-none text-danger" />
                 <div className="min-w-0 flex-1">
-                  <div className="text-xs font-bold text-danger-dark">{last.damage}</div>
+                  <div className="text-xs font-bold text-danger-dark">{damageLabel(last.damage)}</div>
                   <div className="mt-0.5 font-mono text-[10px] text-danger">{last.photo}</div>
                 </div>
                 {last.photoDataUrl && (
                   <button onClick={() => openPhoto(last.photoDataUrl)} className="flex-none">
-                    <img src={last.photoDataUrl} alt="Damage attachment" className="h-12 w-12 rounded-md border border-[rgba(220,38,38,.35)] object-cover" />
+                    <img src={last.photoDataUrl} alt={t('Damage attachment')} className="h-12 w-12 rounded-md border border-[rgba(220,38,38,.35)] object-cover" />
                   </button>
                 )}
               </div>
@@ -217,12 +235,12 @@ export default function Scan() {
               <div className="mt-3 flex items-start gap-2 rounded-[11px] border border-[rgba(255,122,0,.3)] bg-[rgba(255,122,0,.08)] p-2.5">
                 <TriangleAlert size={16} strokeWidth={2} className="mt-px flex-none text-[#C2410C]" />
                 <div className="min-w-0 flex-1">
-                  <div className="text-xs font-bold text-[#C2410C]">Flagged for the office to reconcile</div>
+                  <div className="text-xs font-bold text-[#C2410C]">{t('Flagged for the office to reconcile')}</div>
                   {last.noCodeNote && <div className="mt-0.5 text-[10.5px] text-[#C2410C]">{last.noCodeNote}</div>}
                 </div>
                 {last.noCodePhotoDataUrl && (
                   <button onClick={() => openPhoto(last.noCodePhotoDataUrl)} className="flex-none">
-                    <img src={last.noCodePhotoDataUrl} alt="Parcel photo" className="h-12 w-12 rounded-md border border-[rgba(255,122,0,.35)] object-cover" />
+                    <img src={last.noCodePhotoDataUrl} alt={t('Parcel photo')} className="h-12 w-12 rounded-md border border-[rgba(255,122,0,.35)] object-cover" />
                   </button>
                 )}
               </div>
@@ -231,7 +249,7 @@ export default function Scan() {
         ) : (
           <div className="flex items-center gap-2.5 py-1">
             <ScanLine size={22} strokeWidth={1.6} className="flex-none text-light" />
-            <div className="text-[13px] font-bold text-ink">Pull the trigger to scan</div>
+            <div className="text-[13px] font-bold text-ink">{t('Pull the trigger to scan')}</div>
           </div>
         )}
       </div>
@@ -242,15 +260,15 @@ export default function Scan() {
         {/* Outbound parcels leave in perfect condition: damage is an inbound thing. */}
         {!isOut && (
           <button onClick={openDamage} className="flex min-h-[48px] flex-1 items-center justify-center gap-1.5 rounded-xl border border-[rgba(220,38,38,.3)] bg-white text-[13px] font-bold text-danger">
-            <TriangleAlert size={16} strokeWidth={2} /> Damage
+            <TriangleAlert size={16} strokeWidth={2} /> {t('Damage')}
           </button>
         )}
         <button
           onClick={removeLast}
-          aria-label="Remove last parcel"
+          aria-label={t('Remove last parcel')}
           className={'flex min-h-[48px] items-center justify-center gap-1.5 rounded-xl border border-[rgba(148,163,184,.35)] bg-white text-[13px] font-bold text-secondary ' + (isOut ? 'flex-1' : 'w-[52px] flex-none')}
         >
-          <Trash2 size={17} strokeWidth={2} />{isOut && ' Remove last'}
+          <Trash2 size={17} strokeWidth={2} />{isOut && <> {t('Remove last')}</>}
         </button>
       </div>
 
@@ -260,11 +278,11 @@ export default function Scan() {
 
       <div className="overflow-hidden rounded-[14px] border border-[rgba(148,163,184,.25)] bg-white">
         <div className="flex items-center gap-2 border-b border-[rgba(148,163,184,.25)] bg-page px-3 py-2.5">
-          <div className="text-[10px] font-bold uppercase tracking-[.08em] text-secondary">Session</div>
-          <div className="ml-auto text-[11px] font-bold text-ink">{parcels.length} parcels / {boxes} boxes</div>
+          <div className="text-[10px] font-bold uppercase tracking-[.08em] text-secondary">{t('Session')}</div>
+          <div className="ml-auto text-[11px] font-bold text-ink">{parcels.length === 1 ? t('{n} parcel', { n: parcels.length }) : t('{n} parcels', { n: parcels.length })} / {boxes === 1 ? t('{n} box', { n: boxes }) : t('{n} boxes', { n: boxes })}</div>
         </div>
         {parcels.length === 0 ? (
-          <div className="px-3 py-4 text-center text-xs text-light">No parcels in this session yet.</div>
+          <div className="px-3 py-4 text-center text-xs text-light">{t('No parcels in this session yet.')}</div>
         ) : (
           parcels.slice().reverse().map((r, i) => (
             <div key={r.code} className="flex items-center gap-2.5 border-b border-[rgba(148,163,184,.15)] px-3 py-2.5 last:border-b-0">
@@ -278,23 +296,23 @@ export default function Scan() {
                   <div className="truncate text-[10px] text-secondary">{r.fbaId || r.shipmentId}</div>
                 )}
                 {direction === 'out' && !r.shipmentId && r.shipmentStatus === 'unknown' && (
-                  <div className="truncate text-[10px] font-bold text-danger">Not in Prep-Center — no DDT</div>
+                  <div className="truncate text-[10px] font-bold text-danger">{t('Not in Prep-Center — no DDT')}</div>
                 )}
                 {direction === 'out' && !r.shipmentId && r.shipmentStatus === 'pending' && (
                   // The reason, not just the state: "couldn't check" reads like a
                   // silent failure, and the operator has no way to tell a dead
                   // spot from an endpoint that isn't answering at all.
                   <div className="truncate text-[10px] text-[#C2410C]" title={r.shipmentError || ''}>
-                    {r.shipmentError ? `Not checked — ${r.shipmentError}` : 'Shipping pending — resolves at sync'}
+                    {r.shipmentError ? t('Not checked — {error}', { error: r.shipmentError }) : t('Shipping pending — resolves at sync')}
                   </div>
                 )}
               </div>
-              {r.damage && <div className="flex-none text-[11px] font-bold text-danger">DMG</div>}
-              {r.noCode && <div className="flex-none text-[11px] font-bold text-[#C2410C]">NO CODE</div>}
+              {r.damage && <div className="flex-none text-[11px] font-bold text-danger">{t('DMG')}</div>}
+              {r.noCode && <div className="flex-none text-[11px] font-bold text-[#C2410C]">{t('NO CODE')}</div>}
               <div className="flex-none text-[11px] font-bold text-ink">{r.boxes}×</div>
               <button
                 onClick={() => removeParcel(r.code)}
-                aria-label={`Remove ${r.code}`}
+                aria-label={t('Remove {code}', { code: r.code })}
                 className="flex h-7 w-7 flex-none items-center justify-center rounded-full text-light"
               >
                 <X size={15} strokeWidth={2.2} />
@@ -305,7 +323,7 @@ export default function Scan() {
       </div>
 
       <div className="relative rounded-[14px] border border-[rgba(148,163,184,.25)] bg-white p-3">
-        <div className="mb-2 text-[10px] font-bold uppercase tracking-[.08em] text-secondary">Scanner ready</div>
+        <div className="mb-2 text-[10px] font-bold uppercase tracking-[.08em] text-secondary">{t('Scanner ready')}</div>
         <div className="flex gap-2">
           {/* Stays in the DOM and focused either way, so a hardware
               scanner-wedge always has somewhere to type into — but there's
@@ -321,7 +339,7 @@ export default function Scan() {
             onChange={(e) => setBuffer(e.target.value)}
             onKeyDown={onKey}
             onBlur={() => setManualKeyboard(false)}
-            placeholder="Type the code…"
+            placeholder={t('Type the code…')}
             inputMode={showTrackingInput ? 'text' : 'none'}
             aria-hidden={!showTrackingInput}
             className={
@@ -340,22 +358,22 @@ export default function Scan() {
             <button
               onClick={scanWithCamera}
               disabled={scanning}
-              aria-label="Scan with camera"
+              aria-label={t('Scan with camera')}
               className={
                 'flex min-h-[54px] items-center justify-center gap-2 rounded-xl bg-primary text-white shadow-focusring disabled:opacity-60 ' +
                 (showTrackingInput ? 'w-[54px] flex-none' : 'flex-1 text-[14px] font-bold')
               }
             >
-              <Camera size={20} strokeWidth={2} /> {!showTrackingInput && (scanning ? 'Opening…' : 'Scan with camera')}
+              <Camera size={20} strokeWidth={2} /> {!showTrackingInput && (scanning ? t('Opening…') : t('Scan with camera'))}
             </button>
           )}
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
           <button onClick={openManualKeyboard} className="flex items-center gap-1 text-[10.5px] font-bold text-secondary">
-            <KeyboardIcon size={12} strokeWidth={2} /> Type manually instead
+            <KeyboardIcon size={12} strokeWidth={2} /> {t('Type manually instead')}
           </button>
           <button onClick={() => openNoCodeSheet()} className="flex items-center gap-1 text-[10.5px] font-bold text-[#C2410C]">
-            <Camera size={12} strokeWidth={2} /> Can't scan it? Log with photo
+            <Camera size={12} strokeWidth={2} /> {t("Can't scan it? Log with photo")}
           </button>
         </div>
         {/* Follow-up action right where the rejection happened, rather than
@@ -366,13 +384,13 @@ export default function Scan() {
           <div className="mt-2 flex items-center gap-2 rounded-xl border border-[rgba(255,122,0,.35)] bg-[rgba(255,122,0,.08)] p-2.5">
             <div className="min-w-0 flex-1">
               <div className="truncate font-mono text-[11px] font-bold text-[#C2410C]">{rejectedScan.code}</div>
-              <div className="text-[10.5px] text-[#C2410C]">Rejected — {rejectedScan.reason}</div>
+              <div className="text-[10.5px] text-[#C2410C]">{t('Rejected — {reason}', { reason: rejectionReason(rejectedScan) })}</div>
             </div>
             <button
               onClick={() => openNoCodeSheet(`Scanned: ${rejectedScan.code} — ${rejectedScan.reason}`)}
               className="flex-none rounded-lg bg-[#FF7A00] px-2.5 py-2 text-[11px] font-bold text-white"
             >
-              Log anyway
+              {t('Log anyway')}
             </button>
           </div>
         )}
@@ -380,7 +398,7 @@ export default function Scan() {
       </div>
 
       <button onClick={toSign} className="flex min-h-[56px] w-full items-center justify-center gap-2.5 rounded-xl bg-ink text-[15px] font-extrabold text-white">
-        <PenLine size={18} strokeWidth={2} /> Close session &amp; sign
+        <PenLine size={18} strokeWidth={2} /> {t('Close session & sign')}
       </button>
       </div>
     </div>

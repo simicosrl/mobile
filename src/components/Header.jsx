@@ -20,7 +20,7 @@ function headerCopy(app) {
   if (screen === 'scan') return { title: isOut ? t('Outbound scan') : t('Inbound scan'), sub: `${sessionDocLabel} · ${carrier}` };
   if (screen === 'sign') return { title: t('Driver signature'), sub: `${sessionDocLabel} · ${carrier}` };
   if (screen === 'confirm') return { title: t('Session closed'), sub: `${docLabel} · ${carrier}` };
-  if (screen === 'session') return { title: sel ? sel.doc : t('Session'), sub: sel ? `${sel.direction === 'out' ? t('Outbound') : t('Inbound')} · ${sel.date}` : '' };
+  if (screen === 'session') return { title: sel ? sel.doc : t('Session'), sub: sel ? `${sel.direction === 'out' ? t('Outbound|direction') : t('Inbound|direction')} · ${sel.date}` : '' };
   if (screen === 'inbound') return { title: t('Inbound'), sub: t('Parcels received from couriers · last 7 days') };
   if (screen === 'outbound') return { title: t('Outbound'), sub: t('Parcels handed to couriers · last 7 days') };
   if (screen === 'ddts') return { title: 'DDT', sub: t('Delivery notes · last 7 days') };

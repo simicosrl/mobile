@@ -23,8 +23,12 @@ export function getLanguage() {
   return current;
 }
 
+// A key may carry a context after "|" when one English word needs two French
+// ones: t('Inbound|direction') shows "Inbound" in English, "Entrée" in French,
+// while t('Inbound') (the list) is "Entrées".
 export function t(text, vars) {
-  let s = current === 'fr' ? (fr[text] ?? text) : text;
+  const english = text.includes('|') ? text.slice(0, text.indexOf('|')) : text;
+  let s = current === 'fr' ? (fr[text] ?? english) : english;
   if (vars) s = s.replace(/\{(\w+)\}/g, (m, k) => (k in vars ? String(vars[k]) : m));
   return s;
 }
