@@ -3,6 +3,7 @@ import { docsGetAll, docPut, docsClearAll, kvGet, kvSet } from '../lib/db';
 import { DEFAULT_ORG_SETTINGS } from '../lib/seed';
 import { DAMAGE_TYPES, carriersForCountry, parsePrefixes, normalizePrefixes } from '../lib/carriers';
 import { trackingFromBarcode } from '../lib/trackingCodes';
+import { setLanguage as setI18nLanguage, defaultLanguage } from '../i18n';
 import { hhmm, stamp, docNumber } from '../lib/format';
 import { feedback } from '../lib/audio';
 import * as api from '../lib/api';
@@ -78,6 +79,8 @@ export function AppProvider({ children }) {
   const [docSeq, setDocSeq] = useState({ in: 1, out: 1 });
   const [orgSettings, setOrgSettings] = useState(DEFAULT_ORG_SETTINGS);
   const [driverProfiles, setDriverProfiles] = useState([]); // [{ name, courierCompany, plate, lastUsedAt }]
+  // Language chosen on this phone (Settings), or null to follow the warehouse.
+  const [languageChoice, setLanguageChoice] = useState(null);
   const [carriers, setCarriers] = useState([]); // [{ name, pattern, country }] — pattern is a required tracking-code prefix, or null
   // Prep-Center operators who have signed in on this phone, keyed by their
   // Prep-Center user id: { userId, email, name, profile, refreshToken, ... }.
@@ -118,6 +121,7 @@ export function AppProvider({ children }) {
         kvGet('driverProfilesCountryTaggedV1', false),
         kvGet('carriers', []),
       ]);
+      setLanguageChoice(await kvGet('language', null));
       const savedPrepOperators = await kvGet('prepOperators', {});
       prepOperatorsRef.current = savedPrepOperators || {};
       setPrepOperators(prepOperatorsRef.current);
@@ -1620,8 +1624,16 @@ export function AppProvider({ children }) {
     return Array.from(byName.values()).sort((a, b) => a.name.localeCompare(b.name));
   }, [carriers, shift]);
 
+  const language = languageChoice || defaultLanguage(shift?.country);
+  // Set before the screens render so every t() call this render uses it.
+  setI18nLanguage(language);
+  const chooseLanguage = useCallback((code) => {
+    setLanguageChoice(code);
+    kvSet('language', code);
+  }, []);
+
   const value = useMemo(() => ({
-    ready, now,
+    ready, now, language, chooseLanguage,
     shift, prepSignIn, prepVerifyMfa, prepChooseCountry, forgetPrepOperator, prepOperators, withPrep, endShift,
     screen, setScreen, canGoBack, goBack, goHome, goToInboundTab, goToOutboundTab, goToDdtTab, goToApiTab, goToSettings,
     direction, carrier, setCarrier, courierCompany, setCourierCompany, shipment, setShipment: setShipmentRef,
@@ -1646,7 +1658,7 @@ export function AppProvider({ children }) {
     toast, showToast,
     inputRef,
   }), [
-    ready, now, shift, prepSignIn, prepVerifyMfa, prepChooseCountry, forgetPrepOperator, prepOperators, withPrep, endShift, screen, canGoBack, goBack, goHome, goToInboundTab, goToOutboundTab, goToDdtTab, goToApiTab, goToSettings,
+    ready, now, language, chooseLanguage, shift, prepSignIn, prepVerifyMfa, prepChooseCountry, forgetPrepOperator, prepOperators, withPrep, endShift, screen, canGoBack, goBack, goHome, goToInboundTab, goToOutboundTab, goToDdtTab, goToApiTab, goToSettings,
     direction, carrier, courierCompany, shipment, parcels, sessionStartedAt, startSession, toScan, docSeq,
     submitScan, accept, dupCode, dupTime, closeDup, dupAddBox, boxPlus, boxMinus, removeLast, removeParcel, flash,
     damageSheet, openDamage, closeDamage, toggleDamageType, setDamageNote, setDamagePhoto, saveDamage,

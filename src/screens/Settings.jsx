@@ -4,6 +4,7 @@ import { Capacitor } from '@capacitor/core';
 import { useApp } from '../state/AppContext';
 import { Check, Download, ChevronDown, ChevronRight, Plus, RefreshCw, Globe, X } from '../components/icons';
 import { parsePrefixes } from '../lib/carriers';
+import { LANGUAGES, t } from '../i18n';
 import KeyboardDiagnostics from '../components/KeyboardDiagnostics';
 import ScannerTest from '../components/ScannerTest';
 
@@ -193,7 +194,7 @@ function CarrierRow({ carrier, onSave }) {
 export default function Settings() {
   const {
     shift, orgSettings, updateOrgSettings, showToast, updateInfo, checkUpdateNow, downloadUpdate, carriers, saveCarrier,
-    loginEvents, pullingLoginEvents, pullLoginEventsNow, forgetPrepOperator, goToApiTab,
+    loginEvents, pullingLoginEvents, pullLoginEventsNow, forgetPrepOperator, goToApiTab, language, chooseLanguage,
   } = useApp();
   const [org, setOrg] = useState(orgSettings);
   const [saved, setSaved] = useState(false);
@@ -242,6 +243,20 @@ export default function Settings() {
           <div className="min-h-[48px] w-full rounded-xl border border-inputborder bg-page px-4 py-3 text-sm text-secondary">
             <div className="font-bold text-ink">{shift?.operatorName}</div>
             <div className="truncate font-mono text-[12px]">{shift?.prep?.email} · {shift?.country}</div>
+          </div>
+        </div>
+        <div>
+          <div className="mb-2 text-[11px] font-bold uppercase tracking-[.06em] text-secondary">{t('Language')}</div>
+          <div className="flex gap-1 rounded-[11px] bg-segtrack p-1">
+            {LANGUAGES.map((l) => (
+              <button
+                key={l.code}
+                onClick={() => chooseLanguage(l.code)}
+                className={'flex-1 rounded-lg py-2 text-xs font-bold ' + (language === l.code ? 'bg-white text-ink shadow-seg' : 'bg-transparent text-secondary')}
+              >
+                {l.name}
+              </button>
+            ))}
           </div>
         </div>
         {shift?.prep && (
