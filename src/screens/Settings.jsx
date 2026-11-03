@@ -40,10 +40,10 @@ const LOGO_MAX_EDGE = 480;
 function downscaleToDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onerror = () => reject(new Error('could not read the file'));
+    reader.onerror = () => reject(new Error(t('could not read the file')));
     reader.onload = () => {
       const img = new Image();
-      img.onerror = () => reject(new Error('that file is not an image the app can read'));
+      img.onerror = () => reject(new Error(t('that file is not an image the app can read')));
       img.onload = () => {
         const scale = Math.min(1, LOGO_MAX_EDGE / Math.max(img.width, img.height));
         const canvas = document.createElement('canvas');
@@ -76,16 +76,16 @@ function LogoField({ value, onChange }) {
   };
   return (
     <div>
-      <div className="mb-2 text-[11px] font-bold uppercase tracking-[.06em] text-secondary">Logo</div>
+      <div className="mb-2 text-[11px] font-bold uppercase tracking-[.06em] text-secondary">{t('Logo')}</div>
       <div className="flex items-center gap-3">
         <div className="flex h-[58px] w-[112px] flex-none items-center justify-center overflow-hidden rounded-xl border border-inputborder bg-white">
           {value
-            ? <img src={value} alt="Company logo" data-testid="logo-preview" className="max-h-[52px] max-w-[104px] object-contain" />
-            : <span className="text-[10px] text-light">none</span>}
+            ? <img src={value} alt={t('Company logo')} data-testid="logo-preview" className="max-h-[52px] max-w-[104px] object-contain" />
+            : <span className="text-[10px] text-light">{t('none')}</span>}
         </div>
         <div className="flex min-w-0 flex-1 flex-col gap-2">
           <label className="flex min-h-[40px] cursor-pointer items-center justify-center rounded-xl border border-[rgba(148,163,184,.4)] bg-white text-[13px] font-bold text-ink">
-            {value ? 'Replace' : 'Choose image'}
+            {value ? t('Replace') : t('Choose image')}
             <input type="file" accept="image/*" onChange={pick} className="hidden" data-testid="logo-input" />
           </label>
           {value && (
@@ -94,13 +94,13 @@ function LogoField({ value, onChange }) {
               onClick={() => { setError(null); onChange(null); }}
               className="min-h-[36px] rounded-xl text-[12px] font-bold text-danger"
             >
-              Remove
+              {t('Remove')}
             </button>
           )}
         </div>
       </div>
       <div className="mt-2 text-[11px] leading-snug text-secondary">
-        Printed at the top of every delivery note this warehouse issues. Each prep center sets its own.
+        {t('Printed at the top of every delivery note this warehouse issues. Each prep center sets its own.')}
       </div>
       {error && <div className="mt-1.5 text-[11px] font-bold text-danger">{error}</div>}
     </div>
@@ -142,9 +142,9 @@ function CarrierRow({ carrier, onSave }) {
     e?.preventDefault();
     const value = draft.trim().toUpperCase();
     if (!value) return;
-    if (!/^[0-9A-Z]+$/.test(value)) { setError('Letters and digits only, one prefix at a time.'); return; }
-    if (value.length > 10) { setError('A prefix is at most 10 characters.'); return; }
-    if (prefixes.includes(value)) { setError(`${value} is already there.`); return; }
+    if (!/^[0-9A-Z]+$/.test(value)) { setError(t('Letters and digits only, one prefix at a time.')); return; }
+    if (value.length > 10) { setError(t('A prefix is at most 10 characters.')); return; }
+    if (prefixes.includes(value)) { setError(t('{value} is already there.', { value })); return; }
     save([...prefixes, value]);
     setDraft('');
     setError(null);
@@ -155,7 +155,7 @@ function CarrierRow({ carrier, onSave }) {
       <div className="flex items-center gap-2">
         <div className="min-w-0 flex-1 truncate text-[13px] font-bold text-ink">{carrier.name}</div>
         <div className="flex-none text-[11px] text-secondary">
-          {prefixes.length ? `${prefixes.length} prefix${prefixes.length === 1 ? '' : 'es'}` : 'no restriction'}
+          {prefixes.length === 1 ? t('{n} prefix', { n: 1 }) : prefixes.length ? t('{n} prefixes', { n: prefixes.length }) : t('no restriction')}
         </div>
       </div>
       {prefixes.length > 0 && (
@@ -166,7 +166,7 @@ function CarrierRow({ carrier, onSave }) {
               <button
                 type="button"
                 onClick={() => save(prefixes.filter((x) => x !== p))}
-                aria-label={`Remove prefix ${p} from ${carrier.name}`}
+                aria-label={t('Remove prefix {prefix} from {carrier}', { prefix: p, carrier: carrier.name })}
                 className="flex h-5 w-5 items-center justify-center rounded-full text-light"
               >
                 <X size={12} strokeWidth={2.6} />
@@ -179,8 +179,8 @@ function CarrierRow({ carrier, onSave }) {
         <input
           value={draft}
           onChange={(e) => { setDraft(e.target.value); setError(null); }}
-          placeholder="Add prefix…"
-          aria-label={`Add a prefix to ${carrier.name}`}
+          placeholder={t('Add prefix…')}
+          aria-label={t('Add a prefix to {carrier}', { carrier: carrier.name })}
           autoCapitalize="characters" autoCorrect="off" spellCheck={false}
           className="min-h-[38px] min-w-0 flex-1 rounded-lg border border-inputborder bg-white px-2.5 font-mono text-[12.5px] uppercase text-ink"
         />
@@ -212,7 +212,7 @@ export default function Settings() {
     setChecking(true);
     const res = await checkUpdateNow();
     setChecking(false);
-    showToast(res.available ? `Update available — v${res.versionName}` : 'You have the latest version');
+    showToast(res.available ? t('Update available — v{version}', { version: res.versionName }) : t('You have the latest version'));
   };
 
   const set = (key) => (e) => { setOrg((o) => ({ ...o, [key]: e.target.value })); setSaved(false); };
@@ -220,7 +220,7 @@ export default function Settings() {
   const save = async () => {
     updateOrgSettings(org);
     setSaved(true);
-    showToast('Settings saved');
+    showToast(t('Settings saved'));
   };
 
   const addCarrier = () => {
@@ -229,17 +229,17 @@ export default function Settings() {
     // Prefixes are added on the carrier's own row; an existing carrier keeps its own.
     const existing = carriers.find((c) => c.name.toLowerCase() === name.toLowerCase());
     saveCarrier(existing?.name || name, existing?.pattern || null);
-    showToast(`${name.toUpperCase()} ${existing ? 'is already in the list' : 'added'}`);
+    showToast(existing ? t('{name} is already in the list', { name: name.toUpperCase() }) : t('{name} added', { name: name.toUpperCase() }));
     setNewCarrierName('');
   };
 
   return (
     <div className="flex flex-col gap-3.5 px-3.5 pb-[22px] pt-3.5">
-      <Section title="Operator profile" summary={shift?.operatorName} defaultOpen>
+      <Section title={t('Operator profile')} summary={shift?.operatorName} defaultOpen>
         {/* Name, country and permissions belong to the Prep-Center profile;
             they are changed there, not on the phone. */}
         <div>
-          <div className="mb-2 text-[11px] font-bold uppercase tracking-[.06em] text-secondary">Prep-Center account</div>
+          <div className="mb-2 text-[11px] font-bold uppercase tracking-[.06em] text-secondary">{t('Prep-Center account')}</div>
           <div className="min-h-[48px] w-full rounded-xl border border-inputborder bg-page px-4 py-3 text-sm text-secondary">
             <div className="font-bold text-ink">{shift?.operatorName}</div>
             <div className="truncate font-mono text-[12px]">{shift?.prep?.email} · {shift?.country}</div>
@@ -262,11 +262,11 @@ export default function Settings() {
         {shift?.prep && (
           <button
             onClick={() => {
-              if (window.confirm('Sign out of the Prep-Center on this phone and end the shift?')) forgetPrepOperator();
+              if (window.confirm(t('Sign out of the Prep-Center on this phone and end the shift?'))) forgetPrepOperator();
             }}
             className="self-start text-[12.5px] font-bold text-danger underline underline-offset-2"
           >
-            Remove me from this phone
+            {t('Remove me from this phone')}
           </button>
         )}
       </Section>
@@ -278,18 +278,18 @@ export default function Settings() {
       >
         <Globe size={18} strokeWidth={2} className="flex-none text-primary" />
         <div className="min-w-0 flex-1">
-          <div className="text-[10px] font-bold uppercase tracking-[.1em] text-light">API &amp; integrations</div>
-          <div className="mt-0.5 truncate text-[11.5px] text-secondary">Prep-Center connection, sync and manifest</div>
+          <div className="text-[10px] font-bold uppercase tracking-[.1em] text-light">{t('API & integrations')}</div>
+          <div className="mt-0.5 truncate text-[11.5px] text-secondary">{t('Prep-Center connection, sync and manifest')}</div>
         </div>
         <ChevronRight size={16} strokeWidth={2.2} className="flex-none text-light" />
       </button>
 
-      <Section title="Warehouse" summary={org.warehouseLocation}>
-        <Field label="Location" value={org.warehouseLocation} onChange={set('warehouseLocation')} placeholder="Casazza (BG)" />
-        <Field label="Dock / area" value={org.warehouseDock} onChange={set('warehouseDock')} placeholder="Dock 2" />
+      <Section title={t('Warehouse')} summary={org.warehouseLocation}>
+        <Field label={t('Location')} value={org.warehouseLocation} onChange={set('warehouseLocation')} placeholder="Casazza (BG)" />
+        <Field label={t('Dock / area')} value={org.warehouseDock} onChange={set('warehouseDock')} placeholder={t('Dock 2')} />
       </Section>
 
-      <Section title="Company (printed on the A4 document)" summary={org.companyName}>
+      <Section title={t('Company (printed on the A4 document)')} summary={org.companyName}>
         {/* Kept in the local draft like every other field, and also saved on
             the spot: choosing a picture is a deliberate act, and having it
             vanish because Save was not pressed afterwards would read as the
@@ -298,11 +298,11 @@ export default function Settings() {
           value={org.companyLogo}
           onChange={(v) => { setOrg((o) => ({ ...o, companyLogo: v })); updateOrgSettings({ companyLogo: v }); }}
         />
-        <Field label="Company name" value={org.companyName} onChange={set('companyName')} placeholder="SIMICO SRL" />
-        <Field label="Address" value={org.companyAddress} onChange={set('companyAddress')} placeholder="Street, city, country" />
+        <Field label={t('Company name')} value={org.companyName} onChange={set('companyName')} placeholder="SIMICO SRL" />
+        <Field label={t('Address')} value={org.companyAddress} onChange={set('companyAddress')} placeholder={t('Street, city, country')} />
         <div className="flex gap-2.5">
           <div className="flex-1">
-            <div className="mb-2 text-[11px] font-bold uppercase tracking-[.06em] text-secondary">VAT number</div>
+            <div className="mb-2 text-[11px] font-bold uppercase tracking-[.06em] text-secondary">{t('VAT number')}</div>
             <input
               value={org.companyVat}
               onChange={set('companyVat')}
@@ -311,21 +311,20 @@ export default function Settings() {
             />
           </div>
           <div className="flex-1">
-            <Field label="Email" type="email" value={org.companyEmail} onChange={set('companyEmail')} placeholder="warehouse@company.com" />
+            <Field label={t('Email')} type="email" value={org.companyEmail} onChange={set('companyEmail')} placeholder="warehouse@company.com" />
           </div>
         </div>
       </Section>
 
-      <Section title="Laser scanner test" summary="check what the scanner sends">
+      <Section title={t('Laser scanner test')} summary={t('check what the scanner sends')}>
         <ScannerTest />
       </Section>
 
-      <Section title="Carriers" summary={`${carriers.length} carrier${carriers.length === 1 ? '' : 's'}`}>
+      <Section title={t('Carriers')} summary={carriers.length === 1 ? t('{n} carrier', { n: 1 }) : t('{n} carriers', { n: carriers.length })}>
         <div className="text-[11px] leading-snug text-secondary">
-          Add a required tracking-code prefix to catch a wrong scan before it's added — e.g. UPS codes always
-          start with <span className="font-mono font-bold text-ink">1Z</span>. Add one prefix at a time with OK; a carrier
-          can have several. No prefixes means no restriction.
-          Shared with every device logged into this country.
+          {t("Add a required tracking-code prefix to catch a wrong scan before it's added — e.g. UPS codes always start with")}{' '}
+          <span className="font-mono font-bold text-ink">1Z</span>
+          {t('. Add one prefix at a time with OK; a carrier can have several. No prefixes means no restriction. Shared with every device logged into this country.')}
         </div>
         <div className="flex flex-col gap-1.5">
           {carriers.map((c) => (
@@ -336,13 +335,13 @@ export default function Settings() {
           <input
             value={newCarrierName}
             onChange={(e) => setNewCarrierName(e.target.value)}
-            placeholder="New carrier name"
+            placeholder={t('New carrier name')}
             className="min-h-[40px] min-w-0 flex-1 rounded-lg border border-inputborder bg-page px-2.5 text-[12.5px] uppercase text-ink"
           />
           <button
             onClick={addCarrier}
             disabled={!newCarrierName.trim()}
-            aria-label="Add carrier"
+            aria-label={t('Add carrier')}
             className="flex h-10 w-10 flex-none items-center justify-center rounded-lg bg-primary text-white disabled:opacity-50"
           >
             <Plus size={17} strokeWidth={2.4} />
@@ -350,18 +349,17 @@ export default function Settings() {
         </div>
       </Section>
 
-      <Section title="Login history" summary={loginEvents.length ? `${loginEvents.length} recent logins` : 'Who logged in, from where, and when'}>
+      <Section title={t('Login history')} summary={loginEvents.length === 1 ? t('{n} recent login', { n: 1 }) : loginEvents.length ? t('{n} recent logins', { n: loginEvents.length }) : t('Who logged in, from where, and when')}>
         <div className="flex items-center gap-2.5">
           <div className="min-w-0 flex-1 text-[11px] leading-snug text-secondary">
-            Every login for this country, with the IP it came from — recorded server-side, not
-            something the phone reports about itself.
+            {t('Every login for this country, with the IP it came from — recorded server-side, not something the phone reports about itself.')}
           </div>
           <button
             onClick={pullLoginEventsNow}
             disabled={pullingLoginEvents}
             className="flex h-9 flex-none items-center gap-1.5 rounded-lg border border-[rgba(148,163,184,.35)] px-3 text-xs font-bold text-ink disabled:opacity-60"
           >
-            <RefreshCw size={14} strokeWidth={2.2} /> {pullingLoginEvents ? 'Loading…' : 'Refresh'}
+            <RefreshCw size={14} strokeWidth={2.2} /> {pullingLoginEvents ? t('Loading…') : t('Refresh')}
           </button>
         </div>
         {loginEvents.length > 0 && (
@@ -370,7 +368,7 @@ export default function Settings() {
               <div key={`${e.badgeId}-${e.loggedInAtIso}-${i}`} className="flex items-center gap-2.5 border-b border-[rgba(148,163,184,.15)] px-3 py-2 last:border-b-0">
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-[12.5px] font-bold text-ink">{e.operatorName || e.badgeId}</div>
-                  <div className="truncate font-mono text-[10.5px] text-secondary">{e.badgeId} · {e.ip || 'unknown IP'}</div>
+                  <div className="truncate font-mono text-[10.5px] text-secondary">{e.badgeId} · {e.ip || t('unknown IP')}</div>
                 </div>
                 <div className="flex-none font-mono text-[10.5px] text-secondary">{formatLoginTime(e.loggedInAtIso)}</div>
               </div>
@@ -380,14 +378,14 @@ export default function Settings() {
       </Section>
 
       {Capacitor.isNativePlatform() && (
-        <Section title="App updates" summary={appVersion ? `v${appVersion.version}` : undefined}>
+        <Section title={t('App updates')} summary={appVersion ? `v${appVersion.version}` : undefined}>
           <div className="flex items-center gap-2.5">
             <div className="min-w-0 flex-1">
               <div className="text-[13px] font-bold text-ink">
-                {appVersion ? `Installed: v${appVersion.version} (build ${appVersion.build})` : 'Installed version'}
+                {appVersion ? t('Installed: v{version} (build {build})', { version: appVersion.version, build: appVersion.build }) : t('Installed version')}
               </div>
               {updateInfo?.available && (
-                <div className="mt-0.5 text-[11px] font-bold text-primary">Update available — v{updateInfo.versionName}</div>
+                <div className="mt-0.5 text-[11px] font-bold text-primary">{t('Update available — v{version}', { version: updateInfo.versionName })}</div>
               )}
             </div>
             <button
@@ -395,18 +393,18 @@ export default function Settings() {
               disabled={checking}
               className="flex h-9 flex-none items-center rounded-lg border border-[rgba(148,163,184,.35)] px-3 text-xs font-bold text-ink disabled:opacity-60"
             >
-              {checking ? 'Checking…' : 'Check now'}
+              {checking ? t('Checking…') : t('Check now')}
             </button>
           </div>
           {updateInfo?.available && (
             <button onClick={downloadUpdate} className="flex min-h-[46px] w-full items-center justify-center gap-2 rounded-xl bg-primary text-sm font-extrabold text-white">
-              <Download size={16} strokeWidth={2.2} /> Download update
+              <Download size={16} strokeWidth={2.2} /> {t('Download update')}
             </button>
           )}
         </Section>
       )}
 
-      <Section title="Diagnostics" summary="Keyboard behaviour on this device">
+      <Section title={t('Diagnostics')} summary={t('Keyboard behaviour on this device')}>
         <KeyboardDiagnostics />
       </Section>
 
@@ -414,7 +412,7 @@ export default function Settings() {
         onClick={save}
         className="flex min-h-[54px] w-full items-center justify-center gap-2 rounded-xl bg-primary text-[15px] font-extrabold text-white"
       >
-        {saved ? <Check size={18} strokeWidth={2.4} /> : null} {saved ? 'Saved' : 'Save changes'}
+        {saved ? <Check size={18} strokeWidth={2.4} /> : null} {saved ? t('Saved') : t('Save changes')}
       </button>
     </div>
   );

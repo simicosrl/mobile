@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useApp } from '../state/AppContext';
 import { Search, Download, TriangleAlert } from '../components/icons';
+import { t } from '../i18n';
 
 // The Inbound and Outbound tabs: the courier handovers of one direction from
 // the last 7 days (what the app keeps on screen), newest first. Each row
@@ -20,8 +21,8 @@ function Seg({ active, children, onClick }) {
 
 const ddtsOf = (h) => ((h.ddts || []).length ? h.ddts : (h.ddtSummaries || []));
 const isToday = (h) => {
-  const t = h.closedAtIso ? new Date(h.closedAtIso) : null;
-  return t && !Number.isNaN(t.getTime()) && t.toDateString() === new Date().toDateString();
+  const d = h.closedAtIso ? new Date(h.closedAtIso) : null;
+  return d && !Number.isNaN(d.getTime()) && d.toDateString() === new Date().toDateString();
 };
 
 export default function History({ direction }) {
@@ -53,21 +54,21 @@ export default function History({ direction }) {
       <input
         value={historyQuery}
         onChange={(e) => setHistoryQuery(e.target.value)}
-        placeholder={isOut ? 'Search tracking, document, driver or DDT' : 'Search tracking, document or driver'}
+        placeholder={isOut ? t('Search tracking, document, driver or DDT') : t('Search tracking, document or driver')}
         className="min-h-[48px] w-full rounded-xl border border-inputborder bg-page px-4 text-[13px] text-ink"
       />
       <div className="flex gap-2">
         <div className="flex flex-1 gap-1 rounded-[11px] bg-segtrack p-1">
-          <Seg active={period === 'today'} onClick={() => setPeriod('today')}>Today</Seg>
-          <Seg active={period === '7d'} onClick={() => setPeriod('7d')}>Last 7 days</Seg>
+          <Seg active={period === 'today'} onClick={() => setPeriod('today')}>{t('Today')}</Seg>
+          <Seg active={period === '7d'} onClick={() => setPeriod('7d')}>{t('Last 7 days')}</Seg>
         </div>
         <select
           value={carrier}
           onChange={(e) => setCarrier(e.target.value)}
-          aria-label="Carrier"
+          aria-label={t('Carrier')}
           className="min-h-[40px] max-w-[42%] rounded-[11px] border border-inputborder bg-white px-2.5 text-[12px] font-bold text-ink"
         >
-          <option value="all">All carriers</option>
+          <option value="all">{t('All carriers')}</option>
           {carriers.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
       </div>
@@ -76,7 +77,7 @@ export default function History({ direction }) {
         <div className="flex items-center gap-1.5 rounded-[11px] border border-[rgba(31,111,235,.25)] bg-[rgba(31,111,235,.07)] px-2.5 py-2">
           <Search size={15} strokeWidth={2.2} className="flex-none text-primary" />
           <div className="text-[11.5px] font-bold text-primary">
-            {matchedCode} — found in {rows.length} handover{rows.length > 1 ? 's' : ''}
+            {rows.length > 1 ? t('{code} — found in {n} handovers', { code: matchedCode, n: rows.length }) : t('{code} — found in {n} handover', { code: matchedCode, n: rows.length })}
           </div>
         </div>
       )}
@@ -102,12 +103,12 @@ export default function History({ direction }) {
               </div>
               <div className="flex-none text-right">
                 <div className="text-xs font-extrabold">{h.parcels.length} / {boxes}</div>
-                <div className="text-[10px] font-bold" style={{ color: signed ? '#16A34A' : '#DC2626' }}>{signed ? 'signed' : 'unsigned'}</div>
+                <div className="text-[10px] font-bold" style={{ color: signed ? '#16A34A' : '#DC2626' }}>{signed ? t('signed') : t('unsigned')}</div>
               </div>
             </button>
             <button
               onClick={() => printDocument(h)}
-              aria-label={`Download ${h.doc}`}
+              aria-label={t('Download {doc}', { doc: h.doc })}
               className="flex h-9 w-9 flex-none items-center justify-center rounded-lg bg-primary text-white"
             >
               <Download size={16} strokeWidth={2.2} />
@@ -118,11 +119,13 @@ export default function History({ direction }) {
 
       {rows.length === 0 && (
         <div className="rounded-[13px] border border-[rgba(148,163,184,.25)] bg-white p-[22px_14px] text-center">
-          <div className="text-[13px] font-bold">{q ? 'No match' : isOut ? 'No outbound handovers' : 'No inbound handovers'}</div>
+          <div className="text-[13px] font-bold">{q ? t('No match') : isOut ? t('No outbound handovers') : t('No inbound handovers')}</div>
           <div className="mt-1 text-[11.5px] text-secondary">
             {q
-              ? `No ${isOut ? 'outbound' : 'inbound'} handover matches that.`
-              : `${period === 'today' ? 'Nothing today' : 'Nothing in the last 7 days'}${carrier !== 'all' ? ` for ${carrier}` : ''}.`}
+              ? (isOut ? t('No outbound handover matches that.') : t('No inbound handover matches that.'))
+              : carrier !== 'all'
+                ? (period === 'today' ? t('Nothing today for {carrier}.', { carrier }) : t('Nothing in the last 7 days for {carrier}.', { carrier }))
+                : (period === 'today' ? t('Nothing today.') : t('Nothing in the last 7 days.'))}
           </div>
         </div>
       )}
