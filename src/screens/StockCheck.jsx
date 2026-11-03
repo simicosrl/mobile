@@ -8,6 +8,7 @@ import * as wh from '../lib/prepWarehouse';
 import { matchLines } from '../lib/prepReceiving';
 import { dayMonth } from '../components/ReceptionBits';
 import { feedback } from '../lib/audio';
+import { t } from '../i18n';
 import { ScanLine, Camera, Keyboard as KeyboardIcon, MapPin, X, Plus, TriangleAlert, RefreshCw, ChevronLeft } from '../components/icons';
 
 // Stock check: scan a product to see whose it is and where it sits, scan a
@@ -23,10 +24,10 @@ import { ScanLine, Camera, Keyboard as KeyboardIcon, MapPin, X, Plus, TriangleAl
 const OWNER_COLOURS = ['#1F6FEB', '#7C3AED', '#0D9488', '#C2410C', '#DB2777', '#4D7C0F'];
 
 function errorText(reason, message) {
-  if (reason === 'offline') return "Can't reach the Prep-Center — moves need a connection.";
-  if (reason === 'expired' || reason === 'unauthorized') return 'Your Prep-Center session has ended. End the shift and scan your badge to sign in again.';
-  if (reason === 'notShelf') return 'No shelf with this code in this warehouse.';
-  return message || 'The Prep-Center returned an error. Try again.';
+  if (reason === 'offline') return t("Can't reach the Prep-Center — moves need a connection.");
+  if (reason === 'expired' || reason === 'unauthorized') return t('Your Prep-Center session has ended. End the shift and scan your badge to sign in again.');
+  if (reason === 'notShelf') return t('No shelf with this code in this warehouse.');
+  return message || t('The Prep-Center returned an error. Try again.');
 }
 
 function Sheet({ children, onClose }) {
@@ -45,7 +46,7 @@ function Photo({ src, size = 56 }) {
     <div className="flex flex-none items-center justify-center overflow-hidden rounded-lg border border-[rgba(148,163,184,.25)] bg-page" style={{ width: size, height: size }}>
       {src && !failed
         ? <img src={src} alt="" loading="lazy" onError={() => setFailed(true)} className="h-full w-full object-contain" />
-        : <span className="text-[8.5px] font-bold uppercase text-light">No photo</span>}
+        : <span className="text-[8.5px] font-bold uppercase text-light">{t('No photo')}</span>}
     </div>
   );
 }
@@ -82,12 +83,12 @@ function LocationLine({ loc, onShelf, onMove, onUnassign }) {
         <span className="text-[13px] font-extrabold text-ink">×{loc.qty}</span>
         {(loc.lot || loc.expiry) && (
           <span className="truncate text-[10.5px] text-secondary">
-            {[loc.lot && `lot ${loc.lot}`, loc.expiry && `exp ${loc.expiry}`].filter(Boolean).join(' · ')}
+            {[loc.lot && t('lot {lot}', { lot: loc.lot }), loc.expiry && t('exp {date}', { date: loc.expiry })].filter(Boolean).join(' · ')}
           </span>
         )}
       </button>
-      <button onClick={onUnassign} aria-label="Back to receiving area" className="flex-none rounded-lg border border-inputborder px-2 py-1 text-[11px] font-bold text-secondary">↩︎</button>
-      <button onClick={onMove} className="flex-none rounded-lg bg-primary px-2.5 py-1 text-[11.5px] font-bold text-white">Move</button>
+      <button onClick={onUnassign} aria-label={t('Back to receiving area')} className="flex-none rounded-lg border border-inputborder px-2 py-1 text-[11px] font-bold text-secondary">↩︎</button>
+      <button onClick={onMove} className="flex-none rounded-lg bg-primary px-2.5 py-1 text-[11.5px] font-bold text-white">{t('Move')}</button>
     </div>
   );
 }
@@ -103,8 +104,8 @@ function ProductView({ data, code, country, onShelf, onMove, onUnassign, onPut }
     return (
       <div className="rounded-xl border border-[rgba(255,122,0,.35)] bg-[rgba(255,122,0,.07)] p-3 text-[12.5px] text-ink">
         {data.owners.length
-          ? <>No client has <span className="font-mono font-bold">{code || 'this product'}</span> in stock in {country}.</>
-          : <>No client has a product with code <span className="font-mono font-bold">{code}</span> on the Prep-Center.</>}
+          ? <>{t('No client has')} <span className="font-mono font-bold">{code || t('this product')}</span> {t('in stock in {country}.', { country })}</>
+          : <>{t('No client has a product with code')} <span className="font-mono font-bold">{code}</span> {t('on the Prep-Center.')}</>}
       </div>
     );
   }
@@ -115,7 +116,7 @@ function ProductView({ data, code, country, onShelf, onMove, onUnassign, onPut }
         <div className="flex gap-2.5 rounded-xl border border-[rgba(255,122,0,.45)] bg-[rgba(255,122,0,.1)] p-3">
           <TriangleAlert size={18} strokeWidth={2} className="mt-0.5 flex-none text-accent-dark" />
           <div className="text-[12.5px] leading-snug text-ink">
-            <b>{owners.length} clients</b> have this product. Each client's stock is shown separately — check the client before moving anything.
+            <b>{t('{n} clients', { n: owners.length })}</b> {t("have this product. Each client's stock is shown separately — check the client before moving anything.")}
           </div>
         </div>
       )}
@@ -125,31 +126,31 @@ function ProductView({ data, code, country, onShelf, onMove, onUnassign, onPut }
           <div key={o.key} className="overflow-hidden rounded-2xl border bg-white shadow-card" style={{ borderColor: colour }}>
             <div className="flex items-center gap-2 px-3.5 py-2" style={{ background: `${colour}14` }}>
               <ClientTag name={o.client} colour={colour} big />
-              {shared && <span className="ml-auto flex-none text-[10px] font-bold uppercase text-secondary">client {i + 1} of {owners.length}</span>}
+              {shared && <span className="ml-auto flex-none text-[10px] font-bold uppercase text-secondary">{t('client {i} of {n}', { i: i + 1, n: owners.length })}</span>}
             </div>
             <div className="p-3.5 pt-3">
               <div className="flex gap-3">
                 <Photo src={o.item?.image_url} />
                 <div className="min-w-0 flex-1">
-                  <div className="line-clamp-2 text-[13px] font-bold leading-snug">{o.item?.name || 'Product'}</div>
+                  <div className="line-clamp-2 text-[13px] font-bold leading-snug">{o.item?.name || t('Product')}</div>
                   <Codes item={o.item} />
                 </div>
               </div>
               {o.item?.id && (
                 <div className="mt-3 grid grid-cols-3 gap-1.5 text-center">
-                  <div className="rounded-lg bg-segtrack py-1.5"><div className="text-[16px] font-extrabold">{o.stock}</div><div className="text-[9px] font-bold uppercase text-secondary">stock {country}</div></div>
-                  <div className="rounded-lg bg-success-tint2 py-1.5"><div className="text-[16px] font-extrabold text-success-dark">{o.onShelves}</div><div className="text-[9px] font-bold uppercase text-secondary">on shelves</div></div>
-                  <div className={`rounded-lg py-1.5 ${o.notOnShelf ? 'bg-[rgba(255,122,0,.1)]' : 'bg-segtrack'}`}><div className={`text-[16px] font-extrabold ${o.notOnShelf ? 'text-accent-dark' : ''}`}>{o.notOnShelf}</div><div className="text-[9px] font-bold uppercase text-secondary">not on a shelf</div></div>
+                  <div className="rounded-lg bg-segtrack py-1.5"><div className="text-[16px] font-extrabold">{o.stock}</div><div className="text-[9px] font-bold uppercase text-secondary">{t('stock {country}', { country })}</div></div>
+                  <div className="rounded-lg bg-success-tint2 py-1.5"><div className="text-[16px] font-extrabold text-success-dark">{o.onShelves}</div><div className="text-[9px] font-bold uppercase text-secondary">{t('on shelves')}</div></div>
+                  <div className={`rounded-lg py-1.5 ${o.notOnShelf ? 'bg-[rgba(255,122,0,.1)]' : 'bg-segtrack'}`}><div className={`text-[16px] font-extrabold ${o.notOnShelf ? 'text-accent-dark' : ''}`}>{o.notOnShelf}</div><div className="text-[9px] font-bold uppercase text-secondary">{t('not on a shelf')}</div></div>
                 </div>
               )}
               {o.notOnShelf > 0 && (
                 <div className="mt-2.5 flex items-center gap-2 rounded-lg bg-[rgba(255,122,0,.08)] px-2.5 py-2">
                   <div className="min-w-0 flex-1 text-[12px] leading-snug text-ink">
-                    <b className="text-accent-dark">{o.notOnShelf} not on a shelf</b>
+                    <b className="text-accent-dark">{t('{n} not on a shelf', { n: o.notOnShelf })}</b>
                   </div>
                   {o.placeable > 0 && (
                     <button onClick={() => onPut({ owner: o, colour })} className="flex-none rounded-lg bg-accent px-2.5 py-1.5 text-[11.5px] font-extrabold text-white">
-                      Put on shelf
+                      {t('Put on shelf')}
                     </button>
                   )}
                 </div>
@@ -167,14 +168,14 @@ function ProductView({ data, code, country, onShelf, onMove, onUnassign, onPut }
                   ))}
                 </div>
               ) : o.item?.id ? (
-                <div className="mt-2.5 text-[12px] text-secondary">Not on any shelf in {country}.</div>
+                <div className="mt-2.5 text-[12px] text-secondary">{t('Not on any shelf in {country}.', { country })}</div>
               ) : null}
               {o.expected.length > 0 && (
                 <div className="mt-2.5 rounded-lg bg-[rgba(31,111,235,.07)] px-2.5 py-2">
                   {o.expected.map((e) => (
                     <div key={e.receptionId} className="text-[11.5px] text-ink">
-                      <b className="text-primary">{e.expected - e.received} expected</b> in reception #{String(e.receptionId).slice(0, 8)}
-                      {e.tracking ? ` · ${e.tracking}` : ''} · announced {dayMonth(e.announced)}
+                      <b className="text-primary">{e.expected - e.received === 1 ? t('1 expected') : t('{n} expected', { n: e.expected - e.received })}</b> {t('in reception #{id}', { id: String(e.receptionId).slice(0, 8) })}
+                      {e.tracking ? ` · ${e.tracking}` : ''} · {t('announced {date}', { date: dayMonth(e.announced) })}
                     </div>
                   ))}
                 </div>
@@ -193,10 +194,10 @@ function ShelfView({ data, onProduct, onMove, onUnassign, onMoveAll, onQuickMove
   const { shelf, groups } = data;
   const units = groups.reduce((a, g) => a + g.rows.reduce((b, r) => b + r.qty, 0), 0);
   const products = groups.reduce((a, g) => a + g.rows.length, 0);
-  const status = !shelf.active ? ['Blocked / inactive', 'bg-danger-tint text-danger-dark']
-    : shelf.claim?.status === 'empty_pending_check' ? ['Verify empty', 'bg-[rgba(255,122,0,.12)] text-accent-dark']
-      : shelf.claim?.status === 'conflict' ? ['Conflict', 'bg-danger-tint text-danger-dark']
-        : units === 0 ? ['Free', 'bg-success-tint text-success-dark'] : ['In use', 'bg-[rgba(31,111,235,.1)] text-primary'];
+  const status = !shelf.active ? [t('Blocked / inactive'), 'bg-danger-tint text-danger-dark']
+    : shelf.claim?.status === 'empty_pending_check' ? [t('Verify empty'), 'bg-[rgba(255,122,0,.12)] text-accent-dark']
+      : shelf.claim?.status === 'conflict' ? [t('Conflict'), 'bg-danger-tint text-danger-dark']
+        : units === 0 ? [t('Free'), 'bg-success-tint text-success-dark'] : [t('In use'), 'bg-[rgba(31,111,235,.1)] text-primary'];
   return (
     <div className="flex flex-col gap-3">
       <div className="rounded-2xl border border-[rgba(148,163,184,.25)] bg-white p-3.5 shadow-card">
@@ -205,14 +206,14 @@ function ShelfView({ data, onProduct, onMove, onUnassign, onMoveAll, onQuickMove
           <div className="font-mono text-[20px] font-extrabold tracking-[-.01em]">{shelf.code}</div>
           <span className={`rounded-full px-2 py-[3px] text-[10px] font-extrabold uppercase ${status[1]}`}>{status[0]}</span>
         </div>
-        <div className="mt-1 text-[12px] text-secondary">{units} unit{units === 1 ? '' : 's'} · {products} product{products === 1 ? '' : 's'}</div>
+        <div className="mt-1 text-[12px] text-secondary">{units === 1 ? t('{n} unit', { n: units }) : t('{n} units', { n: units })} · {products === 1 ? t('{n} product', { n: products }) : t('{n} products', { n: products })}</div>
         {units > 0 && (
           <div className="mt-3 flex gap-2">
             <button onClick={onQuickMove} className="flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-xl bg-primary text-[13px] font-extrabold text-white">
-              <ScanLine size={16} strokeWidth={2.2} /> Quick move
+              <ScanLine size={16} strokeWidth={2.2} /> {t('Quick move')}
             </button>
             <button onClick={onMoveAll} className="flex min-h-[44px] flex-1 items-center justify-center rounded-xl border border-inputborder text-[13px] font-bold text-ink">
-              Move everything
+              {t('Move everything')}
             </button>
           </div>
         )}
@@ -220,11 +221,11 @@ function ShelfView({ data, onProduct, onMove, onUnassign, onMoveAll, onQuickMove
       {groups.length > 1 && (
         <div className="flex gap-2.5 rounded-xl border border-[rgba(255,122,0,.45)] bg-[rgba(255,122,0,.1)] p-3 text-[12.5px] leading-snug text-ink">
           <TriangleAlert size={18} strokeWidth={2} className="mt-0.5 flex-none text-accent-dark" />
-          This shelf holds goods of {groups.length} clients.
+          {t('This shelf holds goods of {n} clients.', { n: groups.length })}
         </div>
       )}
       {units === 0 && (
-        <div className="rounded-xl border border-dashed border-[rgba(148,163,184,.4)] p-4 text-center text-[12.5px] text-secondary">Nothing on this shelf.</div>
+        <div className="rounded-xl border border-dashed border-[rgba(148,163,184,.4)] p-4 text-center text-[12.5px] text-secondary">{t('Nothing on this shelf.')}</div>
       )}
       {groups.map((g, gi) => {
         const colour = OWNER_COLOURS[gi % OWNER_COLOURS.length];
@@ -239,14 +240,14 @@ function ShelfView({ data, onProduct, onMove, onUnassign, onMoveAll, onQuickMove
                     <div className="min-w-0 flex-1">
                       <div className="line-clamp-2 text-[12.5px] font-bold leading-snug">{r.name}</div>
                       <div className="truncate font-mono text-[10px] text-secondary">
-                        {[r.ean, r.fnsku || r.sku, r.lot && `lot ${r.lot}`, r.expiry && `exp ${r.expiry}`].filter(Boolean).join(' · ')}
+                        {[r.ean, r.fnsku || r.sku, r.lot && t('lot {lot}', { lot: r.lot }), r.expiry && t('exp {date}', { date: r.expiry })].filter(Boolean).join(' · ')}
                       </div>
                     </div>
                     <div className="flex-none text-[16px] font-extrabold">×{r.qty}</div>
                   </button>
                   <div className="flex flex-none flex-col gap-1">
-                    <button onClick={() => onMove({ loc: r, name: r.name, client: g.client, clientId: r.clientId || g.clientId, colour, image: r.image })} className="rounded-lg bg-primary px-2.5 py-1 text-[11px] font-bold text-white">Move</button>
-                    <button onClick={() => onUnassign({ loc: r, name: r.name, client: g.client, colour, image: r.image })} aria-label="Back to receiving area" className="rounded-lg border border-inputborder px-2 py-[3px] text-[10.5px] font-bold text-secondary">↩︎ Recv.</button>
+                    <button onClick={() => onMove({ loc: r, name: r.name, client: g.client, clientId: r.clientId || g.clientId, colour, image: r.image })} className="rounded-lg bg-primary px-2.5 py-1 text-[11px] font-bold text-white">{t('Move')}</button>
+                    <button onClick={() => onUnassign({ loc: r, name: r.name, client: g.client, colour, image: r.image })} aria-label={t('Back to receiving area')} className="rounded-lg border border-inputborder px-2 py-[3px] text-[10.5px] font-bold text-secondary">{t('↩︎ Recv.')}</button>
                   </div>
                 </div>
               ))}
@@ -272,7 +273,7 @@ function QtyPicker({ value, max, onChange }) {
         className="min-h-[48px] min-w-0 flex-1 rounded-xl border-2 border-primary text-center text-[22px] font-extrabold"
       />
       <button onClick={() => onChange(Math.min(max, value + 1))} className="flex h-12 w-12 flex-none items-center justify-center rounded-xl border border-inputborder"><Plus size={22} /></button>
-      <button onClick={() => onChange(max)} className="flex h-12 flex-none items-center justify-center rounded-xl border border-inputborder px-3 text-[12.5px] font-bold">All {max}</button>
+      <button onClick={() => onChange(max)} className="flex h-12 flex-none items-center justify-center rounded-xl border border-inputborder px-3 text-[12.5px] font-bold">{t('All {n}', { n: max })}</button>
     </div>
   );
 }
@@ -289,7 +290,7 @@ function CameraButton({ onCode, disabled }) {
         type="button"
         onClick={async () => { const c = await scan(); if (c) onCode(c); }}
         disabled={disabled || scanning}
-        aria-label="Scan with camera"
+        aria-label={t('Scan with camera')}
         className="flex min-h-[48px] w-[48px] flex-none items-center justify-center rounded-xl bg-primary text-white disabled:opacity-60"
       >
         <Camera size={19} strokeWidth={2} />
@@ -329,7 +330,7 @@ function MoveSheet({ title, rows: initialRows, editableQty, country, withPrep, o
       shelf = res.shelf;
     }
     if (rows.some((r) => r.loc.placeId === shelf.id)) {
-      setChecked({ error: `That is the shelf the goods are already on (${shelf.code}).` });
+      setChecked({ error: t('That is the shelf the goods are already on ({shelf}).', { shelf: shelf.code }) });
     } else {
       setChecked({ shelf });
       keysRef.current = {};
@@ -357,7 +358,7 @@ function MoveSheet({ title, rows: initialRows, editableQty, country, withPrep, o
     setBusy(false);
     const failed = rows.filter((r) => r.qty && next[r.loc.id] !== 'done');
     feedback(failed.length > 0);
-    if (!failed.length) onDone(`Moved to ${checked.shelf.code}`);
+    if (!failed.length) onDone(t('Moved to {shelf}', { shelf: checked.shelf.code }));
   };
 
   const total = rows.reduce((a, r) => a + r.qty, 0);
@@ -367,7 +368,7 @@ function MoveSheet({ title, rows: initialRows, editableQty, country, withPrep, o
     <Sheet onClose={busy ? undefined : () => (anyDone ? onDone() : onClose())}>
       <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1 text-[15px] font-extrabold">{title}</div>
-        {!busy && <button onClick={() => (anyDone ? onDone() : onClose())} aria-label="Close" className="flex h-8 w-8 flex-none items-center justify-center rounded-full text-light"><X size={17} /></button>}
+        {!busy && <button onClick={() => (anyDone ? onDone() : onClose())} aria-label={t('Close')} className="flex h-8 w-8 flex-none items-center justify-center rounded-full text-light"><X size={17} /></button>}
       </div>
       <div className="mt-2 flex max-h-[38vh] flex-col gap-2 overflow-y-auto">
         {rows.map((r, i) => (
@@ -377,7 +378,7 @@ function MoveSheet({ title, rows: initialRows, editableQty, country, withPrep, o
               <Photo src={r.image} size={36} />
               <div className="min-w-0 flex-1">
                 <div className="truncate text-[12.5px] font-bold">{r.name}</div>
-                <div className="font-mono text-[10.5px] text-secondary">from {r.loc.code} · {r.loc.qty} there{r.loc.lot ? ` · lot ${r.loc.lot}` : ''}</div>
+                <div className="font-mono text-[10.5px] text-secondary">{t('from {shelf} · {n} there', { shelf: r.loc.code, n: r.loc.qty })}{r.loc.lot ? ` · ${t('lot {lot}', { lot: r.loc.lot })}` : ''}</div>
               </div>
               {!editableQty && <div className="flex-none text-[15px] font-extrabold">×{r.qty}</div>}
             </div>
@@ -388,7 +389,7 @@ function MoveSheet({ title, rows: initialRows, editableQty, country, withPrep, o
             )}
             {results[r.loc.id] && (
               <div className={`mt-1 text-[11.5px] font-bold ${results[r.loc.id] === 'done' ? 'text-success-dark' : 'text-danger'}`}>
-                {results[r.loc.id] === 'done' ? `Moved ${r.qty} ✓` : results[r.loc.id]}
+                {results[r.loc.id] === 'done' ? t('Moved {n} ✓', { n: r.qty }) : results[r.loc.id]}
               </div>
             )}
           </div>
@@ -396,18 +397,18 @@ function MoveSheet({ title, rows: initialRows, editableQty, country, withPrep, o
       </div>
 
       <form onSubmit={check} className="mt-3">
-        <div className="mb-1 text-[10px] font-bold uppercase tracking-[.08em] text-light">Scan or type the destination shelf</div>
+        <div className="mb-1 text-[10px] font-bold uppercase tracking-[.08em] text-light">{t('Scan or type the destination shelf')}</div>
         <div className="flex gap-2">
           <input
             autoFocus
             value={dest}
             onChange={(e) => { setDest(e.target.value); setChecked(null); }}
             autoCapitalize="characters" autoCorrect="off" spellCheck={false}
-            placeholder="e.g. E-4"
+            placeholder={t('e.g. E-4')}
             className="min-h-[48px] min-w-0 flex-1 rounded-xl border-2 border-primary px-3.5 font-mono text-[16px] uppercase"
           />
           <CameraButton disabled={busy} onCode={scanned} />
-          <button type="submit" disabled={!dest.trim() || busy} className="flex-none rounded-xl border border-inputborder px-3.5 text-[13px] font-bold text-primary disabled:text-light">Check</button>
+          <button type="submit" disabled={!dest.trim() || busy} className="flex-none rounded-xl border border-inputborder px-3.5 text-[13px] font-bold text-primary disabled:text-light">{t('Check')}</button>
         </div>
         {checked?.error && <div className="mt-1.5 text-[12px] font-bold text-danger">{checked.error}</div>}
       </form>
@@ -417,9 +418,12 @@ function MoveSheet({ title, rows: initialRows, editableQty, country, withPrep, o
         disabled={!checked?.shelf || busy || total === 0}
         className="mt-3 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-xl bg-primary px-3 text-[14.5px] font-extrabold text-white disabled:opacity-50"
       >
-        {busy ? 'Moving…' : checked?.shelf
-          ? <>Move {total} unit{total === 1 ? '' : 's'}: {[...new Set(rows.map((r) => r.loc.code))].join(', ')} → {checked.shelf.code}</>
-          : 'Check the destination shelf first'}
+        {busy ? t('Moving…') : checked?.shelf
+          ? (() => {
+            const vars = { n: total, from: [...new Set(rows.map((r) => r.loc.code))].join(', '), to: checked.shelf.code };
+            return total === 1 ? t('Move {n} unit: {from} → {to}', vars) : t('Move {n} units: {from} → {to}', vars);
+          })()
+          : t('Check the destination shelf first')}
       </button>
     </Sheet>
   );
@@ -454,13 +458,13 @@ function PutSheet({ target, country, withPrep, onClose, onDone }) {
     const res = await withPrep((t) => wh.putOnShelf(t, { owner, qty, shelf: checked, keys: keysRef.current }));
     setBusy(false);
     feedback(!res.ok);
-    if (res.ok) onDone(`${res.placed} put on ${checked.code}`);
-    else setError(`${res.placed ? `${res.placed} placed, then: ` : ''}${errorText(res.reason, res.message)}`);
+    if (res.ok) onDone(t('{n} put on {shelf}', { n: res.placed, shelf: checked.code }));
+    else setError(res.placed ? t('{n} placed, then: {error}', { n: res.placed, error: errorText(res.reason, res.message) }) : errorText(res.reason, res.message));
   };
   return (
     <Sheet onClose={busy ? undefined : onClose}>
-      <div className="text-[15px] font-extrabold">Put on a shelf</div>
-      <div className="mt-0.5 text-[11.5px] text-secondary">Units already in stock, not on any shelf. The stock does not change.</div>
+      <div className="text-[15px] font-extrabold">{t('Put on a shelf')}</div>
+      <div className="mt-0.5 text-[11.5px] text-secondary">{t('Units already in stock, not on any shelf. The stock does not change.')}</div>
       <div className="mt-3 rounded-xl border p-2.5" style={{ borderColor: colour }}>
         <ClientTag name={owner.client} colour={colour} />
         <div className="mt-1 flex items-center gap-2">
@@ -470,20 +474,20 @@ function PutSheet({ target, country, withPrep, onClose, onDone }) {
       </div>
       <div className="mt-3"><QtyPicker value={qty} max={owner.placeable} onChange={(v) => { setQty(v); keysRef.current = {}; }} /></div>
       <form onSubmit={check} className="mt-3">
-        <div className="mb-1 text-[10px] font-bold uppercase tracking-[.08em] text-light">Scan or type the shelf</div>
+        <div className="mb-1 text-[10px] font-bold uppercase tracking-[.08em] text-light">{t('Scan or type the shelf')}</div>
         <div className="flex gap-2">
           <input
             autoFocus value={dest} onChange={(e) => { setDest(e.target.value); setChecked(null); }}
-            autoCapitalize="characters" autoCorrect="off" spellCheck={false} placeholder="e.g. E-4"
+            autoCapitalize="characters" autoCorrect="off" spellCheck={false} placeholder={t('e.g. E-4')}
             className="min-h-[48px] min-w-0 flex-1 rounded-xl border-2 border-primary px-3.5 font-mono text-[16px] uppercase"
           />
           <CameraButton disabled={busy} onCode={scanned} />
-          <button type="submit" disabled={!dest.trim() || busy} className="flex-none rounded-xl border border-inputborder px-3.5 text-[13px] font-bold text-primary disabled:text-light">Check</button>
+          <button type="submit" disabled={!dest.trim() || busy} className="flex-none rounded-xl border border-inputborder px-3.5 text-[13px] font-bold text-primary disabled:text-light">{t('Check')}</button>
         </div>
       </form>
       {error && <div className="mt-2 text-[12px] font-bold text-danger">{error}</div>}
       <button onClick={go} disabled={!checked || busy || !qty} className="mt-3 flex min-h-[52px] w-full items-center justify-center rounded-xl bg-accent text-[14.5px] font-extrabold text-white disabled:opacity-50">
-        {busy ? 'Saving…' : checked ? `Put ${qty} on ${checked.code}` : 'Check the shelf first'}
+        {busy ? t('Saving…') : checked ? t('Put {n} on {shelf}', { n: qty, shelf: checked.code }) : t('Check the shelf first')}
       </button>
     </Sheet>
   );
@@ -501,22 +505,22 @@ function UnassignSheet({ target, withPrep, onClose, onDone }) {
     const res = await withPrep((t) => wh.unassign(t, { locationId: target.loc.id, qty, key: keyRef.current }));
     setBusy(false);
     feedback(!res.ok);
-    if (res.ok) onDone(`${qty} back in the receiving area`);
+    if (res.ok) onDone(t('{n} back in the receiving area', { n: qty }));
     else setError(errorText(res.reason, res.message));
   };
   return (
     <Sheet onClose={busy ? undefined : onClose}>
-      <div className="text-[15px] font-extrabold">Back to the receiving area</div>
-      <div className="mt-0.5 text-[11.5px] text-secondary">Takes the units off the shelf without changing the stock — as on the website.</div>
+      <div className="text-[15px] font-extrabold">{t('Back to the receiving area')}</div>
+      <div className="mt-0.5 text-[11.5px] text-secondary">{t('Takes the units off the shelf without changing the stock — as on the website.')}</div>
       <div className="mt-3 rounded-xl border p-2.5" style={{ borderColor: target.colour }}>
         <ClientTag name={target.client} colour={target.colour} />
         <div className="mt-1 truncate text-[12.5px] font-bold">{target.name}</div>
-        <div className="font-mono text-[10.5px] text-secondary">on {target.loc.code} · {target.loc.qty} there</div>
+        <div className="font-mono text-[10.5px] text-secondary">{t('on {shelf} · {n} there', { shelf: target.loc.code, n: target.loc.qty })}</div>
       </div>
       <div className="mt-3"><QtyPicker value={qty} max={target.loc.qty} onChange={(v) => { setQty(v); keyRef.current = null; }} /></div>
       {error && <div className="mt-2 text-[12px] font-bold text-danger">{error}</div>}
       <button onClick={go} disabled={busy || !qty} className="mt-3 flex min-h-[52px] w-full items-center justify-center rounded-xl bg-ink text-[14.5px] font-extrabold text-white disabled:opacity-50">
-        {busy ? 'Saving…' : `Take ${qty} off ${target.loc.code}`}
+        {busy ? t('Saving…') : t('Take {n} off {shelf}', { n: qty, shelf: target.loc.code })}
       </button>
     </Sheet>
   );
@@ -540,7 +544,7 @@ function QuickMove({ shelfData, country, withPrep, showToast, onClose, onDone })
   const pick = useCallback((row) => {
     setPicked((p) => {
       const cur = p[row.id] || 0;
-      if (cur >= row.qty) { feedback(true); showToast(`Only ${row.qty} of this on ${row.code}`); return p; }
+      if (cur >= row.qty) { feedback(true); showToast(t('Only {n} of this on {shelf}', { n: row.qty, shelf: row.code })); return p; }
       feedback(false);
       return { ...p, [row.id]: cur + 1 };
     });
@@ -555,7 +559,7 @@ function QuickMove({ shelfData, country, withPrep, showToast, onClose, onDone })
       setMoving({ dest: code });
     } else {
       feedback(true);
-      showToast(`${code} is not on shelf ${shelfData.shelf.code}`);
+      showToast(t('{code} is not on shelf {shelf}', { code, shelf: shelfData.shelf.code }));
     }
   };
   const scanner = useScanInput(onCode, { paused: !!choose || !!moving });
@@ -565,20 +569,20 @@ function QuickMove({ shelfData, country, withPrep, showToast, onClose, onDone })
   return (
     <div className="absolute inset-0 z-30 flex flex-col bg-page">
       <div className="flex items-center gap-2 border-b border-[rgba(148,163,184,.25)] bg-white px-3.5 py-3">
-        <button onClick={onClose} aria-label="Close" className="flex h-[34px] w-[34px] items-center justify-center rounded-[9px] border border-[rgba(148,163,184,.3)]"><X size={16} /></button>
+        <button onClick={onClose} aria-label={t('Close')} className="flex h-[34px] w-[34px] items-center justify-center rounded-[9px] border border-[rgba(148,163,184,.3)]"><X size={16} /></button>
         <div className="min-w-0">
-          <div className="text-[15px] font-extrabold">Quick move from {shelfData.shelf.code}</div>
-          <div className="text-[10.5px] text-secondary">Scan each unit you take, then scan the destination shelf</div>
+          <div className="text-[15px] font-extrabold">{t('Quick move from {shelf}', { shelf: shelfData.shelf.code })}</div>
+          <div className="text-[10.5px] text-secondary">{t('Scan each unit you take, then scan the destination shelf')}</div>
         </div>
       </div>
       <div className="flex-1 overflow-y-auto px-3.5 py-3">
         <div className={scanner.showInput || isCameraScanSupported() ? 'mb-3 flex gap-2' : ''}>
-          <input {...scanner.inputProps} placeholder="Product barcode…" className={scanner.showInput ? 'min-h-[46px] min-w-0 flex-1 rounded-xl border-2 border-primary px-3 font-mono text-[14px]' : 'absolute h-px w-px opacity-0'} />
-          {!scanner.showInput && isCameraScanSupported() && <div className="flex-1 self-center text-[11.5px] text-secondary">Scan each unit, then the destination shelf</div>}
+          <input {...scanner.inputProps} placeholder={t('Product barcode…')} className={scanner.showInput ? 'min-h-[46px] min-w-0 flex-1 rounded-xl border-2 border-primary px-3 font-mono text-[14px]' : 'absolute h-px w-px opacity-0'} />
+          {!scanner.showInput && isCameraScanSupported() && <div className="flex-1 self-center text-[11.5px] text-secondary">{t('Scan each unit, then the destination shelf')}</div>}
           <CameraButton disabled={!!choose || !!moving} onCode={onCode} />
         </div>
         {!scanner.showInput && (
-          <button onClick={scanner.openManual} className="mb-2 flex items-center gap-1 text-[10.5px] font-bold text-secondary"><KeyboardIcon size={12} strokeWidth={2} /> Type a code instead</button>
+          <button onClick={scanner.openManual} className="mb-2 flex items-center gap-1 text-[10.5px] font-bold text-secondary"><KeyboardIcon size={12} strokeWidth={2} /> {t('Type a code instead')}</button>
         )}
         <div className="flex flex-col gap-2">
           {rows.map((r) => (
@@ -587,12 +591,12 @@ function QuickMove({ shelfData, country, withPrep, showToast, onClose, onDone })
               <div className="min-w-0 flex-1">
                 <ClientTag name={r.client} colour={r.colour} />
                 <div className="truncate text-[12px] font-bold">{r.name}</div>
-                {r.lot && <div className="font-mono text-[10px] text-secondary">lot {r.lot}</div>}
+                {r.lot && <div className="font-mono text-[10px] text-secondary">{t('lot {lot}', { lot: r.lot })}</div>}
               </div>
               <div className="flex flex-none items-center gap-1">
                 <button onClick={() => setPicked((p) => { const n = (p[r.id] || 0) - 1; const { [r.id]: _x, ...rest } = p; return n > 0 ? { ...p, [r.id]: n } : rest; })} className="h-8 w-8 rounded-lg border border-inputborder text-[18px] font-bold">−</button>
                 <div className="w-14 text-center text-[14px] font-extrabold">{picked[r.id] || 0}<span className="text-[11px] text-light">/{r.qty}</span></div>
-                <button onClick={() => setPicked((p) => ({ ...p, [r.id]: r.qty }))} className="h-8 rounded-lg border border-inputborder px-2 text-[11px] font-bold">All</button>
+                <button onClick={() => setPicked((p) => ({ ...p, [r.id]: r.qty }))} className="h-8 rounded-lg border border-inputborder px-2 text-[11px] font-bold">{t('All')}</button>
               </div>
             </div>
           ))}
@@ -604,19 +608,19 @@ function QuickMove({ shelfData, country, withPrep, showToast, onClose, onDone })
           disabled={!total}
           className="flex min-h-[52px] w-full items-center justify-center gap-2 rounded-xl bg-primary text-[14.5px] font-extrabold text-white disabled:opacity-50"
         >
-          <MapPin size={17} /> {total ? `Move ${total} unit${total === 1 ? '' : 's'} — choose destination` : 'Scan the units you take'}
+          <MapPin size={17} /> {total ? (total === 1 ? t('Move {n} unit — choose destination', { n: total }) : t('Move {n} units — choose destination', { n: total })) : t('Scan the units you take')}
         </button>
       </div>
 
       {choose && (
         <Sheet onClose={() => setChoose(null)}>
-          <div className="text-[14px] font-extrabold">Which one did you take?</div>
-          <div className="mt-0.5 text-[11.5px] text-secondary">This barcode is on this shelf more than once — check the client.</div>
+          <div className="text-[14px] font-extrabold">{t('Which one did you take?')}</div>
+          <div className="mt-0.5 text-[11.5px] text-secondary">{t('This barcode is on this shelf more than once — check the client.')}</div>
           <div className="mt-3 flex flex-col gap-2">
             {choose.map((r) => (
               <button key={r.id} onClick={() => { pick(r); setChoose(null); }} className="rounded-xl border p-2.5 text-left" style={{ borderColor: r.colour }}>
                 <ClientTag name={r.client} colour={r.colour} big />
-                <div className="mt-0.5 truncate text-[12px]">{r.name}{r.lot ? ` · lot ${r.lot}` : ''} · {r.qty} on shelf</div>
+                <div className="mt-0.5 truncate text-[12px]">{r.name}{r.lot ? ` · ${t('lot {lot}', { lot: r.lot })}` : ''} · {t('{n} on shelf', { n: r.qty })}</div>
               </button>
             ))}
           </div>
@@ -626,7 +630,7 @@ function QuickMove({ shelfData, country, withPrep, showToast, onClose, onDone })
         <MoveSheet
           initialDest={moving.dest}
           editableQty={false}
-          title={`Move ${total} unit${total === 1 ? '' : 's'} from ${shelfData.shelf.code}`}
+          title={total === 1 ? t('Move {n} unit from {shelf}', { n: total, shelf: shelfData.shelf.code }) : t('Move {n} units from {shelf}', { n: total, shelf: shelfData.shelf.code })}
           rows={pickedRows.map((r) => ({ loc: r, qty: picked[r.id], name: r.name, client: r.client, clientId: r.clientId, colour: r.colour, image: r.image }))}
           country={country}
           withPrep={withPrep}
@@ -709,29 +713,29 @@ export default function StockCheck() {
         <div className="flex items-center gap-3">
           <div className="flex h-11 w-11 flex-none items-center justify-center rounded-xl bg-primary text-white"><ScanLine size={22} strokeWidth={1.9} /></div>
           <div className="min-w-0">
-            <div className="text-[15px] font-extrabold tracking-[-.015em]">Scan a product or a shelf</div>
-            <div className="text-[11.5px] leading-snug text-secondary">{loading ? 'Looking it up on the Prep-Center…' : `Whose it is, where it sits · ${country || ''} warehouse`}</div>
+            <div className="text-[15px] font-extrabold tracking-[-.015em]">{t('Scan a product or a shelf')}</div>
+            <div className="text-[11.5px] leading-snug text-secondary">{loading ? t('Looking it up on the Prep-Center…') : t('Whose it is, where it sits · {country} warehouse', { country: country || '' })}</div>
           </div>
         </div>
         <div className="mt-3 flex gap-2">
           <input
             {...scanner.inputProps}
-            placeholder="EAN, FNSKU, SKU or shelf code…"
+            placeholder={t('EAN, FNSKU, SKU or shelf code…')}
             className={scanner.showInput ? 'min-h-[50px] min-w-0 flex-1 rounded-xl border-2 border-primary bg-white px-3.5 font-mono text-[15px] text-ink' : 'absolute h-px w-px opacity-0'}
           />
           {isCameraScanSupported() && (
             <button
               onClick={async () => { const c = await scan(); if (c) open({ kind: 'scan', code: c }); }}
               disabled={scanning || loading}
-              aria-label="Scan with camera"
+              aria-label={t('Scan with camera')}
               className={'flex min-h-[50px] items-center justify-center gap-2 rounded-xl bg-primary text-white disabled:opacity-60 ' + (scanner.showInput ? 'w-[50px] flex-none' : 'flex-1 text-[14px] font-bold')}
             >
-              <Camera size={19} strokeWidth={2} /> {!scanner.showInput && 'Scan with camera'}
+              <Camera size={19} strokeWidth={2} /> {!scanner.showInput && t('Scan with camera')}
             </button>
           )}
         </div>
         {isCameraScanSupported() && !scanner.showInput && (
-          <button onClick={scanner.openManual} className="mt-2 flex items-center gap-1 text-[10.5px] font-bold text-secondary"><KeyboardIcon size={12} strokeWidth={2} /> Type a code instead</button>
+          <button onClick={scanner.openManual} className="mt-2 flex items-center gap-1 text-[10.5px] font-bold text-secondary"><KeyboardIcon size={12} strokeWidth={2} /> {t('Type a code instead')}</button>
         )}
         {cameraError && <div className="mt-2 text-[11.5px] text-danger">{cameraError}</div>}
       </div>
@@ -739,12 +743,12 @@ export default function StockCheck() {
       {view && (
         <div className="flex items-center gap-2">
           {stack.length > 1 && (
-            <button onClick={back} className="flex items-center gap-0.5 text-[12px] font-bold text-primary"><ChevronLeft size={15} /> Back</button>
+            <button onClick={back} className="flex items-center gap-0.5 text-[12px] font-bold text-primary"><ChevronLeft size={15} /> {t('Back')}</button>
           )}
           <div className="min-w-0 flex-1 truncate text-[10px] font-bold uppercase tracking-[.1em] text-light">
-            {view.kind === 'shelf' ? 'Shelf' : 'Product'} · <span className="font-mono normal-case tracking-normal">{view.code || (data?.owners?.[0]?.item?.name) || ''}</span>
+            {view.kind === 'shelf' ? t('Shelf') : t('Product')} · <span className="font-mono normal-case tracking-normal">{view.code || (data?.owners?.[0]?.item?.name) || ''}</span>
           </div>
-          <button onClick={reload} disabled={loading} aria-label="Refresh" className="flex h-7 w-7 items-center justify-center rounded-full text-secondary disabled:opacity-50">
+          <button onClick={reload} disabled={loading} aria-label={t('Refresh')} className="flex h-7 w-7 items-center justify-center rounded-full text-secondary disabled:opacity-50">
             <RefreshCw size={14} strokeWidth={2.2} className={loading ? 'animate-spin' : ''} />
           </button>
         </div>
@@ -754,8 +758,8 @@ export default function StockCheck() {
 
       {!view && !error && (
         <div className="rounded-xl border border-dashed border-[rgba(148,163,184,.4)] p-4 text-[12.5px] leading-relaxed text-secondary">
-          <b className="text-ink">Product</b> — whose it is (one card per client), how much is in stock, on which shelves, and what is still expected.<br />
-          <b className="text-ink">Shelf</b> — what is on it, per client. From there: <b className="text-ink">Quick move</b> or move everything to another shelf.
+          <b className="text-ink">{t('Product')}</b> {t('— whose it is (one card per client), how much is in stock, on which shelves, and what is still expected.')}<br />
+          <b className="text-ink">{t('Shelf')}</b> {t('— what is on it, per client. From there:')} <b className="text-ink">{t('Quick move')}</b> {t('or move everything to another shelf.')}
         </div>
       )}
 
@@ -788,10 +792,10 @@ export default function StockCheck() {
       )}
 
       {sheet?.kind === 'move' && (
-        <MoveSheet title="Move to another shelf" rows={sheet.rows} editableQty country={country} withPrep={withPrep} onClose={() => setSheet(null)} onDone={moveDone} />
+        <MoveSheet title={t('Move to another shelf')} rows={sheet.rows} editableQty country={country} withPrep={withPrep} onClose={() => setSheet(null)} onDone={moveDone} />
       )}
       {sheet?.kind === 'moveAll' && (
-        <MoveSheet title={`Move everything from ${data.shelf.code}`} rows={sheet.rows} editableQty={false} country={country} withPrep={withPrep} onClose={() => setSheet(null)} onDone={moveDone} />
+        <MoveSheet title={t('Move everything from {shelf}', { shelf: data.shelf.code })} rows={sheet.rows} editableQty={false} country={country} withPrep={withPrep} onClose={() => setSheet(null)} onDone={moveDone} />
       )}
       {sheet?.kind === 'put' && (
         <PutSheet target={sheet.target} country={country} withPrep={withPrep} onClose={() => setSheet(null)} onDone={moveDone} />

@@ -1,5 +1,6 @@
 import { clientLabel, receptionTrackings } from '../lib/prepReceiving';
 import { ChevronRight } from './icons';
+import { getLanguage } from '../i18n';
 
 // Small pieces shared by the receiving screens.
 
@@ -23,7 +24,7 @@ export function StatusChip({ status }) {
 export function dayMonth(iso) {
   if (!iso) return '';
   const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString(getLanguage() === 'fr' ? 'fr-FR' : 'en-GB', { day: 'numeric', month: 'short' });
 }
 
 export function shortDate(iso) {
